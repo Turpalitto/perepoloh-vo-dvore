@@ -1,0 +1,7 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+promo/ai-icon-src.png
+promo/ai-cover-src.png
+*.local

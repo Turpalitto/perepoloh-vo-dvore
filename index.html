@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#79b34c" />
+    <title>Переполох во дворе</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='6' y='30' width='88' height='40' rx='14' fill='%233f7fd1'/%3E%3Ccircle cx='28' cy='72' r='12' fill='%23332a20'/%3E%3Ccircle cx='72' cy='72' r='12' fill='%23332a20'/%3E%3C/svg%3E"
+    />
+    <style>
+      /* минимальный экран загрузки до подключения бандла */
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        background: #79b34c;
+        z-index: 100;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      #boot .boot-title {
+        color: #fff7e6;
+        font-size: 30px;
+        font-weight: 800;
+        text-shadow: 0 3px 0 rgba(61, 44, 30, 0.35);
+        text-align: center;
+        padding: 0 20px;
+      }
+      #boot .boot-spinner {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        border: 6px solid rgba(255, 247, 230, 0.35);
+        border-top-color: #fff7e6;
+        animation: boot-spin 0.9s linear infinite;
+      }
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <div id="boot">
+      <div class="boot-title">Переполох во дворе</div>
+      <div class="boot-spinner"></div>
+    </div>
+    <div id="app"></div>
+  </body>
+</html>

@@ -282,6 +282,20 @@ body {
   padding: 14px;
   overflow-y: auto;
 }
+.chapter-header {
+  grid-column: 1 / -1;
+  color: var(--cream);
+  font-size: 17px;
+  font-weight: 900;
+  text-shadow: 0 2px 0 rgba(61, 44, 30, 0.4);
+  padding: 10px 4px 0;
+}
+.deadlock-toast {
+  background: rgba(148, 44, 34, 0.92);
+}
+.btn-skip {
+  background: #f6c445;
+}
 .level-card {
   appearance: none;
   border: none;

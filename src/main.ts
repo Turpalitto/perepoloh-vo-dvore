@@ -2,7 +2,7 @@ import './styles.css';
 import { GameAudio } from './game/audio';
 import { applyDaytime } from './game/daytime';
 import { initI18n } from './game/i18n';
-import { SaveStore, defaultSave, mergeSave } from './game/save';
+import { SaveStore, defaultSave, mergeSave, totalStars } from './game/save';
 import { createPlatform } from './platform';
 import { App } from './ui/app';
 import { setTargetSkin } from './ui/sprites';
@@ -23,7 +23,13 @@ async function boot(): Promise<void> {
   const store = new SaveStore(platform, save);
   const audio = new GameAudio(save.sound, save.music);
   const app = new App(platform, store, audio);
-  app.showMenu();
+  // первый запуск на Яндексе — сразу в геймплей (конверсия первой сессии);
+  // локально и после любого прогресса — обычное меню
+  if (platform.name === 'yandex' && totalStars(save) === 0 && !save.daily) {
+    app.startLevel(1);
+  } else {
+    app.showMenu();
+  }
   document.getElementById('boot')?.remove();
   platform.ready();
 }

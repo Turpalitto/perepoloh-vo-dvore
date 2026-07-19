@@ -57,7 +57,15 @@ const RU: Dict = {
   'daily.winStreak': 'Серия дней: {n} 🔥',
   'boss.chip': 'Босс',
   'skins.title': 'Цвет машины',
-  'skin.locked': 'Откроется за ★ {n}'
+  'skin.locked': 'Откроется за ★ {n}',
+  'deadlock.warn': '⚠ Похоже, выезд заблокирован ящиками. Отмена или Заново помогут!',
+  'btn.skip': 'Пропустить',
+  'chapter.1': 'Глава 1 · Знакомство',
+  'chapter.2': 'Глава 2 · Во дворе тесно',
+  'chapter.3': 'Глава 3 · Настоящий переполох',
+  'chapter.4': 'Глава 4 · Крепкие орешки',
+  'chapter.5': 'Глава 5 · Мастерская деда',
+  'chapter.6': 'Глава 6 · Легенды двора'
 };
 
 const EN: Dict = {
@@ -110,7 +118,15 @@ const EN: Dict = {
   'daily.winStreak': 'Day streak: {n} 🔥',
   'boss.chip': 'Boss',
   'skins.title': 'Car colour',
-  'skin.locked': 'Unlocks at ★ {n}'
+  'skin.locked': 'Unlocks at ★ {n}',
+  'deadlock.warn': '⚠ Looks like the exit is blocked by crates. Undo or Restart will help!',
+  'btn.skip': 'Skip',
+  'chapter.1': 'Chapter 1 · Getting Started',
+  'chapter.2': 'Chapter 2 · Crowded Yard',
+  'chapter.3': 'Chapter 3 · Real Frenzy',
+  'chapter.4': 'Chapter 4 · Tough Nuts',
+  'chapter.5': "Chapter 5 · Grandpa's Workshop",
+  'chapter.6': 'Chapter 6 · Yard Legends'
 };
 
 const TR: Dict = {
@@ -163,7 +179,15 @@ const TR: Dict = {
   'daily.winStreak': 'Gün serisi: {n} 🔥',
   'boss.chip': 'Boss',
   'skins.title': 'Araba rengi',
-  'skin.locked': '★ {n} ile açılır'
+  'skin.locked': '★ {n} ile açılır',
+  'deadlock.warn': '⚠ Çıkış sandıklarla tıkanmış görünüyor. Geri Al ya da Yeniden dene!',
+  'btn.skip': 'Atla',
+  'chapter.1': 'Bölüm 1 · Başlangıç',
+  'chapter.2': 'Bölüm 2 · Kalabalık Bahçe',
+  'chapter.3': 'Bölüm 3 · Gerçek Karmaşa',
+  'chapter.4': 'Bölüm 4 · Zorlu Cevizler',
+  'chapter.5': 'Bölüm 5 · Dedenin Atölyesi',
+  'chapter.6': 'Bölüm 6 · Bahçe Efsaneleri'
 };
 
 /**

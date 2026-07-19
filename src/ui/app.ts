@@ -5,7 +5,7 @@
 import levelsJson from '../levels/levels.json';
 import type { LevelDef } from '../core/types';
 import { GameState, createState, starsFor } from '../core/game';
-import { hint } from '../core/solver';
+import { hint, solve } from '../core/solver';
 import type { GameAudio } from '../game/audio';
 import { advanceStreak, currentStreak, generateDaily, isDoneToday, todayKey } from '../game/daily';
 import { getLang, levelText, setLang, t } from '../game/i18n';
@@ -42,6 +42,8 @@ export class App {
   private root: HTMLElement;
   private winsSinceAd = 0;
   private inGameplay = false;
+  /** Рестарты за сессию по уровням — после 3 предлагаем пропуск за рекламу. */
+  private restartCounts = new Map<number, number>();
 
   constructor(
     private readonly platform: Platform,
@@ -50,6 +52,7 @@ export class App {
   ) {
     this.root = document.getElementById('app')!;
     document.addEventListener('visibilitychange', () => {
+      this.audio.setHidden(document.hidden);
       if (document.hidden) {
         if (this.inGameplay) this.platform.gameplayStop();
       } else if (this.inGameplay) {
@@ -254,10 +257,14 @@ export class App {
 
   showLevels(): void {
     this.setGameplay(false);
-    const cards = LEVELS.map((l) => {
+    const parts: string[] = [];
+    LEVELS.forEach((l) => {
+      if ((l.id - 1) % 12 === 0) {
+        parts.push(`<div class="chapter-header">${t(`chapter.${Math.floor((l.id - 1) / 12) + 1}`)}</div>`);
+      }
       const unlocked = isLevelUnlocked(LEVELS, this.store.data, l.id);
       const stars = this.store.starsOf(l.id);
-      return `
+      parts.push(`
         <button class="level-card ${unlocked ? '' : 'locked'}" data-level="${l.id}" data-testid="level-card-${l.id}" ${
           unlocked ? '' : 'disabled'
         }>
@@ -267,8 +274,9 @@ export class App {
               ? starIcons(stars)
               : `<svg class="lock" viewBox="0 0 24 24" width="22" height="22" aria-label="Закрыт"><rect x="5" y="10.5" width="14" height="10" rx="3" fill="#a08c66"/><path d="M8 11 V7.5 a4 4 0 0 1 8 0 V11" fill="none" stroke="#a08c66" stroke-width="2.6"/></svg>`
           }</span>
-        </button>`;
-    }).join('');
+        </button>`);
+    });
+    const cards = parts.join('');
     this.root.innerHTML = `
       <div class="screen levels-screen" data-testid="screen-levels">
         <div class="panel-top">
@@ -328,6 +336,7 @@ export class App {
           <button class="btn" data-testid="btn-undo" disabled>${t('btn.undo')}</button>
           <button class="btn" data-testid="btn-restart">${t('btn.restart')}</button>
           <button class="btn" data-testid="btn-hint">${t('btn.hint')}</button>
+          <button class="btn btn-skip" data-testid="btn-skip" style="display:none">${t('btn.skip')}</button>
         </div>
         <div class="overlay-slot"></div>
       </div>`;
@@ -345,6 +354,37 @@ export class App {
       movesEl.textContent = String(cur.moves);
       undoBtn.disabled = undoStack.length === 0;
       hudStar?.classList.toggle('collected', cur.starCollected);
+    };
+
+    // детектор тупика: без ящиков любой ход обратим, уровень всегда проходим;
+    // после траты ящика честно проверяем решателем
+    const deadlock = { el: null as HTMLDivElement | null, timer: 0 };
+    const hideDeadlock = () => {
+      deadlock.el?.remove();
+      deadlock.el = null;
+    };
+    const showDeadlock = () => {
+      if (deadlock.el) return;
+      const d = document.createElement('div');
+      d.className = 'hint-toast deadlock-toast';
+      d.setAttribute('data-testid', 'deadlock-toast');
+      d.textContent = t('deadlock.warn');
+      this.q('.overlay-slot').appendChild(d);
+      deadlock.el = d;
+    };
+    const updateDeadlock = () => {
+      if (!level.pieces.some((p) => p.kind === 'crate')) return;
+      window.clearTimeout(deadlock.timer);
+      deadlock.timer = window.setTimeout(() => {
+        if (finished || cur.won) return;
+        if (!cur.pieces.some((p) => p.used > 0)) {
+          hideDeadlock();
+          return;
+        }
+        const res = solve(level, { from: cur, stateLimit: 12_000 });
+        if (!res.solvable && !res.exhausted) showDeadlock();
+        else hideDeadlock();
+      }, 250);
     };
 
     const bv = new BoardView(host, level, cur, {
@@ -370,6 +410,7 @@ export class App {
         if (res.exited) this.audio.play('honk');
         if (Math.random() < 0.25) this.audio.play('cluck');
         refreshHud();
+        updateDeadlock();
       },
       onExitDone: () => {
         if (!finished) {
@@ -388,7 +429,13 @@ export class App {
       bv.setState(prev);
       this.audio.play('undo');
       refreshHud();
+      updateDeadlock();
     });
+    const skipBtn = this.q<HTMLButtonElement>('[data-testid=btn-skip]');
+    const refreshSkip = () => {
+      skipBtn.style.display = !daily && (this.restartCounts.get(level.id) ?? 0) >= 3 ? '' : 'none';
+    };
+    refreshSkip();
     this.q('[data-testid=btn-restart]').addEventListener('click', () => {
       if (finished || cur.won) return;
       undoStack.length = 0;
@@ -396,6 +443,31 @@ export class App {
       bv.setState(cur);
       this.audio.play('click');
       refreshHud();
+      hideDeadlock();
+      if (!daily) {
+        this.restartCounts.set(level.id, (this.restartCounts.get(level.id) ?? 0) + 1);
+        refreshSkip();
+      }
+    });
+    skipBtn.addEventListener('click', async () => {
+      if (finished || cur.won) return;
+      this.audio.play('click');
+      bv.interactive = false;
+      try {
+        const ok = await this.platform.showRewarded(this.adHandlers());
+        if (ok) {
+          finished = true;
+          this.restartCounts.delete(level.id);
+          this.store.recordResult(level.id, 1);
+          const idx = LEVELS.findIndex((l) => l.id === level.id);
+          const nxt = idx >= 0 && idx < LEVELS.length - 1 ? LEVELS[idx + 1] : null;
+          if (nxt) this.startLevel(nxt.id);
+          else this.showMenu();
+          return;
+        }
+      } finally {
+        if (!finished) bv.interactive = true;
+      }
     });
     this.q('[data-testid=btn-pause]').addEventListener('click', () => {
       if (finished || cur.won) return;
@@ -488,7 +560,10 @@ export class App {
     overlay.querySelector('[data-testid=btn-pause-restart]')!.addEventListener('click', () => {
       this.audio.play('click');
       if (daily) this.startDaily();
-      else this.startLevel(level.id);
+      else {
+        this.restartCounts.set(level.id, (this.restartCounts.get(level.id) ?? 0) + 1);
+        this.startLevel(level.id);
+      }
       this.setGameplay(true);
     });
     overlay.querySelector('[data-testid=btn-exit-menu]')!.addEventListener('click', () => {

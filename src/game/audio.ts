@@ -24,6 +24,7 @@ export class GameAudio {
   private master: GainNode | null = null;
   private noiseBuf: AudioBuffer | null = null;
   private ducked = false;
+  private hidden = false;
   private ambientStarted = false;
   private engine: { osc: OscillatorNode; gain: GainNode } | null = null;
   private musicGain: GainNode | null = null;
@@ -65,10 +66,20 @@ export class GameAudio {
     else this.stopMusic();
   }
 
+  private applyMasterGain(): void {
+    if (this.master) this.master.gain.value = this.ducked || this.hidden ? 0 : 0.5;
+  }
+
   /** Временный мьют на время рекламы (не трогает пользовательскую настройку). */
   duck(on: boolean): void {
     this.ducked = on;
-    if (this.master) this.master.gain.value = on ? 0 : 0.5;
+    this.applyMasterGain();
+  }
+
+  /** Требование платформы: при сворачивании страницы звук останавливается. */
+  setHidden(on: boolean): void {
+    this.hidden = on;
+    this.applyMasterGain();
   }
 
   /** Летний двор: редкое щебетание птиц фоном. */

@@ -93,6 +93,8 @@ export class BoardView {
     this.updateGate(false);
     // хук для e2e-тестов и отладки
     (window as unknown as { __board?: BoardView }).__board = this;
+    // лонгтап на поле не должен вызывать контекстное меню (требование платформы)
+    svg.addEventListener('contextmenu', (e) => e.preventDefault());
     svg.addEventListener('pointerdown', this.onDown);
     svg.addEventListener('pointermove', this.onMove);
     svg.addEventListener('pointerup', this.onUp);

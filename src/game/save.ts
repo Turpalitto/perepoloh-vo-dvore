@@ -1,3 +1,4 @@
+import type { DailyState } from './daily';
 import type { Platform } from '../platform/types';
 
 export interface SaveData {
@@ -9,10 +10,14 @@ export interface SaveData {
   /** Язык интерфейса; по умолчанию русский. */
   lang: 'ru' | 'en' | 'tr';
   lastLevel: number;
+  /** Выбранный скин целевой машины. */
+  targetSkin: number;
+  /** Прогресс «уровня дня». */
+  daily?: DailyState;
 }
 
 export function defaultSave(): SaveData {
-  return { v: 1, stars: {}, sound: true, music: true, lang: 'ru', lastLevel: 1 };
+  return { v: 1, stars: {}, sound: true, music: true, lang: 'ru', lastLevel: 1, targetSkin: 0 };
 }
 
 export function sanitizeSave(raw: unknown): SaveData | null {
@@ -30,7 +35,12 @@ export function sanitizeSave(raw: unknown): SaveData | null {
     sound: typeof r.sound === 'boolean' ? r.sound : true,
     music: typeof r.music === 'boolean' ? r.music : true,
     lang: r.lang === 'en' || r.lang === 'tr' ? r.lang : 'ru',
-    lastLevel: Number.isInteger(r.lastLevel) && (r.lastLevel as number) >= 1 ? (r.lastLevel as number) : 1
+    lastLevel: Number.isInteger(r.lastLevel) && (r.lastLevel as number) >= 1 ? (r.lastLevel as number) : 1,
+    targetSkin: Number.isInteger(r.targetSkin) && (r.targetSkin as number) >= 0 ? (r.targetSkin as number) : 0,
+    daily:
+      r.daily && typeof r.daily.last === 'string' && Number.isInteger(r.daily.streak) && r.daily.streak >= 1
+        ? { last: r.daily.last, streak: r.daily.streak }
+        : undefined
   };
 }
 
@@ -44,7 +54,9 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
     sound: b.sound,
     music: b.music,
     lang: b.lang,
-    lastLevel: Math.max(a.lastLevel, b.lastLevel)
+    lastLevel: Math.max(a.lastLevel, b.lastLevel),
+    targetSkin: b.targetSkin,
+    daily: !a.daily ? b.daily : !b.daily ? a.daily : a.daily.last > b.daily.last ? a.daily : b.daily
   };
 }
 
@@ -83,6 +95,16 @@ export class SaveStore {
 
   setLang(lang: SaveData['lang']): void {
     this.data.lang = lang;
+    this.persist();
+  }
+
+  setTargetSkin(i: number): void {
+    this.data.targetSkin = i;
+    this.persist();
+  }
+
+  setDaily(state: DailyState): void {
+    this.data.daily = state;
     this.persist();
   }
 

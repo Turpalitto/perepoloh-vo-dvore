@@ -2,7 +2,7 @@
  * Двор-меню: сцена хорошеет по мере набора звёзд.
  * Каждому этапу из progression.ts соответствует визуальный слой.
  */
-import { catArt, chickenArt } from './sprites';
+import { catArt, chickenArt, getTargetSkin } from './sprites';
 
 export function yardSVG(u: Set<string>): string {
   const fenceFixed = u.has('fence');
@@ -134,15 +134,16 @@ export function yardSVG(u: Set<string>): string {
     <ellipse cx="470" cy="470" rx="330" ry="110" fill="#dbb271"/>
     <ellipse cx="470" cy="470" rx="330" ry="110" fill="none" stroke="rgba(93,64,25,0.2)" stroke-width="4" stroke-dasharray="16 14"/>`;
 
-  // машинка-«жигулёнок» едет по двору
+  // машинка-«жигулёнок» едет по двору (цвет — выбранный скин игрока)
+  const skin = getTargetSkin();
   const car = `<g transform="translate(508,470)" data-tap="honk"><g class="tap-inner">
       <ellipse cx="0" cy="26" rx="58" ry="10" fill="rgba(43,29,10,0.2)"/>
-      <rect x="-56" y="-24" width="112" height="46" rx="14" fill="#3f7fd1" stroke="#2d5f9f" stroke-width="4"/>
-      <rect x="-26" y="-18" width="46" height="34" rx="8" fill="#6099dd"/>
+      <rect x="-56" y="-24" width="112" height="46" rx="14" fill="${skin.body}" stroke="${skin.dark}" stroke-width="4"/>
+      <rect x="-26" y="-18" width="46" height="34" rx="8" fill="${skin.light}"/>
       <rect x="-20" y="-18" width="34" height="14" rx="5" fill="#c7e6f2" stroke="#8fbfd4" stroke-width="2"/>
       <circle cx="-34" cy="26" r="12" fill="#332a20"/><circle cx="-34" cy="26" r="5" fill="#8f8578"/>
       <circle cx="34" cy="26" r="12" fill="#332a20"/><circle cx="34" cy="26" r="5" fill="#8f8578"/>
-      <circle cx="52" cy="-10" r="5" fill="#ffe9a8" stroke="#2d5f9f" stroke-width="2"/>
+      <circle cx="52" cy="-10" r="5" fill="#ffe9a8" stroke="${skin.dark}" stroke-width="2"/>
     </g></g>`;
 
   return `<svg viewBox="0 0 900 620" preserveAspectRatio="xMidYMid slice" class="yard-svg">

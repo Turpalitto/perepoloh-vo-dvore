@@ -7,9 +7,9 @@ import { validateLevel } from '../src/core/validator';
 const LEVELS = levelsJson as LevelDef[];
 
 describe('уровни игры', () => {
-  it('ровно 36 уровней с уникальными id по порядку', () => {
-    expect(LEVELS).toHaveLength(36);
-    expect(LEVELS.map((l) => l.id)).toEqual(Array.from({ length: 36 }, (_, i) => i + 1));
+  it('ровно 72 уровня с уникальными id по порядку', () => {
+    expect(LEVELS).toHaveLength(72);
+    expect(LEVELS.map((l) => l.id)).toEqual(Array.from({ length: 72 }, (_, i) => i + 1));
   });
 
   it('сложность не убывает и есть все три ступени', () => {

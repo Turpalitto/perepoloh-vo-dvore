@@ -18,7 +18,32 @@ const CAR_SKINS: CarColors[] = [
   { body: '#e0a32e', dark: '#b07c1a', light: '#eab95e' }
 ];
 
-const TARGET: CarColors = { body: '#3f7fd1', dark: '#2d5f9f', light: '#6099dd' };
+/** Скины целевого «жигулёнка»; открываются за суммарные звёзды. */
+export interface TargetSkin extends CarColors {
+  /** Порог суммарных звёзд для открытия. */
+  unlockStars: number;
+  nameKey: string;
+}
+
+export const TARGET_SKINS: TargetSkin[] = [
+  { body: '#3f7fd1', dark: '#2d5f9f', light: '#6099dd', unlockStars: 0, nameKey: 'skin.blue' },
+  { body: '#8b5fc9', dark: '#6a4499', light: '#a37fd9', unlockStars: 15, nameKey: 'skin.violet' },
+  { body: '#e07b39', dark: '#b25a20', light: '#ea9a63', unlockStars: 40, nameKey: 'skin.orange' },
+  { body: '#e06a9f', dark: '#b34a7c', light: '#ea8fb8', unlockStars: 70, nameKey: 'skin.pink' },
+  { body: '#4a4a52', dark: '#31313a', light: '#68686f', unlockStars: 100, nameKey: 'skin.black' }
+];
+
+let targetSkinIdx = 0;
+
+export function setTargetSkin(i: number): void {
+  targetSkinIdx = Math.max(0, Math.min(TARGET_SKINS.length - 1, i));
+}
+
+export function getTargetSkin(): TargetSkin {
+  return TARGET_SKINS[targetSkinIdx];
+}
+
+const TARGET: CarColors = TARGET_SKINS[0];
 const GLASS = '#c7e6f2';
 const GLASS_DARK = '#8fbfd4';
 const TIRE = '#332a20';
@@ -131,7 +156,7 @@ export function pieceArt(def: PieceDef): string {
   const shadow = `<rect x="10" y="20" width="${def.len * CELL - 14}" height="76" rx="20" fill="rgba(43,29,10,0.25)"/>`;
   switch (def.kind) {
     case 'target':
-      return shadow + carBody(TARGET, true);
+      return shadow + carBody(TARGET_SKINS[targetSkinIdx] ?? TARGET, true);
     case 'car':
       return shadow + carBody(CAR_SKINS[(def.skin ?? 0) % CAR_SKINS.length], false);
     case 'truck':

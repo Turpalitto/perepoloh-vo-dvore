@@ -5,6 +5,7 @@ import { initI18n } from './game/i18n';
 import { SaveStore, defaultSave, mergeSave } from './game/save';
 import { createPlatform } from './platform';
 import { App } from './ui/app';
+import { setTargetSkin } from './ui/sprites';
 
 async function boot(): Promise<void> {
   applyDaytime();
@@ -18,6 +19,7 @@ async function boot(): Promise<void> {
   }
   // по умолчанию русский; выбор игрока хранится в сейве, ?lang= — переопределение
   initI18n(save.lang);
+  setTargetSkin(save.targetSkin);
   const store = new SaveStore(platform, save);
   const audio = new GameAudio(save.sound, save.music);
   const app = new App(platform, store, audio);

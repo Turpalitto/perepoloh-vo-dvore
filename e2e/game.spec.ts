@@ -42,7 +42,7 @@ test.describe('Переполох во дворе', () => {
     await page.goto('/?mock=1&lang=ru');
     await expect(page.getByTestId('menu-play')).toBeVisible();
     await expect(page.getByTestId('screen-menu')).toContainText('Переполох');
-    await expect(page.getByTestId('stars-total')).toContainText('★ 0 / 108');
+    await expect(page.getByTestId('stars-total')).toContainText('★ 0 / 216');
     expect(errors).toEqual([]);
   });
 
@@ -89,10 +89,10 @@ test.describe('Переполох во дворе', () => {
     await dragPiece(page, 'T', 5.7, 0);
     await expect(page.getByTestId('win-overlay')).toBeVisible();
     await page.getByTestId('btn-win-menu').click();
-    await expect(page.getByTestId('stars-total')).toContainText('★ 3 / 108');
+    await expect(page.getByTestId('stars-total')).toContainText('★ 3 / 216');
     await page.reload();
     await expect(page.getByTestId('menu-play')).toHaveText('Продолжить');
-    await expect(page.getByTestId('stars-total')).toContainText('★ 3 / 108');
+    await expect(page.getByTestId('stars-total')).toContainText('★ 3 / 216');
     await page.getByTestId('menu-levels').click();
     await expect(page.getByTestId('level-card-1')).toContainText('★★★');
     await expect(page.getByTestId('level-card-2')).toBeEnabled();
@@ -123,6 +123,25 @@ test.describe('Переполох во дворе', () => {
     await expect(page.getByTestId('menu-play')).toHaveText('Oyna');
     await page.getByTestId('lang-toggle').click();
     await expect(page.getByTestId('menu-play')).toHaveText('Играть');
+    expect(errors).toEqual([]);
+  });
+
+  test('уровень дня открывается и показывает серию в меню', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?mock=1&lang=ru');
+    await expect(page.getByTestId('menu-daily')).toContainText('Уровень дня');
+    await page.getByTestId('menu-daily').click();
+    await expect(page.getByTestId('board')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.hud-level')).toContainText('Уровень дня');
+    expect(errors).toEqual([]);
+  });
+
+  test('скины: заблокированные недоступны, выбор сохраняется', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?mock=1&lang=ru');
+    await expect(page.getByTestId('skin-0')).toBeEnabled();
+    await expect(page.getByTestId('skin-1')).toBeDisabled(); // нужно ★15
+    await expect(page.getByTestId('skin-0')).toHaveClass(/selected/);
     expect(errors).toEqual([]);
   });
 

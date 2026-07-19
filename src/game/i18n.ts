@@ -49,7 +49,15 @@ const RU: Dict = {
   'rules.4': 'Ящик можно толкать в любую сторону, но лишь несколько раз — смотри на цифру сверху.',
   'rules.5': 'Увидел на поле канистру? Проедь по ней любой машиной и забери звезду.',
   'rules.6': 'За прохождение уровня — ★. Уложился в подсказанное число ходов — ★★. Решил идеально (и забрал звезду, если она есть) — ★★★.',
-  'rules.7': 'Ошибся — жми «Отмена». Совсем запутался — «Заново». Оба хода бесплатны и без ограничений.'
+  'rules.7': 'Ошибся — жми «Отмена». Совсем запутался — «Заново». Оба хода бесплатны и без ограничений.',
+  'daily.button': 'Уровень дня',
+  'daily.done': 'пройден ✓',
+  'daily.streak': 'серия: {n} 🔥',
+  'daily.title': 'Уровень дня',
+  'daily.winStreak': 'Серия дней: {n} 🔥',
+  'boss.chip': 'Босс',
+  'skins.title': 'Цвет машины',
+  'skin.locked': 'Откроется за ★ {n}'
 };
 
 const EN: Dict = {
@@ -94,7 +102,15 @@ const EN: Dict = {
   'rules.4': 'You can push a crate any direction, but only a few times — check the number printed on it.',
   'rules.5': 'Spot a milk can on the field? Drive any vehicle over it to grab a star.',
   'rules.6': 'Clear the level for ★. Do it within the suggested move count for ★★. Solve it perfectly (and grab the star, if there is one) for ★★★.',
-  'rules.7': 'Made a mistake? Tap Undo. Totally stuck? Tap Restart. Both are free and unlimited.'
+  'rules.7': 'Made a mistake? Tap Undo. Totally stuck? Tap Restart. Both are free and unlimited.',
+  'daily.button': 'Daily Level',
+  'daily.done': 'done ✓',
+  'daily.streak': 'streak: {n} 🔥',
+  'daily.title': 'Daily Level',
+  'daily.winStreak': 'Day streak: {n} 🔥',
+  'boss.chip': 'Boss',
+  'skins.title': 'Car colour',
+  'skin.locked': 'Unlocks at ★ {n}'
 };
 
 const TR: Dict = {
@@ -139,7 +155,15 @@ const TR: Dict = {
   'rules.4': 'Sandığı istediğin yöne itebilirsin ama sadece birkaç kez — üzerindeki sayıya bak.',
   'rules.5': 'Sahada bir süt güğümü mü gördün? Herhangi bir araçla üzerinden geç, yıldızı kap.',
   'rules.6': 'Bölümü bitirince ★. Önerilen hamle sayısında kalınca ★★. Kusursuz çözünce (ve varsa yıldızı alınca) ★★★.',
-  'rules.7': 'Yanlış mı yaptın? Geri Al\'a bas. Çok mu karıştı? Yeniden Başlat\'a bas. İkisi de bedava, sınırsız.'
+  'rules.7': 'Yanlış mı yaptın? Geri Al\'a bas. Çok mu karıştı? Yeniden Başlat\'a bas. İkisi de bedava, sınırsız.',
+  'daily.button': 'Günün Bölümü',
+  'daily.done': 'bitti ✓',
+  'daily.streak': 'seri: {n} 🔥',
+  'daily.title': 'Günün Bölümü',
+  'daily.winStreak': 'Gün serisi: {n} 🔥',
+  'boss.chip': 'Boss',
+  'skins.title': 'Araba rengi',
+  'skin.locked': '★ {n} ile açılır'
 };
 
 /**
@@ -183,7 +207,43 @@ const EN_NAMES: Dict = {
   'Ящики и трактор': 'Crates and Tractor',
   'Капкан для жигулёнка': 'Trap for the Little Car',
   'Последний рубеж': 'The Last Stand',
-  'Осада двора': 'Yard Siege'
+  'Осада двора': 'Yard Siege',
+  'Рассвет над полем': 'Dawn over the Field',
+  'Гости с ярмарки': 'Guests from the Fair',
+  'Сарай на замке': 'The Locked Barn',
+  'Молочный рейс': 'The Milk Run',
+  'Тропинка к бане': 'Path to the Bathhouse',
+  'Сосед на тракторе': 'Neighbour on a Tractor',
+  'Бочки на счету': 'Barrels Counted',
+  'Огородная страда': 'Garden Harvest Rush',
+  'Тесный сеновал': 'Cramped Hayloft',
+  'Вечерний разъезд': 'Evening Departure',
+  'Дровяной затор': 'Firewood Jam',
+  'Курятник шумит': 'Noisy Henhouse',
+  'Хитрый закуток': 'The Tricky Corner',
+  'Три подводы': 'Three Carts',
+  'Северный угол': 'The North Corner',
+  'Задний двор': 'The Backyard',
+  'Гараж деда': "Grandpa's Garage",
+  'Обходной путь': 'The Detour',
+  'Сенная лихорадка': 'Hay Fever',
+  'Узкие воротца': 'The Narrow Gate',
+  'Долгий выезд': 'The Long Way Out',
+  Круговорот: 'The Roundabout',
+  'Стальной затор': 'Steel Gridlock',
+  'Хмурое утро': 'Gloomy Morning',
+  'Точный расчёт': 'Precise Calculation',
+  'Лабиринт из ящиков': 'Crate Labyrinth',
+  'Час пик в деревне': 'Village Rush Hour',
+  'Великая уборка': 'The Grand Cleanup',
+  'Последняя миля': 'The Last Mile',
+  'Дворовый гамбит': 'Yard Gambit',
+  'Босс: Большая ярмарка': 'Boss: The Grand Fair',
+  'Босс: Осенний завал': 'Boss: Autumn Pile-Up',
+  'Босс: Тракторный слёт': 'Boss: Tractor Rally',
+  'Босс: Сенокосный аврал': 'Boss: Haymaking Frenzy',
+  'Босс: Деревенский узел': 'Boss: The Village Knot',
+  'Босс: Царь двора': 'Boss: King of the Yard'
 };
 
 const EN_HINTS: Dict = {
@@ -231,7 +291,43 @@ const TR_NAMES: Dict = {
   'Ящики и трактор': 'Sandıklar ve Traktör',
   'Капкан для жигулёнка': 'Jiguli Tuzağı',
   'Последний рубеж': 'Son Savunma',
-  'Осада двора': 'Bahçe Kuşatması'
+  'Осада двора': 'Bahçe Kuşatması',
+  'Рассвет над полем': 'Tarlada Şafak',
+  'Гости с ярмарки': 'Panayır Konukları',
+  'Сарай на замке': 'Kilitli Ahır',
+  'Молочный рейс': 'Süt Seferi',
+  'Тропинка к бане': 'Hamam Yolu',
+  'Сосед на тракторе': 'Traktörlü Komşu',
+  'Бочки на счету': 'Sayılı Variller',
+  'Огородная страда': 'Bostan Telaşı',
+  'Тесный сеновал': 'Dar Samanlık',
+  'Вечерний разъезд': 'Akşam Ayrılışı',
+  'Дровяной затор': 'Odun Tıkanıklığı',
+  'Курятник шумит': 'Gürültülü Kümes',
+  'Хитрый закуток': 'Kurnaz Köşe',
+  'Три подводы': 'Üç Araba',
+  'Северный угол': 'Kuzey Köşesi',
+  'Задний двор': 'Arka Bahçe',
+  'Гараж деда': 'Dedenin Garajı',
+  'Обходной путь': 'Dolambaçlı Yol',
+  'Сенная лихорадка': 'Saman Telaşı',
+  'Узкие воротца': 'Dar Kapı',
+  'Долгий выезд': 'Uzun Çıkış',
+  Круговорот: 'Döngü',
+  'Стальной затор': 'Çelik Tıkanıklık',
+  'Хмурое утро': 'Kasvetli Sabah',
+  'Точный расчёт': 'İnce Hesap',
+  'Лабиринт из ящиков': 'Sandık Labirenti',
+  'Час пик в деревне': 'Köyde Yoğun Saat',
+  'Великая уборка': 'Muhteşem Temizlik',
+  'Последняя миля': 'Son Kilometre',
+  'Дворовый гамбит': 'Bahçe Gambiti',
+  'Босс: Большая ярмарка': 'Boss: Büyük Panayır',
+  'Босс: Осенний завал': 'Boss: Sonbahar Yığını',
+  'Босс: Тракторный слёт': 'Boss: Traktör Buluşması',
+  'Босс: Сенокосный аврал': 'Boss: Saman Mesaisi',
+  'Босс: Деревенский узел': 'Boss: Köy Düğümü',
+  'Босс: Царь двора': 'Boss: Bahçenin Kralı'
 };
 
 const TR_HINTS: Dict = {

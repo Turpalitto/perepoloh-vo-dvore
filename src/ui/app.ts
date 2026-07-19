@@ -7,6 +7,7 @@ import type { LevelDef } from '../core/types';
 import { GameState, createState, starsFor } from '../core/game';
 import { hint } from '../core/solver';
 import type { GameAudio } from '../game/audio';
+import { advanceStreak, currentStreak, generateDaily, isDoneToday, todayKey } from '../game/daily';
 import { getLang, levelText, setLang, t } from '../game/i18n';
 import {
   INTERSTITIAL_EVERY,
@@ -20,6 +21,7 @@ import {
 import { SaveStore, totalStars } from '../game/save';
 import type { AdHandlers, Platform } from '../platform/types';
 import { BoardView } from './board';
+import { TARGET_SKINS, setTargetSkin } from './sprites';
 import { yardSVG } from './yard';
 
 const LEVELS = levelsJson as LevelDef[];
@@ -63,6 +65,14 @@ export class App {
       },
       { capture: true }
     );
+    // прогреваем кэш «уровня дня», пока игрок смотрит меню — клик будет мгновенным
+    window.setTimeout(() => {
+      try {
+        generateDaily();
+      } catch (e) {
+        console.warn('прогрев уровня дня не удался:', e);
+      }
+    }, 1200);
   }
 
   private setGameplay(on: boolean): void {
@@ -137,7 +147,23 @@ export class App {
               hasProgress ? t('menu.continue') : t('menu.play')
             }</button>
             <button class="btn btn-big" data-testid="menu-levels">${t('menu.levels')}</button>
+            <button class="btn btn-big btn-daily" data-testid="menu-daily">🔥 ${t('daily.button')}${
+              isDoneToday(this.store.data.daily)
+                ? ` · ${t('daily.done')}`
+                : currentStreak(this.store.data.daily) > 0
+                  ? ` · ${t('daily.streak', { n: currentStreak(this.store.data.daily) })}`
+                  : ''
+            }</button>
           </div>
+          <div class="skin-row" data-testid="skin-row">${TARGET_SKINS.map((s, i) => {
+            const unlockedSkin = total >= s.unlockStars;
+            const selected = this.store.data.targetSkin === i;
+            return `<button class="skin-swatch${selected ? ' selected' : ''}" data-skin="${i}"
+              data-testid="skin-${i}" style="--c:${s.body}" ${unlockedSkin ? '' : 'disabled'}
+              title="${unlockedSkin ? '' : t('skin.locked', { n: s.unlockStars })}">${
+                unlockedSkin ? '' : `<span class="skin-lock">★${s.unlockStars}</span>`
+              }</button>`;
+          }).join('')}</div>
           <div class="menu-progress">
             <span class="stars-total" data-testid="stars-total">★ ${total} / ${max}</span>
             <span class="next-upgrade">${
@@ -161,6 +187,19 @@ export class App {
       this.audio.play('click');
       this.showLevels();
     });
+    this.q('[data-testid=menu-daily]').addEventListener('click', () => {
+      this.audio.play('click');
+      this.startDaily();
+    });
+    this.root.querySelectorAll<HTMLButtonElement>('.skin-swatch:not([disabled])').forEach((b) =>
+      b.addEventListener('click', () => {
+        const i = Number(b.dataset.skin);
+        setTargetSkin(i);
+        this.store.setTargetSkin(i);
+        this.audio.play('click');
+        this.showMenu();
+      })
+    );
     this.wireSoundToggle(this.q('[data-testid=sound-toggle]'));
     this.wireMusicToggle(this.q('[data-testid=music-toggle]'));
     this.q('[data-testid=lang-toggle]').addEventListener('click', () => {
@@ -222,7 +261,7 @@ export class App {
         <button class="level-card ${unlocked ? '' : 'locked'}" data-level="${l.id}" data-testid="level-card-${l.id}" ${
           unlocked ? '' : 'disabled'
         }>
-          <span class="level-num">${l.id}</span>
+          <span class="level-num">${l.width > 6 ? '👑 ' : ''}${l.id}</span>
           <span class="level-stars">${
             unlocked
               ? starIcons(stars)
@@ -260,12 +299,25 @@ export class App {
       return;
     }
     this.store.setLastLevel(id);
+    this.runLevel(level, false);
+  }
+
+  /** «Уровень дня»: генерируется на лету из seed = сегодняшняя дата. */
+  startDaily(): void {
+    this.runLevel(generateDaily(), true);
+  }
+
+  private runLevel(level: LevelDef, daily: boolean): void {
+    const isBoss = level.width > 6;
+    const title = daily
+      ? `🔥 ${t('daily.title')}`
+      : `${isBoss ? '👑 ' : ''}${level.id}. ${levelText('name', level.name)}`;
     const starHud = level.star ? `<span class="hud-star" data-testid="hud-star">★</span>` : '';
     this.root.innerHTML = `
       <div class="screen game-screen" data-testid="screen-game">
         <div class="hud hud-top">
           <button class="icon-btn" data-testid="btn-pause" aria-label="${t('pause.title')}">${pauseIcon}</button>
-          <div class="hud-level">${level.id}. ${levelText('name', level.name)}</div>
+          <div class="hud-level">${title}</div>
           <div class="hud-right">
             ${starHud}
             <div class="hud-moves">${t('hud.moves')} <b data-testid="hud-moves">0</b><span class="hud-par">${t('hud.goal', { n: level.par2 })}</span></div>
@@ -322,7 +374,7 @@ export class App {
       onExitDone: () => {
         if (!finished) {
           finished = true;
-          this.finishLevel(level, cur);
+          this.finishLevel(level, cur, daily);
         }
       }
     });
@@ -348,7 +400,7 @@ export class App {
     this.q('[data-testid=btn-pause]').addEventListener('click', () => {
       if (finished || cur.won) return;
       this.audio.play('click');
-      this.showPause(level, bv);
+      this.showPause(level, bv, daily);
     });
     this.q('[data-testid=btn-hint]').addEventListener('click', async () => {
       if (finished || cur.won) return;
@@ -405,7 +457,7 @@ export class App {
     window.setTimeout(() => el.remove(), 820);
   }
 
-  private showPause(level: LevelDef, bv: BoardView): void {
+  private showPause(level: LevelDef, bv: BoardView, daily = false): void {
     this.setGameplay(false);
     this.audio.engineStop();
     bv.interactive = false;
@@ -415,7 +467,7 @@ export class App {
     overlay.innerHTML = `
       <div class="dialog">
         <h2>${t('pause.title')}</h2>
-        <div class="dialog-sub">${level.id}. ${levelText('name', level.name)}</div>
+        <div class="dialog-sub">${daily ? t('daily.title') : `${level.id}. ${levelText('name', level.name)}`}</div>
         <button class="btn btn-primary btn-big" data-testid="btn-resume">${t('pause.resume')}</button>
         <button class="btn btn-big" data-testid="btn-pause-restart">${t('pause.restart')}</button>
         <div class="dialog-row">
@@ -435,7 +487,8 @@ export class App {
     });
     overlay.querySelector('[data-testid=btn-pause-restart]')!.addEventListener('click', () => {
       this.audio.play('click');
-      this.startLevel(level.id);
+      if (daily) this.startDaily();
+      else this.startLevel(level.id);
       this.setGameplay(true);
     });
     overlay.querySelector('[data-testid=btn-exit-menu]')!.addEventListener('click', () => {
@@ -444,23 +497,32 @@ export class App {
     });
   }
 
-  private finishLevel(level: LevelDef, endState: GameState): void {
+  private finishLevel(level: LevelDef, endState: GameState, daily = false): void {
     this.setGameplay(false);
     this.audio.engineStop();
     navigator.vibrate?.([28, 45, 28]);
     const stars = starsFor(level, endState.moves, endState.starCollected);
     const before = totalStars(this.store.data);
-    const improved = this.store.recordResult(level.id, stars);
-    const after = totalStars(this.store.data);
-    const unlocked = newlyUnlocked(before, after);
-    if (improved) void this.platform.submitScore(after);
+    let unlocked: ReturnType<typeof newlyUnlocked> = [];
+    let justMastered = false;
+    let dailyStreak = 0;
+    if (daily) {
+      const newDaily = advanceStreak(this.store.data.daily, todayKey());
+      this.store.setDaily(newDaily);
+      dailyStreak = newDaily.streak;
+    } else {
+      const improved = this.store.recordResult(level.id, stars);
+      const after = totalStars(this.store.data);
+      unlocked = newlyUnlocked(before, after);
+      if (improved) void this.platform.submitScore(after);
+      const maxTotal = LEVELS.length * 3;
+      justMastered = before < maxTotal && after === maxTotal;
+      if (justMastered) navigator.vibrate?.([20, 40, 20, 40, 60]);
+    }
     this.audio.play('win');
-    const maxTotal = LEVELS.length * 3;
-    const justMastered = before < maxTotal && after === maxTotal;
-    if (justMastered) navigator.vibrate?.([20, 40, 20, 40, 60]);
 
-    const idx = LEVELS.findIndex((l) => l.id === level.id);
-    const next = idx >= 0 && idx < LEVELS.length - 1 ? LEVELS[idx + 1] : null;
+    const idx = daily ? -1 : LEVELS.findIndex((l) => l.id === level.id);
+    const next = !daily && idx >= 0 && idx < LEVELS.length - 1 ? LEVELS[idx + 1] : null;
     const starNote = level.star
       ? endState.starCollected
         ? `<div class="win-note ok">${t('win.starOk')}</div>`
@@ -472,6 +534,9 @@ export class App {
           .join('')
       : '';
     const masterNote = justMastered ? `<div class="win-master" data-testid="win-master">${t('win.master')}</div>` : '';
+    const dailyNote = daily
+      ? `<div class="win-upgrade" data-testid="win-daily-streak">${t('daily.winStreak', { n: dailyStreak })}</div>`
+      : '';
     const confettiColors = ['#e2574c', '#f6c445', '#45968f', '#3f7fd1', '#e88fb6'];
     const confetti = Array.from({ length: justMastered ? 44 : 20 }, () => {
       const c = confettiColors[Math.floor(Math.random() * confettiColors.length)];
@@ -492,11 +557,14 @@ export class App {
         }</div>
         ${starNote}
         ${masterNote}
+        ${dailyNote}
         ${upgradeNote}
         ${
           next
             ? `<button class="btn btn-primary btn-big" data-testid="btn-next">${t('win.next')}</button>`
-            : `<div class="win-note ok">${t('win.allDone')}</div><button class="btn btn-primary btn-big" data-testid="btn-final-menu">${t('win.menu')}</button>`
+            : daily
+              ? `<button class="btn btn-primary btn-big" data-testid="btn-final-menu">${t('win.menu')}</button>`
+              : `<div class="win-note ok">${t('win.allDone')}</div><button class="btn btn-primary btn-big" data-testid="btn-final-menu">${t('win.menu')}</button>`
         }
         <div class="dialog-row">
           <button class="btn" data-testid="btn-again">${t('win.again')}</button>
@@ -521,7 +589,8 @@ export class App {
     });
     overlay.querySelector('[data-testid=btn-again]')?.addEventListener('click', () => {
       this.audio.play('click');
-      this.startLevel(level.id);
+      if (daily) this.startDaily();
+      else this.startLevel(level.id);
     });
     overlay.querySelector('[data-testid=btn-win-menu]')?.addEventListener('click', () => {
       this.audio.play('click');

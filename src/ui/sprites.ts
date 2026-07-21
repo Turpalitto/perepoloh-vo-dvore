@@ -272,6 +272,17 @@ export function kindBadge(kind: PieceDef['kind']): string {
   }
 }
 
+/** Ледяная колея (клетка поля, не отдельная фигура): замёрзшая лужа во дворе. */
+export function iceArt(): string {
+  return `
+    <ellipse cx="50" cy="55" rx="42" ry="34" fill="#bfe6f0" opacity="0.55"/>
+    <ellipse cx="50" cy="55" rx="42" ry="34" fill="none" stroke="#8fc7dc" stroke-width="4"/>
+    <path d="M20 46 Q40 40 50 52 Q60 64 82 58" fill="none" stroke="#e8f7fb" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+    <path d="M30 68 Q45 62 55 68 Q65 74 74 66" fill="none" stroke="#e8f7fb" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+    <circle cx="34" cy="48" r="3" fill="#f5fcfe" opacity="0.9"/>
+    <circle cx="66" cy="62" r="2.4" fill="#f5fcfe" opacity="0.9"/>`;
+}
+
 export function starArt(): string {
   return `
     <circle cx="50" cy="52" r="30" fill="#fff3c9" opacity="0.7"/>

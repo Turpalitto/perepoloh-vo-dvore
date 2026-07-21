@@ -15,7 +15,7 @@ import {
 } from '../core/game';
 import type { SolveMove } from '../core/solver';
 import { t } from '../game/i18n';
-import { CELL, chickenArt, kindBadge, pieceArt, starArt, wallArt, wellArt } from './sprites';
+import { CELL, chickenArt, iceArt, kindBadge, pieceArt, starArt, wallArt, wellArt } from './sprites';
 
 const M = 90; // поля вокруг двора: забор, куры
 
@@ -239,6 +239,13 @@ export class BoardView {
 
     // забор с проёмом ворот
     make(this.fenceSvg()).classList.add('layer-fence');
+
+    // ледяная колея: разметка клеток поля, под фигурами и полосой хода
+    let iceHtml = '';
+    for (const cell of level.ice ?? []) {
+      iceHtml += `<g class="ice-cell" transform="translate(${cell.x * CELL},${cell.y * CELL})">${iceArt()}</g>`;
+    }
+    if (iceHtml) make(iceHtml).classList.add('layer-ice');
 
     // следы колёс
     this.tracksLayer = make('');
@@ -761,9 +768,16 @@ export class BoardView {
     const sign = Math.sign(move.offset);
     const dx = move.axis === 'x' ? sign : 0;
     const dy = move.axis === 'y' ? sign : 0;
-    const steps = Math.abs(move.offset);
-    const exit = move.exitAxis === move.axis && move.exitSign === sign && steps === move.exitK;
-    const result = applyMove(this.level, this.state, move.idx, dx, dy, steps);
+    const exit = move.exitAxis === move.axis && move.exitSign === sign && Math.abs(move.offset) === move.exitK;
+    let steps = Math.abs(move.offset);
+    // как и при перетаскивании: лёд может запретить именно эту точку остановки —
+    // доводим до ближайшей легальной клетки в ту же сторону вместо отмены хода.
+    const hardLimit = exit ? steps : sign > 0 ? move.inPos[move.axis] : move.inNeg[move.axis];
+    let result = applyMove(this.level, this.state, move.idx, dx, dy, steps);
+    while (!result && !exit && steps < hardLimit) {
+      steps++;
+      result = applyMove(this.level, this.state, move.idx, dx, dy, steps);
+    }
     if (!result) {
       this.bumpPiece(move.idx, move.axis);
       this.events.onBump();
@@ -983,10 +997,12 @@ export class BoardView {
     let steps = 0;
     let axis: 'x' | 'y' = d.axis ?? 'x';
     let exit = false;
+    let maxIn = 0;
+    let minIn = 0;
     if (cur) {
       axis = cur.axis;
-      const maxIn = d.exitAxis === axis && d.exitSign > 0 ? d.inBoardPos[axis] : d.pos[axis];
-      const minIn = -(d.exitAxis === axis && d.exitSign < 0 ? d.inBoardPos[axis] : d.neg[axis]);
+      maxIn = d.exitAxis === axis && d.exitSign > 0 ? d.inBoardPos[axis] : d.pos[axis];
+      minIn = -(d.exitAxis === axis && d.exitSign < 0 ? d.inBoardPos[axis] : d.neg[axis]);
       if (d.exitAxis === axis && d.exitSign > 0 && cur.off > maxIn + 0.45) {
         exit = true;
         steps = d.exitK;
@@ -1000,9 +1016,18 @@ export class BoardView {
     if (steps !== 0) {
       const dx = axis === 'x' ? Math.sign(steps) : 0;
       const dy = axis === 'y' ? Math.sign(steps) : 0;
-      const res = applyMove(this.level, this.state, d.idx, dx, dy, Math.abs(steps));
+      let magnitude = Math.abs(steps);
+      // Ледяная колея запрещает часть промежуточных стопов (applyMove вернёт null).
+      // Вместо снапа в начало «доводим» жест вперёд до ближайшей легальной точки
+      // в ту же сторону — так отпускание на льду не выглядит как баг.
+      const hardLimit = exit ? magnitude : steps > 0 ? maxIn : -minIn;
+      let res = applyMove(this.level, this.state, d.idx, dx, dy, magnitude);
+      while (!res && !exit && magnitude < hardLimit) {
+        magnitude++;
+        res = applyMove(this.level, this.state, d.idx, dx, dy, magnitude);
+      }
       if (res) {
-        this.commit(res, d.idx, exit, dx, dy, Math.abs(steps));
+        this.commit(res, d.idx, exit, dx, dy, magnitude);
         return;
       }
     }

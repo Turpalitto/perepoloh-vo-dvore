@@ -24,6 +24,8 @@ export interface GenOptions {
   exitRow: number;
   pieceMin: number;
   pieceMax: number;
+  /** Вероятность добавить нажимную кнопку ворот (0..1). По умолчанию 0. */
+  gateChance?: number;
 }
 
 export const GEN_6X6: GenOptions = { width: 6, height: 6, exitRow: 2, pieceMin: 6, pieceMax: 9 };
@@ -113,6 +115,21 @@ export function genCandidate(rng: () => number, o: GenOptions): LevelDef | null 
     break;
   }
   if (!star) return null;
+  mark(star.x, star.y);
+
+  // Нажимная кнопка ворот: до проезда по ней выезд закрыт. Размещаем на
+  // свободной клетке вне ряда ворот; решатель в findLevel отсеет расклады,
+  // где кнопку нельзя нажать или уровень становится непроходим.
+  let gateSwitch: { x: number; y: number } | undefined;
+  if (o.gateChance && rng() < o.gateChance) {
+    for (let a = 0; a < 30; a++) {
+      const x = ri(W);
+      const y = ri(H);
+      if (y === exitRow || !free(x, y)) continue;
+      gateSwitch = { x, y };
+      break;
+    }
+  }
 
   return {
     id: 0,
@@ -123,6 +140,7 @@ export function genCandidate(rng: () => number, o: GenOptions): LevelDef | null 
     pieces,
     walls,
     star,
+    ...(gateSwitch ? { gateSwitch } : {}),
     par: 1,
     par2: 99,
     difficulty: 'hard',

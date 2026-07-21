@@ -1,6 +1,6 @@
 /** Ось движения техники; ящики ('any') двигаются по обеим осям. */
 export type Dir = 'h' | 'v' | 'any';
-export type Side = 'left' | 'right' | 'top' | 'bottom';
+type Side = 'left' | 'right' | 'top' | 'bottom';
 
 export type PieceKind = 'target' | 'car' | 'truck' | 'tractor' | 'crate';
 
@@ -20,7 +20,7 @@ export interface PieceDef {
 }
 
 export type WallKind = 'hay' | 'barrel' | 'log';
-export interface WallDef {
+interface WallDef {
   x: number;
   y: number;
   kind: WallKind;
@@ -32,12 +32,28 @@ export interface ExitDef {
   index: number;
 }
 
-export interface StarDef {
+interface StarDef {
   x: number;
   y: number;
 }
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+/** Нажимная кнопка во дворе: проезд любой фигуры разблокирует ворота до конца попытки. */
+export interface GateSwitchDef {
+  x: number;
+  y: number;
+}
+
+/**
+ * Ледяная колея: фигура не может произвольно остановиться на этой клетке —
+ * только если дальше в том же направлении путь физически перекрыт. Меняет
+ * тактику: нельзя перегородить дорогу где угодно, лёд «продавливает» ход дальше.
+ */
+export interface IceDef {
+  x: number;
+  y: number;
+}
+
+type Difficulty = 'easy' | 'medium' | 'hard';
 
 export interface LevelDef {
   id: number;
@@ -48,6 +64,8 @@ export interface LevelDef {
   pieces: PieceDef[];
   walls?: WallDef[];
   star?: StarDef;
+  gateSwitch?: GateSwitchDef;
+  ice?: IceDef[];
   /** Оптимум решателя (проверяется тестом). */
   par: number;
   /** Порог двух звёзд: ходов <= par2. */

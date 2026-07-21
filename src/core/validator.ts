@@ -109,6 +109,23 @@ export function validateLevel(level: LevelDef, opts: { withSolver?: boolean } = 
     if (occupied.has(k)) err(`звезда стоит на занятой клетке (${occupied.get(k)})`);
   }
 
+  // Ледяная колея
+  for (const ice of level.ice ?? []) {
+    if (!inside(ice.x, ice.y)) err(`лёд (${ice.x},${ice.y}) вне поля`);
+    const k = `${ice.x},${ice.y}`;
+    if (occupied.has(k)) err(`лёд стоит на занятой клетке (${occupied.get(k)})`);
+    if (level.star?.x === ice.x && level.star.y === ice.y) err(`лёд пересекается со звездой (${ice.x},${ice.y})`);
+  }
+
+  // Нажимная кнопка ворот
+  if (level.gateSwitch) {
+    const { x, y } = level.gateSwitch;
+    if (!inside(x, y)) err(`кнопка ворот (${x},${y}) вне поля`);
+    const k = `${x},${y}`;
+    if (occupied.has(k)) err(`кнопка ворот стоит на занятой клетке (${occupied.get(k)})`);
+    if (level.star?.x === x && level.star.y === y) err(`кнопка ворот пересекается со звездой (${x},${y})`);
+  }
+
   // Пороги звёзд
   if (!Number.isInteger(level.par) || level.par < 1) err(`par должен быть >= 1`);
   if (!Number.isInteger(level.par2) || level.par2 < level.par) err(`par2 должен быть >= par`);

@@ -13,6 +13,8 @@ export interface GameState {
   pieces: PieceState[];
   moves: number;
   starCollected: boolean;
+  /** Ворота разблокированы нажимной кнопкой; на обычных уровнях true с начала. */
+  gateUnlocked: boolean;
   won: boolean;
 }
 
@@ -22,6 +24,8 @@ export interface MoveResult {
   starCollected: boolean;
   /** Целевая машина выехала этим ходом. */
   exited: boolean;
+  /** Нажимная кнопка ворот впервые сработала этим ходом. */
+  gateActivated: boolean;
 }
 
 export const EMPTY = -1;
@@ -32,6 +36,7 @@ export function createState(level: LevelDef): GameState {
     pieces: level.pieces.map((p) => ({ x: p.x, y: p.y, used: 0, gone: false })),
     moves: 0,
     starCollected: false,
+    gateUnlocked: level.gateSwitch === undefined,
     won: false
   };
 }
@@ -41,6 +46,7 @@ export function cloneState(s: GameState): GameState {
     pieces: s.pieces.map((p) => ({ ...p })),
     moves: s.moves,
     starCollected: s.starCollected,
+    gateUnlocked: s.gateUnlocked,
     won: s.won
   };
 }
@@ -98,9 +104,10 @@ export function allowedDirs(def: PieceDef): { dx: number; dy: number }[] {
 }
 
 /** Движется ли фигура в сторону ворот по их ряду/колонке (только целевая). */
-export function isExitLane(level: LevelDef, i: number, s: GameState, dx: number, dy: number): boolean {
+function isExitLane(level: LevelDef, i: number, s: GameState, dx: number, dy: number): boolean {
   const def = level.pieces[i];
   if (def.kind !== 'target') return false;
+  if (level.gateSwitch && !s.gateUnlocked) return false;
   const v = exitVector(level.exit);
   if (dx !== v.dx || dy !== v.dy) return false;
   if (v.dy === 0) return def.dir === 'h' && s.pieces[i].y === level.exit.index;
@@ -180,8 +187,17 @@ export function applyMove(
   steps: number
 ): MoveResult | null {
   if (s.won || steps <= 0) return null;
-  if (steps > maxSteps(level, s, i, dx, dy)) return null;
+  const limit = maxSteps(level, s, i, dx, dy);
+  if (steps > limit) return null;
   const def = level.pieces[i];
+  // Ледяная колея: остановиться на льду можно, только если дальше по этой
+  // прямой ехать физически некуда (steps === limit — вынужденная остановка).
+  // Иначе игрок «выбрал» стоп на льду по своей воле — недопустимо.
+  if (level.ice?.length && steps < limit) {
+    const ps0 = s.pieces[i];
+    const landed = pieceCells(def, { x: ps0.x + dx * steps, y: ps0.y + dy * steps, gone: false });
+    if (landed.some((c) => level.ice!.some((ice) => ice.x === c.x && ice.y === c.y))) return null;
+  }
   const ns = cloneState(s);
   const ps = ns.pieces[i];
 
@@ -192,6 +208,16 @@ export function applyMove(
     for (let t = 0; t <= steps && !starHit; t++) {
       starHit = pieceCells(def, { x: ps.x + dx * t, y: ps.y + dy * t, gone: false }).some(
         (c) => c.x === star.x && c.y === star.y
+      );
+    }
+  }
+
+  let gateActivated = false;
+  const gateSwitch = level.gateSwitch;
+  if (gateSwitch && !ns.gateUnlocked) {
+    for (let t = 0; t <= steps && !gateActivated; t++) {
+      gateActivated = pieceCells(def, { x: ps.x + dx * t, y: ps.y + dy * t, gone: false }).some(
+        (c) => c.x === gateSwitch.x && c.y === gateSwitch.y
       );
     }
   }
@@ -215,7 +241,8 @@ export function applyMove(
 
   ns.moves++;
   if (starHit) ns.starCollected = true;
-  return { state: ns, starCollected: starHit, exited };
+  if (gateActivated) ns.gateUnlocked = true;
+  return { state: ns, starCollected: starHit, exited, gateActivated };
 }
 
 /** Подсчёт звёзд за результат уровня. */

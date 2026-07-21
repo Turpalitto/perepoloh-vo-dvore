@@ -1,5 +1,8 @@
+import './mock.css';
 import type { SaveData } from '../game/save';
 import { sanitizeSave } from '../game/save';
+import { queryParam } from '../query';
+import { DEFAULT_PLATFORM_CONFIG } from './types';
 import type { AdHandlers, Platform } from './types';
 
 const STORAGE_KEY = 'parkovka.save.v1';
@@ -41,17 +44,72 @@ function fakeAd(kind: 'interstitial' | 'rewarded', h: AdHandlers): Promise<boole
   });
 }
 
+/** Заглушка sticky-баннера для локальной разработки: одна из боковых полос. */
+function showMockBanner(): void {
+  if (document.querySelector('[data-testid=mock-banner]')) return;
+  const el = document.createElement('div');
+  el.className = 'mock-banner';
+  el.setAttribute('data-testid', 'mock-banner');
+  el.innerHTML = `<span>Баннер (mock)</span>`;
+  document.body.appendChild(el);
+  // Резервируем высоту баннера, чтобы он не перекрывал нижние кнопки —
+  // так же, как sticky-баннер Яндекса не должен наезжать на управление.
+  document.body.classList.add('mock-banner-on');
+}
+
 export function createMockPlatform(): Platform {
   return {
     name: 'mock',
+    config: { ...DEFAULT_PLATFORM_CONFIG },
+    isTV: queryParam('tv') === '1',
     async init(): Promise<void> {
       console.info('[platform] mock-режим (без Яндекс SDK)');
     },
     getLang(): string {
       return navigator.language ?? 'ru';
     },
-    async submitScore(totalStars: number): Promise<void> {
-      console.info(`[platform] лидерборд (mock): ${totalStars} звёзд`);
+    async submitScore(board: 'yardstars' | 'dailystreak', value: number): Promise<void> {
+      console.info(`[platform] лидерборд ${board} (mock): ${value}`);
+    },
+    async getLeaderboard(board: 'yardstars' | 'dailystreak') {
+      const daily = board === 'dailystreak';
+      return [
+        { rank: 1, name: 'Марфа', score: daily ? 21 : 184 },
+        { rank: 2, name: 'Дед Егор', score: daily ? 14 : 142 },
+        { rank: 3, name: 'Сосед', score: daily ? 9 : 97 }
+      ];
+    },
+    async getMyRank(board: 'yardstars' | 'dailystreak') {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const save = raw ? sanitizeSave(JSON.parse(raw)) : null;
+      if (!save) return null;
+      const score =
+        board === 'dailystreak'
+          ? (save.daily?.streak ?? 0)
+          : Object.values(save.stars).reduce((sum, n) => sum + n, 0);
+      if (score <= 0) return null;
+      const rivals = (await this.getLeaderboard(board)).map((r) => r.score);
+      const rank = rivals.filter((s) => s > score).length + 1;
+      return { rank, name: 'Вы', score, isMe: true };
+    },
+    async requestReview(): Promise<boolean> {
+      console.info('[platform] запрос оценки (mock)');
+      return true;
+    },
+    serverTime(): number {
+      return Date.now();
+    },
+    setLifecycleHandlers(): void {
+      // В mock системные события платформы отсутствуют.
+    },
+    setBackHandler(handler: () => void): void {
+      window.addEventListener('mock-history-back', handler);
+    },
+    async requestFullscreen(): Promise<void> {
+      // Preview остаётся оконным, чтобы TV e2e не менял окружение браузера.
+    },
+    async exit(): Promise<void> {
+      document.documentElement.dataset.mockExit = 'true';
     },
     ready(): void {
       console.info('[platform] игра готова (mock ready)');
@@ -76,6 +134,9 @@ export function createMockPlatform(): Platform {
     },
     showRewarded(h: AdHandlers): Promise<boolean> {
       return fakeAd('rewarded', h);
+    },
+    async showBanner(): Promise<void> {
+      showMockBanner();
     }
   };
 }

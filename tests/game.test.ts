@@ -152,6 +152,36 @@ describe('выезд и победа', () => {
   });
 });
 
+describe('нажимная кнопка ворот', () => {
+  const level = lvl({
+    pieces: [piece('T', 'target', 3, 2, 'h'), piece('A', 'car', 0, 0, 'v')],
+    gateSwitch: { x: 0, y: 3 },
+    mechanics: ['gate-switch']
+  });
+
+  it('не выпускает цель до активации и срабатывает при проезде любой машины', () => {
+    const start = createState(level);
+    expect(start.gateUnlocked).toBe(false);
+    expect(exitSteps(level, start)).toBe(-1);
+
+    const pressed = applyMove(level, start, 1, 0, 1, 3)!;
+    expect(pressed.gateActivated).toBe(true);
+    expect(pressed.state.gateUnlocked).toBe(true);
+    expect(exitSteps(level, pressed.state)).toBe(3);
+
+    const exit = applyMove(level, pressed.state, 0, 1, 0, 3)!;
+    expect(exit.state.won).toBe(true);
+  });
+
+  it('состояние кнопки участвует в независимом клоне для отмены хода', () => {
+    const start = createState(level);
+    const pressed = applyMove(level, start, 1, 0, 1, 3)!.state;
+    const copy = cloneState(pressed);
+    copy.gateUnlocked = false;
+    expect(pressed.gateUnlocked).toBe(true);
+  });
+});
+
 describe('cloneState (основа undo)', () => {
   it('клон независим', () => {
     const level = lvl({ pieces: [piece('T', 'target', 0, 2, 'h')] });

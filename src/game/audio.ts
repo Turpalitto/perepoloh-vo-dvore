@@ -8,6 +8,7 @@ export type SoundName =
   | 'move'
   | 'thud'
   | 'star'
+  | 'switch'
   | 'gate'
   | 'win'
   | 'honk'
@@ -26,10 +27,11 @@ export class GameAudio {
   private ducked = false;
   private hidden = false;
   private ambientStarted = false;
-  private engine: { osc: OscillatorNode; gain: GainNode } | null = null;
+  private engine: { osc: OscillatorNode; lfo: OscillatorNode; gain: GainNode } | null = null;
   private musicGain: GainNode | null = null;
   private musicTimer: number | null = null;
   private musicBar = 0;
+  private mood: 'calm' | 'tense' = 'calm';
 
   constructor(
     public enabled: boolean,
@@ -64,6 +66,11 @@ export class GameAudio {
     this.musicEnabled = on;
     if (on) this.startMusic();
     else this.stopMusic();
+  }
+
+  /** Меняет настроение уже играющей темы: спокойный двор или напряжённый босс. */
+  setMood(tense: boolean): void {
+    this.mood = tense ? 'tense' : 'calm';
   }
 
   private applyMasterGain(): void {
@@ -107,29 +114,40 @@ export class GameAudio {
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = 0.16;
     this.musicGain.connect(this.master);
-    const chords: number[][] = [
+    // Спокойный двор: мягкий мажор. Напряжённый босс: минор пониже и чаще щипки.
+    const calmChords: number[][] = [
       [130.8, 196.0, 329.6], // C
       [110.0, 164.8, 261.6], // Am
       [87.3, 174.6, 261.6], // F
       [98.0, 196.0, 293.7] // G
     ];
-    const scale = [261.6, 293.7, 329.6, 392.0, 440.0, 523.3, 587.3, 659.3]; // C-пентатоника+
+    const tenseChords: number[][] = [
+      [110.0, 164.8, 261.6], // Am
+      [98.0, 146.8, 233.1], // Gm
+      [87.3, 130.8, 207.7], // Fm(ish)
+      [103.8, 155.6, 246.9] // Ab-ish
+    ];
+    const calmScale = [261.6, 293.7, 329.6, 392.0, 440.0, 523.3, 587.3, 659.3]; // C-пентатоника+
+    const tenseScale = [220.0, 246.9, 261.6, 311.1, 349.2, 415.3, 440.0, 493.9]; // ниже и минорнее
     let noteIdx = 3;
-    const BAR = 2.6;
     const playBar = () => {
+      const tense = this.mood === 'tense';
+      const BAR = tense ? 1.9 : 2.6;
       this.musicTimer = window.setTimeout(playBar, BAR * 1000);
       if (!this.ctx || !this.musicGain || this.ducked || !this.musicEnabled) return;
+      const chords = tense ? tenseChords : calmChords;
+      const scale = tense ? tenseScale : calmScale;
       const chord = chords[Math.floor(this.musicBar / 2) % chords.length];
       this.musicBar++;
       // пэд: два мягких голоса аккорда
       for (const f of chord.slice(0, 2)) {
-        this.padTone(f, BAR * 1.05, 0.05);
+        this.padTone(f, BAR * 1.05, tense ? 0.065 : 0.05);
       }
-      // 1–3 щипка мелодии случайным блужданием по ладу
-      const plucks = 1 + Math.floor(Math.random() * 3);
+      // 1–3 щипка мелодии случайным блужданием по ладу (в напряжённом режиме — чаще и гуще)
+      const plucks = (tense ? 2 : 1) + Math.floor(Math.random() * 3);
       for (let i = 0; i < plucks; i++) {
         noteIdx = Math.min(scale.length - 1, Math.max(0, noteIdx + (Math.floor(Math.random() * 5) - 2)));
-        if (Math.random() < 0.75) {
+        if (Math.random() < (tense ? 0.85 : 0.75)) {
           this.pluckTone(scale[noteIdx], 0.2 + Math.random() * (BAR * 0.55));
         }
       }
@@ -203,15 +221,16 @@ export class GameAudio {
     osc.connect(filter).connect(gain).connect(this.master);
     osc.start();
     lfo.start();
-    this.engine = { osc, gain };
+    this.engine = { osc, lfo, gain };
   }
 
   engineStop(): void {
     if (!this.engine || !this.ctx) return;
-    const { osc, gain } = this.engine;
+    const { osc, lfo, gain } = this.engine;
     this.engine = null;
     gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.15);
     osc.stop(this.ctx.currentTime + 0.2);
+    lfo.stop(this.ctx.currentTime + 0.2);
   }
 
   private tone(
@@ -300,6 +319,10 @@ export class GameAudio {
       case 'star':
         this.tone(1319, 0.09, 'sine', 0.2);
         this.tone(1760, 0.16, 'sine', 0.2, 0.08);
+        break;
+      case 'switch':
+        this.tone(420, 0.08, 'square', 0.12, 0, 620);
+        this.tone(840, 0.14, 'sine', 0.16, 0.08, 1040);
         break;
       case 'gate':
         this.tone(200, 0.34, 'sawtooth', 0.055, 0, 300);

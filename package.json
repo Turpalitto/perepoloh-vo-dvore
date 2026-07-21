@@ -1,20 +1,28 @@
 {
   "name": "perepoloh-vo-dvore",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:e2e": "vite build --mode e2e",
+    "verify:dist": "tsx scripts/verify-dist.ts",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "solve": "tsx scripts/solve.ts",
-    "e2e": "playwright test"
+    "generate": "tsx scripts/generate.ts",
+    "rebalance": "tsx scripts/rebalance-levels.ts",
+    "e2e": "npm run build:e2e && playwright test",
+    "screenshots:yandex": "tsx scripts/capture-yandex-screenshots.ts",
+    "promo:puzzle": "tsx scripts/promo-puzzle-v2.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.1",
     "@types/node": "^26.1.1",
+    "@vitejs/plugin-legacy": "^7.2.1",
+    "terser": "^5.49.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "vite": "^7.0.4",

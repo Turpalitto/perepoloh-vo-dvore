@@ -28,7 +28,7 @@ export interface SolveResult {
 const STATE_LIMIT = 400_000;
 
 function stateKey(s: GameState): string {
-  let k = s.starCollected ? 'S' : '.';
+  let k = `${s.starCollected ? 'S' : '.'}${s.gateUnlocked ? 'G' : '.'}`;
   for (const p of s.pieces) {
     k += p.gone ? '|g' : `|${p.x},${p.y},${p.used}`;
   }

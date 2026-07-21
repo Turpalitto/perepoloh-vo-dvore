@@ -1,14 +1,15 @@
-import { createMockPlatform } from './mock';
 import { createYandexPlatform } from './yandex';
 import type { Platform } from './types';
+import { queryParam } from '../query';
 
 const SDK_URL = '/sdk.js';
-const SDK_FALLBACK_URL = 'https://sdk.games.s3.yandex.net/sdk.js';
-const SDK_TIMEOUT_MS = 3000;
+const SDK_TIMEOUT_MS = 10_000;
+const MOCK_BUILD = import.meta.env.DEV || import.meta.env.MODE === 'e2e';
 
 function loadScript(src: string, timeoutMs: number): Promise<boolean> {
   return new Promise((resolve) => {
     const s = document.createElement('script');
+    s.async = true;
     const timer = setTimeout(() => {
       s.remove();
       resolve(false);
@@ -28,25 +29,21 @@ function loadScript(src: string, timeoutMs: number): Promise<boolean> {
 }
 
 /**
- * Выбор платформы: в дев-режиме и по ?mock=1 — mock;
- * иначе пытаемся поднять Яндекс SDK, при неудаче тихо падаем в mock.
+ * Mock существует только в dev/e2e-сборках. В production всегда используется
+ * официальный относительный /sdk.js: тестовая реклама не попадает в релиз.
  */
 export async function createPlatform(): Promise<Platform> {
-  const params = new URLSearchParams(location.search);
-  const forceMock = params.get('mock') === '1' || (import.meta.env.DEV && params.get('yandex') !== '1');
-  if (!forceMock) {
-    const loaded = (await loadScript(SDK_URL, SDK_TIMEOUT_MS)) || (await loadScript(SDK_FALLBACK_URL, SDK_TIMEOUT_MS));
-    if (loaded && window.YaGames) {
-      const platform = createYandexPlatform();
-      try {
-        await platform.init();
-        return platform;
-      } catch (e) {
-        console.warn('[platform] SDK не инициализировался, переходим в mock:', e);
-      }
-    }
+  const useMock = MOCK_BUILD && (queryParam('mock') === '1' || (import.meta.env.DEV && queryParam('yandex') !== '1'));
+  if (useMock) {
+    const { createMockPlatform } = await import('./mock');
+    const mock = createMockPlatform();
+    await mock.init();
+    return mock;
   }
-  const mock = createMockPlatform();
-  await mock.init();
-  return mock;
+
+  const loaded = await loadScript(SDK_URL, SDK_TIMEOUT_MS);
+  if (!loaded || !window.YaGames) throw new Error('Не удалось загрузить SDK Яндекс Игр');
+  const platform = createYandexPlatform();
+  await platform.init();
+  return platform;
 }

@@ -4,13 +4,30 @@
  */
 import { catArt, chickenArt, getTargetSkin } from './sprites';
 
-export function yardSVG(u: Set<string>): string {
+/** Редкие снежинки поверх сцены — единственный след сезонного события в самом дворе. */
+function snowOverlay(): string {
+  const flakes = [
+    [60, -10, 0], [140, -30, 0.6], [230, -6, 1.4], [320, -24, 0.3], [410, -14, 1.0],
+    [500, -32, 0.7], [590, -8, 1.6], [680, -20, 0.2], [760, -12, 1.1], [840, -28, 0.5]
+  ];
+  return `<g class="yard-snow">${flakes
+    .map(([x, y, delay]) => `<circle cx="${x}" cy="${y}" r="4" style="animation-delay:${delay}s"/>`)
+    .join('')}</g>`;
+}
+
+export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
   const fenceFixed = u.has('fence');
   const flowers = u.has('flowers');
   const gatePainted = u.has('gate');
   const doghouse = u.has('doghouse');
   const laundry = u.has('laundry');
   const appletree = u.has('appletree');
+  const workshop = u.has('workshop');
+  const well = u.has('well');
+  const garden = u.has('garden');
+  const pond = u.has('pond');
+  const fair = u.has('fair');
+  const celebration = u.has('celebration');
 
   const railColor = fenceFixed ? '#a9743f' : '#8f7048';
   const gateColor = gatePainted ? '#45968f' : '#8a5a30';
@@ -52,14 +69,14 @@ export function yardSVG(u: Set<string>): string {
     <line x1="52" y1="272" x2="282" y2="272" stroke="#7d5227" stroke-width="4"/>
     <path d="M30 156 L167 66 L304 156 Z" fill="#8a5a30" stroke="#63401f" stroke-width="5" stroke-linejoin="round"/>
     <rect x="238" y="84" width="26" height="52" fill="#7d5227"/>
-    <rect x="118" y="208" width="66" height="58" rx="6" fill="#cfe9f2" stroke="#7d5227" stroke-width="5"/>
+    <rect class="house-window" x="118" y="208" width="66" height="58" rx="6" fill="#cfe9f2" stroke="#7d5227" stroke-width="5"/>
     <line x1="151" y1="208" x2="151" y2="266" stroke="#7d5227" stroke-width="4"/>
     <line x1="118" y1="237" x2="184" y2="237" stroke="#7d5227" stroke-width="4"/>
     <rect x="98" y="204" width="14" height="66" rx="4" fill="#45968f"/>
     <rect x="190" y="204" width="14" height="66" rx="4" fill="#45968f"/>`;
 
   const trash = flowers
-    ? `<g transform="translate(340,436)">
+    ? `<g transform="translate(364,436)">
         <ellipse cx="0" cy="26" rx="86" ry="20" fill="#b98d4f"/>
         ${[-58, -30, -2, 26, 54].map((x, i) => `
           <line x1="${x}" y1="24" x2="${x}" y2="-4" stroke="#4c8a35" stroke-width="5"/>
@@ -107,11 +124,11 @@ export function yardSVG(u: Set<string>): string {
       </g>
       <g transform="translate(452,398)">
         <line x1="0" y1="0" x2="0" y2="60" stroke="#5a5350" stroke-width="7"/>
-        <circle cx="0" cy="-10" r="13" fill="#ffe9a8" stroke="#d9a520" stroke-width="4"/>
+        <circle class="yard-lamp-light" cx="0" cy="-10" r="13" fill="#ffe9a8" stroke="#d9a520" stroke-width="4"/>
       </g>
       <g transform="translate(648,412)">
         <line x1="0" y1="0" x2="0" y2="52" stroke="#5a5350" stroke-width="7"/>
-        <circle cx="0" cy="-10" r="13" fill="#ffe9a8" stroke="#d9a520" stroke-width="4"/>
+        <circle class="yard-lamp-light" cx="0" cy="-10" r="13" fill="#ffe9a8" stroke="#d9a520" stroke-width="4"/>
       </g>`
     : '';
 
@@ -134,6 +151,48 @@ export function yardSVG(u: Set<string>): string {
     <ellipse cx="470" cy="470" rx="330" ry="110" fill="#dbb271"/>
     <ellipse cx="470" cy="470" rx="330" ry="110" fill="none" stroke="rgba(93,64,25,0.2)" stroke-width="4" stroke-dasharray="16 14"/>`;
 
+  const workshopLayer = workshop
+    ? `<g transform="translate(290,188)">
+        <rect width="120" height="112" rx="7" fill="#bd8247" stroke="#7d5227" stroke-width="5"/>
+        <path d="M-10 4 L60 -38 L130 4 Z" fill="#8a5a30" stroke="#63401f" stroke-width="5"/>
+        <rect x="20" y="38" width="80" height="74" rx="5" fill="#6f918f" stroke="#5d4020" stroke-width="5"/>
+        <path d="M28 60 H92 M28 82 H92" stroke="#d7ecea" stroke-width="5"/>
+        <g transform="translate(60,-14)"><circle r="14" fill="#f6c445"/><path d="M-12 0H12M0-12V12" stroke="#8a5a30" stroke-width="5"/></g>
+      </g>`
+    : '';
+  const wellLayer = well
+    ? `<g transform="translate(684,292)">
+        <ellipse cx="0" cy="28" rx="48" ry="19" fill="#8c9691" stroke="#626b68" stroke-width="5"/>
+        <rect x="-48" y="0" width="96" height="30" fill="#9ca7a1" stroke="#626b68" stroke-width="5"/>
+        <ellipse cx="0" cy="0" rx="48" ry="18" fill="#3f7184" stroke="#626b68" stroke-width="5"/>
+        <path d="M-34 -2V-62M34-2V-62M-44-58Q0-92 44-58" fill="none" stroke="#7d5227" stroke-width="8"/>
+        <circle cx="0" cy="-42" r="10" fill="#a9743f" stroke="#63401f" stroke-width="4"/>
+      </g>`
+    : '';
+  const gardenLayer = garden
+    ? `<g transform="translate(30,476)">
+        ${[0, 26, 52].map((y) => `<path d="M0 ${y} Q70 ${y - 14} 140 ${y}" fill="none" stroke="#81552e" stroke-width="14" stroke-linecap="round"/>`).join('')}
+        ${[18, 52, 86, 120].map((x, i) => `<g transform="translate(${x},${(i % 3) * 26 - 5})"><path d="M0 12V-4" stroke="#377334" stroke-width="5"/><circle cx="-6" cy="-5" r="8" fill="#5fa74e"/><circle cx="7" cy="-8" r="8" fill="#6db75b"/></g>`).join('')}
+      </g>`
+    : '';
+  const pondLayer = pond
+    ? `<g transform="translate(684,530)">
+        <ellipse rx="92" ry="38" fill="#64b9d1" stroke="#4a8da5" stroke-width="5"/>
+        <path d="M-80 4Q-55-12-30 2T20 0T72 2" fill="none" stroke="#a9e4ee" stroke-width="4"/>
+        <g transform="translate(20,-8)"><ellipse rx="20" ry="11" fill="#f4e1a8"/><circle cx="16" cy="-10" r="9" fill="#f4e1a8"/><path d="M23-10l12 4-12 4z" fill="#e39b2d"/><circle cx="18" cy="-12" r="2"/></g>
+      </g>`
+    : '';
+  const fairLayer = fair
+    ? `<g><path d="M70 118 Q450 172 830 108" fill="none" stroke="#fff1d0" stroke-width="4"/>
+        ${Array.from({ length: 12 }, (_, i) => { const x = 92 + i * 66; const y = 120 + Math.sin(i / 2) * 17; const color = ['#e2574c', '#f6c445', '#45968f'][i % 3]; return `<path d="M${x} ${y}l18 5-12 24z" fill="${color}"/>`; }).join('')}</g>`
+    : '';
+  const celebrationLayer = celebration
+    ? `<g fill="#fff2a8" opacity=".9">${[[360,80],[430,105],[520,70],[610,128],[735,160]].map(([x,y], i) => `<g transform="translate(${x},${y})"><circle r="5"/><path d="M0-18V18M-18 0H18M-13-13L13 13M13-13L-13 13" stroke="${['#f6c445','#e2574c','#45968f'][i%3]}" stroke-width="4"/></g>`).join('')}</g>`
+    : '';
+  const trophyLayer = trophies > 0
+    ? `<g transform="translate(214,174)"><rect x="-8" y="-12" width="${Math.min(trophies, 6) * 22 + 12}" height="32" rx="8" fill="rgba(61,44,30,.58)"/>${Array.from({ length: Math.min(trophies, 6) }, (_, i) => `<text x="${i * 22}" y="12" font-size="20">🏆</text>`).join('')}</g>`
+    : '';
+
   // машинка-«жигулёнок» едет по двору (цвет — выбранный скин игрока)
   const skin = getTargetSkin();
   const car = `<g transform="translate(508,470)" data-tap="honk"><g class="tap-inner">
@@ -147,9 +206,28 @@ export function yardSVG(u: Set<string>): string {
     </g></g>`;
 
   return `<svg viewBox="0 0 900 620" preserveAspectRatio="xMidYMid slice" class="yard-svg">
-    <rect x="0" y="0" width="900" height="320" fill="#bfe3f2"/>
-    <circle cx="788" cy="86" r="46" fill="#f6c445"/>
-    <circle cx="788" cy="86" r="60" fill="#f6c445" opacity="0.25"/>
+    <rect class="yard-sky" x="0" y="0" width="900" height="320" fill="#bfe3f2"/>
+    <g class="yard-stars" fill="#fff4c7">
+      <circle cx="340" cy="42" r="3"/><circle cx="392" cy="92" r="2.5"/>
+      <circle cx="466" cy="38" r="3.5"/><circle cx="535" cy="116" r="2.5"/>
+      <circle cx="604" cy="48" r="3"/><circle cx="676" cy="104" r="2.5"/>
+      <circle cx="730" cy="34" r="3"/><circle cx="850" cy="138" r="3"/>
+      <path d="M322 122l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/>
+      <path d="M578 82l4 9 9 4-9 4-4 9-4-9-9-4 9-4z"/>
+      <path d="M698 160l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/>
+      <path d="M842 54l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/>
+    </g>
+    <g class="yard-sun">
+      <circle cx="788" cy="86" r="46" fill="#f6c445"/>
+      <circle cx="788" cy="86" r="60" fill="#f6c445" opacity="0.25"/>
+    </g>
+    <g class="yard-moon">
+      <circle cx="788" cy="86" r="48" fill="#fff3c4" opacity="0.18"/>
+      <circle cx="788" cy="86" r="38" fill="#fff3c4"/>
+      <circle cx="773" cy="75" r="7" fill="#e5d9ab" opacity="0.72"/>
+      <circle cx="802" cy="96" r="9" fill="#e5d9ab" opacity="0.58"/>
+      <circle cx="805" cy="69" r="4" fill="#e5d9ab" opacity="0.64"/>
+    </g>
     <g class="clouds-drift">
       <ellipse cx="200" cy="86" rx="66" ry="24" fill="#ffffff" opacity="0.85"/>
       <ellipse cx="256" cy="100" rx="48" ry="18" fill="#ffffff" opacity="0.7"/>
@@ -157,8 +235,15 @@ export function yardSVG(u: Set<string>): string {
     </g>
     <rect x="0" y="252" width="900" height="368" fill="#79b34c"/>
     <path d="M0 252 Q450 236 900 252 L900 268 Q450 252 0 268 Z" fill="#6cae46"/>
+    ${fairLayer}
+    ${celebrationLayer}
     ${house}
+    ${workshopLayer}
+    ${trophyLayer}
     ${yard}
+    ${wellLayer}
+    ${gardenLayer}
+    ${pondLayer}
     ${trash}
     ${fence}
     ${gate}
@@ -169,5 +254,6 @@ export function yardSVG(u: Set<string>): string {
     <g transform="translate(408,300)" data-tap="meow"><g class="tap-inner">${catArt()}</g></g>
     <g transform="translate(210,500) scale(1.4)" data-tap="cluck"><g class="tap-inner"><g class="chicken-bob">${chickenArt()}</g></g></g>
     <g transform="translate(268,530) scale(1.2) scale(-1,1)" data-tap="cluck"><g class="tap-inner"><g class="chicken-bob" style="animation-delay:2.3s">${chickenArt()}</g></g></g>
+    ${season === 'newyear' ? snowOverlay() : ''}
   </svg>`;
 }

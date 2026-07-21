@@ -8,13 +8,22 @@ export interface UpgradeStage {
   title: string;
 }
 
-export const UPGRADES: UpgradeStage[] = [
+// Пороги смещены ниже теоретического максимума (300): последнее улучшение
+// доступно сильному, но не идеальному игроку. Полный сбор 300 звёзд остаётся
+// отдельным трофеем-достижением, а не условием косметики.
+const UPGRADES: UpgradeStage[] = [
   { stars: 2, key: 'fence', title: 'Забор починен!' },
-  { stars: 6, key: 'flowers', title: 'Расцвела клумба!' },
-  { stars: 10, key: 'gate', title: 'Ворота покрашены!' },
-  { stars: 15, key: 'doghouse', title: 'Новая будка — привет, Шарик!' },
-  { stars: 21, key: 'laundry', title: 'Свежее бельё и фонарики!' },
-  { stars: 28, key: 'appletree', title: 'Яблоня и качели!' }
+  { stars: 8, key: 'flowers', title: 'Расцвела клумба!' },
+  { stars: 14, key: 'gate', title: 'Ворота покрашены!' },
+  { stars: 21, key: 'doghouse', title: 'Новая будка — привет, Шарик!' },
+  { stars: 30, key: 'laundry', title: 'Свежее бельё и фонарики!' },
+  { stars: 40, key: 'appletree', title: 'Яблоня и качели!' },
+  { stars: 60, key: 'workshop', title: 'Открылась дедова мастерская!' },
+  { stars: 85, key: 'well', title: 'Старый колодец восстановлен!' },
+  { stars: 115, key: 'garden', title: 'Огород снова плодоносит!' },
+  { stars: 150, key: 'pond', title: 'Во дворе появился пруд!' },
+  { stars: 195, key: 'fair', title: 'Двор готов к ярмарке!' },
+  { stars: 250, key: 'celebration', title: 'Большой праздник во дворе!' }
 ];
 
 export function unlockedUpgrades(total: number): Set<string> {
@@ -44,6 +53,3 @@ export function nextLevelToPlay(levels: LevelDef[], save: SaveData): LevelDef {
   }
   return levels[levels.length - 1];
 }
-
-/** Показывать interstitial перед каждым третьим переходом «Дальше». */
-export const INTERSTITIAL_EVERY = 3;

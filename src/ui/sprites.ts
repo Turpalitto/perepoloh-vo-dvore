@@ -27,10 +27,14 @@ export interface TargetSkin extends CarColors {
 
 export const TARGET_SKINS: TargetSkin[] = [
   { body: '#3f7fd1', dark: '#2d5f9f', light: '#6099dd', unlockStars: 0, nameKey: 'skin.blue' },
-  { body: '#8b5fc9', dark: '#6a4499', light: '#a37fd9', unlockStars: 15, nameKey: 'skin.violet' },
-  { body: '#e07b39', dark: '#b25a20', light: '#ea9a63', unlockStars: 40, nameKey: 'skin.orange' },
-  { body: '#e06a9f', dark: '#b34a7c', light: '#ea8fb8', unlockStars: 70, nameKey: 'skin.pink' },
-  { body: '#4a4a52', dark: '#31313a', light: '#68686f', unlockStars: 100, nameKey: 'skin.black' }
+  { body: '#8b5fc9', dark: '#6a4499', light: '#a37fd9', unlockStars: 20, nameKey: 'skin.violet' },
+  { body: '#e07b39', dark: '#b25a20', light: '#ea9a63', unlockStars: 50, nameKey: 'skin.orange' },
+  { body: '#e06a9f', dark: '#b34a7c', light: '#ea8fb8', unlockStars: 85, nameKey: 'skin.pink' },
+  { body: '#4a4a52', dark: '#31313a', light: '#68686f', unlockStars: 120, nameKey: 'skin.black' },
+  { body: '#4f9e50', dark: '#347236', light: '#75b976', unlockStars: 155, nameKey: 'skin.green' },
+  { body: '#eee1bd', dark: '#aa9365', light: '#fff4d5', unlockStars: 190, nameKey: 'skin.cream' },
+  { body: '#b9252d', dark: '#81191f', light: '#dc4b52', unlockStars: 220, nameKey: 'skin.red' },
+  { body: '#d8ae27', dark: '#987713', light: '#f0cf5a', unlockStars: 250, nameKey: 'skin.gold' }
 ];
 
 let targetSkinIdx = 0;
@@ -70,18 +74,76 @@ function wheels(xs: number[]): string {
     .join('');
 }
 
-function carBody(c: CarColors, striped: boolean): string {
+type CarVariant = 'target' | 0 | 1 | 2;
+
+function carBody(c: CarColors, variant: CarVariant): string {
   const g = gradFill(c.light, c.body);
+  if (variant === 'target') {
+    return `
+      <defs>${g.defs}</defs>
+      ${wheels([24, 140])}
+      <rect x="5" y="13" width="190" height="74" rx="17" fill="${g.fill}" stroke="${c.dark}" stroke-width="5"/>
+      <rect x="2" y="35" width="9" height="30" rx="4" fill="#e8dcc8" stroke="#8f8578" stroke-width="2"/>
+      <rect x="189" y="35" width="9" height="30" rx="4" fill="#e8dcc8" stroke="#8f8578" stroke-width="2"/>
+      <path d="M31 18 V82 M166 18 V82" stroke="${c.dark}" stroke-width="2.5" opacity="0.65"/>
+      <rect x="42" y="23" width="22" height="54" rx="5" fill="${GLASS}" stroke="${GLASS_DARK}" stroke-width="3"/>
+      <rect x="69" y="18" width="62" height="64" rx="8" fill="#fff0bf" stroke="${c.dark}" stroke-width="3"/>
+      <rect x="75" y="24" width="50" height="52" rx="7" fill="${c.light}"/>
+      <rect x="75" y="44" width="50" height="12" rx="4" fill="#f6c445"/>
+      <path d="M80 29 H120" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="0.32"/>
+      <rect x="137" y="23" width="22" height="54" rx="5" fill="${GLASS}" stroke="${GLASS_DARK}" stroke-width="3"/>
+      <path d="M168 39 L184 50 L168 61 Z" fill="#f6c445" stroke="#8a6114" stroke-width="2.5" stroke-linejoin="round"/>
+      <circle cx="188" cy="29" r="6.5" fill="#fff1a8" stroke="${c.dark}" stroke-width="2"/>
+      <circle cx="188" cy="71" r="6.5" fill="#fff1a8" stroke="${c.dark}" stroke-width="2"/>
+      <rect x="11" y="23" width="7" height="15" rx="3" fill="#d83f38" stroke="${c.dark}" stroke-width="2"/>
+      <rect x="11" y="62" width="7" height="15" rx="3" fill="#d83f38" stroke="${c.dark}" stroke-width="2"/>
+      <rect x="88" y="8" width="24" height="6" rx="3" fill="#e8dcc8" opacity="0.9"/>`;
+  }
+
+  if (variant === 1) {
+    return `
+      <defs>${g.defs}</defs>
+      ${wheels([24, 140])}
+      <rect x="7" y="13" width="186" height="74" rx="15" fill="${g.fill}" stroke="${c.dark}" stroke-width="4"/>
+      <rect x="28" y="23" width="25" height="54" rx="6" fill="${GLASS}" stroke="${GLASS_DARK}" stroke-width="2"/>
+      <rect x="58" y="18" width="82" height="64" rx="11" fill="${c.light}" stroke="${c.dark}" stroke-width="2"/>
+      <rect x="64" y="24" width="31" height="52" rx="7" fill="${GLASS}" opacity="0.9"/>
+      <rect x="101" y="24" width="33" height="52" rx="7" fill="${GLASS}" opacity="0.9"/>
+      <path d="M98 23 V77" stroke="${GLASS_DARK}" stroke-width="3"/>
+      <rect x="148" y="23" width="24" height="54" rx="6" fill="${GLASS}" stroke="${GLASS_DARK}" stroke-width="2"/>
+      <circle cx="187" cy="30" r="6" fill="#ffe9a8" stroke="${c.dark}" stroke-width="2"/>
+      <circle cx="187" cy="70" r="6" fill="#ffe9a8" stroke="${c.dark}" stroke-width="2"/>
+      <rect x="10" y="24" width="7" height="14" rx="3" fill="#d94a3d"/>
+      <rect x="10" y="62" width="7" height="14" rx="3" fill="#d94a3d"/>`;
+  }
+
+  if (variant === 2) {
+    return `
+      <defs>${g.defs}</defs>
+      ${wheels([32, 128])}
+      <rect x="19" y="14" width="168" height="72" rx="31" fill="${g.fill}" stroke="${c.dark}" stroke-width="4"/>
+      <rect x="48" y="25" width="21" height="50" rx="8" fill="${GLASS}" stroke="${GLASS_DARK}" stroke-width="2"/>
+      <rect x="74" y="20" width="56" height="60" rx="18" fill="${c.light}"/>
+      <path d="M81 27 Q102 20 123 27" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+      <rect x="136" y="25" width="20" height="50" rx="8" fill="${GLASS}" stroke="${GLASS_DARK}" stroke-width="2"/>
+      <circle cx="178" cy="32" r="6" fill="#ffe9a8" stroke="${c.dark}" stroke-width="2"/>
+      <circle cx="178" cy="68" r="6" fill="#ffe9a8" stroke="${c.dark}" stroke-width="2"/>
+      <circle cx="27" cy="32" r="4.5" fill="#d94a3d"/>
+      <circle cx="27" cy="68" r="4.5" fill="#d94a3d"/>`;
+  }
+
   return `
     <defs>${g.defs}</defs>
     ${wheels([26, 138])}
     <rect x="8" y="14" width="184" height="72" rx="24" fill="${g.fill}" stroke="${c.dark}" stroke-width="4"/>
     <rect x="38" y="24" width="18" height="52" rx="6" fill="${GLASS}" stroke="${GLASS_DARK}" stroke-width="2"/>
     <rect x="66" y="20" width="60" height="60" rx="12" fill="${c.light}"/>
-    ${striped ? `<rect x="66" y="44" width="60" height="12" fill="#f6c445" rx="4"/>` : ''}
     <rect x="132" y="24" width="20" height="52" rx="6" fill="${GLASS}" stroke="${GLASS_DARK}" stroke-width="2"/>
+    <path d="M72 25 H120" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="0.25"/>
     <circle cx="186" cy="30" r="6" fill="#ffe9a8" stroke="${c.dark}" stroke-width="2"/>
     <circle cx="186" cy="70" r="6" fill="#ffe9a8" stroke="${c.dark}" stroke-width="2"/>
+    <circle cx="14" cy="30" r="4.5" fill="#d94a3d" stroke="${c.dark}" stroke-width="2"/>
+    <circle cx="14" cy="70" r="4.5" fill="#d94a3d" stroke="${c.dark}" stroke-width="2"/>
     <rect x="10" y="42" width="8" height="16" rx="3" fill="#e8dcc8"/>`;
 }
 
@@ -156,9 +218,9 @@ export function pieceArt(def: PieceDef): string {
   const shadow = `<rect x="10" y="20" width="${def.len * CELL - 14}" height="76" rx="20" fill="rgba(43,29,10,0.25)"/>`;
   switch (def.kind) {
     case 'target':
-      return shadow + carBody(TARGET_SKINS[targetSkinIdx] ?? TARGET, true);
+      return shadow + carBody(TARGET_SKINS[targetSkinIdx] ?? TARGET, 'target');
     case 'car':
-      return shadow + carBody(CAR_SKINS[(def.skin ?? 0) % CAR_SKINS.length], false);
+      return shadow + carBody(CAR_SKINS[(def.skin ?? 0) % CAR_SKINS.length], (def.skin ?? 0) % CAR_SKINS.length as 0 | 1 | 2);
     case 'truck':
       return shadow + truckBody();
     case 'tractor':
@@ -191,6 +253,22 @@ export function wallArt(kind: WallKind): string {
         <circle cx="16" cy="63" r="7" fill="#d9b877"/>
         <circle cx="84" cy="39" r="7" fill="#d9b877"/>
         <circle cx="84" cy="63" r="7" fill="#d9b877"/>`;
+  }
+}
+
+/** Символ фигуры, не зависящий от цвета — для режима высокого контраста и миниатюр. */
+export function kindBadge(kind: PieceDef['kind']): string {
+  switch (kind) {
+    case 'target':
+      return '★';
+    case 'car':
+      return '●';
+    case 'truck':
+      return '■';
+    case 'tractor':
+      return '▲';
+    case 'crate':
+      return '◆';
   }
 }
 

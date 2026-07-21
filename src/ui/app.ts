@@ -22,6 +22,13 @@ import { DailyLevelService } from '../game/daily-client';
 import { generateEndless } from '../game/endless';
 import { requestReminderPermission } from '../game/reminder';
 import { currentSeason } from '../game/season';
+import {
+  WEEKLY_QUEST_REWARD_HINTS,
+  currentWeekKey,
+  isWeeklyQuestClaimed,
+  selectWeeklyQuests,
+  weeklyQuestProgress
+} from '../game/weekly';
 import { getLang, levelText, setLang, t } from '../game/i18n';
 import {
   isLevelUnlocked,
@@ -560,6 +567,13 @@ export class App {
     const visibleSkins = TARGET_SKINS.map((skin, index) => ({ skin, index })).filter(
       ({ index }) => index < 5 || total >= TARGET_SKINS[index - 1].unlockStars
     );
+    const week = currentWeekKey();
+    const weeklyQuests = selectWeeklyQuests(week).map((quest) => {
+      const progress = weeklyQuestProgress(this.store.data.weekly, week, quest);
+      const done = progress >= quest.goal;
+      const claimed = isWeeklyQuestClaimed(this.store.data.weekly, week, quest.key);
+      return { quest, progress, done, claimed };
+    });
     this.root.innerHTML = `
       <div class="screen menu-screen" data-testid="screen-menu">
         <div class="yard-bg">${yardSVG(unlockedUpgrades(total), trophies, season?.id)}</div>
@@ -596,6 +610,22 @@ export class App {
                   ? `💡 ${this.store.data.hintTokens ?? 0}`
                   : `🎁 ${t('gift.claim', { n: giftAmount })}`
               }</button>
+            </div>
+            <div class="weekly-quests" data-testid="weekly-quests">
+              <div class="weekly-quests-title">${t('weekly.title')}</div>
+              ${weeklyQuests
+                .map(
+                  ({ quest, progress, done, claimed }) => `
+                <div class="weekly-quest${done ? ' done' : ''}" data-testid="weekly-quest-${quest.key}">
+                  <span class="weekly-quest-icon">${quest.icon}</span>
+                  <span class="weekly-quest-label">${t(`weekly.${quest.key}`)} · ${progress}/${quest.goal}</span>
+                  <button class="btn btn-small weekly-claim" data-testid="weekly-claim-${quest.key}"
+                    data-quest="${quest.key}" ${done && !claimed ? '' : 'disabled'}>${
+                    claimed ? `✓ ${t('weekly.claimed')}` : `💡 ${t('weekly.claim')}`
+                  }</button>
+                </div>`
+                )
+                .join('')}
             </div>
             <div class="menu-meta-row">
               <button class="btn" data-testid="menu-leaderboard">🏆 ${t('menu.leaderboard')}</button>
@@ -672,6 +702,17 @@ export class App {
         this.store.setTargetSkin(i);
         this.audio.play('click');
         this.showMenu();
+      })
+    );
+    this.root.querySelectorAll<HTMLButtonElement>('.weekly-claim:not([disabled])').forEach((b) =>
+      b.addEventListener('click', () => {
+        const key = b.dataset.quest!;
+        const entry = weeklyQuests.find((q) => q.quest.key === key);
+        if (!entry) return;
+        const claimed = this.store.claimWeeklyQuest(week, key, entry.done, WEEKLY_QUEST_REWARD_HINTS);
+        if (!claimed) return;
+        this.audio.play('star');
+        this.showMenuInner();
       })
     );
     window.requestAnimationFrame(() => {
@@ -1345,6 +1386,8 @@ export class App {
     let justMastered = false;
     let dailyStreak = 0;
     let weeklyCup = false;
+    this.store.recordWeeklyEvent(currentWeekKey(), 'win', 1);
+    if (stars === 3) this.store.recordWeeklyEvent(currentWeekKey(), 'perfect', 1);
     if (daily) {
       const previousTrophies = weeklyTrophies(this.store.data.daily);
       const newDaily = advanceStreak(this.store.data.daily, dailyDate ?? this.dailyKey());
@@ -1505,6 +1548,7 @@ export class App {
     this.audio.engineStop();
     this.vibrate([28, 45, 28]);
     this.endlessStreak++;
+    this.store.recordWeeklyEvent(currentWeekKey(), 'endless', this.endlessStreak);
     const stars = starsFor(level, endState.moves, endState.starCollected);
     const achievementsBefore = unlockedAchievementKeys(this.store.data);
     const isNewBest = this.store.recordEndless(this.endlessStreak);

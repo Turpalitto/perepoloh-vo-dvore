@@ -1556,7 +1556,7 @@ html[data-daytime='night'] .yard-lamp-light {
     grid-template-columns: repeat(2, minmax(220px, 300px));
   }
 }
-@media (orientation: landscape) and (max-height: 520px) {
+@media (orientation: landscape) and (max-height: 700px) {
   .menu-screen {
     justify-content: center;
   }

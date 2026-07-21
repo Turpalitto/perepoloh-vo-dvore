@@ -14,7 +14,8 @@ import {
   targetIndex
 } from '../core/game';
 import type { SolveMove } from '../core/solver';
-import { CELL, chickenArt, pieceArt, starArt, wallArt, wellArt } from './sprites';
+import { t } from '../game/i18n';
+import { CELL, chickenArt, kindBadge, pieceArt, starArt, wallArt, wellArt } from './sprites';
 
 const M = 90; // поля вокруг двора: забор, куры
 
@@ -25,6 +26,7 @@ export interface BoardEvents {
   /** Ход применён; state уже обновлён внутри BoardView. */
   onCommit(res: MoveResult, piece: number): void;
   onBump(): void;
+  onGateSwitch(): void;
   onGateOpen(): void;
   /** Анимация выезда закончилась. */
   onExitDone(): void;
@@ -49,6 +51,27 @@ interface DragInfo {
   moved: boolean;
 }
 
+interface InputPoint {
+  clientX: number;
+  clientY: number;
+  target: EventTarget | null;
+  pointerId?: number;
+  preventDefault(): void;
+}
+
+interface TVMoveInfo {
+  idx: number;
+  axis: 'x' | 'y' | null;
+  offset: number;
+  neg: { x: number; y: number };
+  pos: { x: number; y: number };
+  inNeg: { x: number; y: number };
+  inPos: { x: number; y: number };
+  exitAxis: 'x' | 'y' | null;
+  exitSign: number;
+  exitK: number;
+}
+
 function mulberry32(a: number) {
   return () => {
     a |= 0;
@@ -68,6 +91,7 @@ export class BoardView {
   private readonly events: BoardEvents;
   private pieceEls: SVGGElement[] = [];
   private starEl: SVGGElement | null = null;
+  private gateSwitchEl: SVGGElement | null = null;
   private tracksLayer!: SVGGElement;
   private rangeLayer!: SVGGElement;
   private hintLayer!: SVGGElement;
@@ -76,6 +100,10 @@ export class BoardView {
   private drag: DragInfo | null = null;
   private animLock = false;
   private exitTimer: number | null = null;
+  private readonly usingPointerEvents = typeof window.PointerEvent === 'function';
+  private lastTouchAt = 0;
+  private selectedPiece = 0;
+  private tvMove: TVMoveInfo | null = null;
 
   constructor(host: HTMLElement, level: LevelDef, state: GameState, events: BoardEvents) {
     this.level = level;
@@ -87,24 +115,59 @@ export class BoardView {
     svg.setAttribute('viewBox', `${-M} ${-M} ${vbW} ${vbH}`);
     svg.classList.add('board');
     svg.setAttribute('data-testid', 'board');
+    svg.setAttribute('data-tv-default', 'true');
+    svg.setAttribute('tabindex', '0');
+    svg.setAttribute('role', 'application');
+    svg.setAttribute('aria-label', t('tv.boardLabel'));
     host.appendChild(svg);
     this.svg = svg;
+    this.selectedPiece = Math.max(0, targetIndex(level));
     this.build();
+    this.updateTVSelection();
+    this.updateGateSwitch(false);
     this.updateGate(false);
     // хук для e2e-тестов и отладки
-    (window as unknown as { __board?: BoardView }).__board = this;
     // лонгтап на поле не должен вызывать контекстное меню (требование платформы)
     svg.addEventListener('contextmenu', (e) => e.preventDefault());
-    svg.addEventListener('pointerdown', this.onDown);
-    svg.addEventListener('pointermove', this.onMove);
-    svg.addEventListener('pointerup', this.onUp);
-    svg.addEventListener('pointercancel', this.onUp);
+    if (this.usingPointerEvents) {
+      svg.addEventListener('pointerdown', this.onPointerDown);
+      svg.addEventListener('pointermove', this.onPointerMove);
+      svg.addEventListener('pointerup', this.onPointerUp);
+      svg.addEventListener('pointercancel', this.onPointerUp);
+    } else {
+      // Safari/iOS до Pointer Events: полноценный touch + mouse fallback.
+      svg.addEventListener('touchstart', this.onTouchStart, { passive: false });
+      svg.addEventListener('touchmove', this.onTouchMove, { passive: false });
+      svg.addEventListener('touchend', this.onTouchEnd, { passive: false });
+      svg.addEventListener('touchcancel', this.onTouchEnd, { passive: false });
+      svg.addEventListener('mousedown', this.onMouseDown);
+      window.addEventListener('mousemove', this.onMouseMove);
+      window.addEventListener('mouseup', this.onMouseUp);
+    }
+    svg.addEventListener('keydown', this.onTVKeyDown);
+    svg.addEventListener('focus', this.onTVFocus);
     window.addEventListener('blur', this.onWindowBlur);
   }
 
   destroy(): void {
     window.removeEventListener('blur', this.onWindowBlur);
+    if (this.usingPointerEvents) {
+      this.svg.removeEventListener('pointerdown', this.onPointerDown);
+      this.svg.removeEventListener('pointermove', this.onPointerMove);
+      this.svg.removeEventListener('pointerup', this.onPointerUp);
+      this.svg.removeEventListener('pointercancel', this.onPointerUp);
+    } else {
+      this.svg.removeEventListener('touchstart', this.onTouchStart);
+      this.svg.removeEventListener('touchmove', this.onTouchMove);
+      this.svg.removeEventListener('touchend', this.onTouchEnd);
+      this.svg.removeEventListener('touchcancel', this.onTouchEnd);
+      this.svg.removeEventListener('mousedown', this.onMouseDown);
+      window.removeEventListener('mousemove', this.onMouseMove);
+      window.removeEventListener('mouseup', this.onMouseUp);
+    }
     if (this.exitTimer !== null) clearTimeout(this.exitTimer);
+    this.svg.removeEventListener('keydown', this.onTVKeyDown);
+    this.svg.removeEventListener('focus', this.onTVFocus);
     this.svg.remove();
   }
 
@@ -185,6 +248,23 @@ export class BoardView {
     this.rangeLayer = make('');
     this.rangeLayer.classList.add('layer-range');
 
+    // нажимная кнопка: любая проехавшая по ней машина навсегда разблокирует ворота
+    if (level.gateSwitch) {
+      const g = document.createElementNS(ns, 'g');
+      g.classList.add('gate-switch');
+      g.setAttribute('data-testid', 'gate-switch');
+      g.setAttribute('aria-hidden', 'true');
+      g.innerHTML = `
+        <ellipse class="switch-shadow" cx="32" cy="38" rx="26" ry="16"/>
+        <circle class="switch-rim" cx="32" cy="32" r="25"/>
+        <circle class="switch-button" cx="32" cy="30" r="18"/>
+        <path class="switch-icon" d="M32 15v25M20 29l12 12 12-12M18 47h28"/>
+        <circle class="switch-light" cx="48" cy="16" r="5"/>`;
+      g.style.transform = `translate(${level.gateSwitch.x * CELL}px, ${level.gateSwitch.y * CELL}px)`;
+      this.svg.appendChild(g);
+      this.gateSwitchEl = g;
+    }
+
     // звезда
     if (level.star) {
       const g = document.createElementNS(ns, 'g');
@@ -212,7 +292,7 @@ export class BoardView {
       g.setAttribute('data-piece', def.id);
       const rotate =
         def.dir === 'v' && def.kind !== 'crate' ? ` transform="rotate(90) translate(0,-${CELL})"` : '';
-      g.innerHTML = `<g class="mid enter" style="animation-delay:${60 + i * 55}ms"><g class="art"${rotate}>${pieceArt(def)}</g></g>`;
+      g.innerHTML = `<g class="mid enter" style="animation-delay:${60 + i * 55}ms"><g class="art"${rotate}>${pieceArt(def)}</g><text class="kind-badge" x="14" y="30">${kindBadge(def.kind)}</text></g>`;
       this.svg.appendChild(g);
       this.pieceEls.push(g);
     }
@@ -368,7 +448,16 @@ export class BoardView {
         <rect x="${hy1 - 26}" y="${hx - 15}" width="30" height="30" rx="8" fill="#6b4a1f"/>
         <rect x="${hy2 - 4}" y="${hx - 15}" width="30" height="30" rx="8" fill="#6b4a1f"/>`;
     }
-    return `<g class="gate" data-testid="gate">${panels}</g>`;
+    const lockX = vert ? hx : hy1 + CELL / 2;
+    const lockY = vert ? hy1 + CELL / 2 : hx;
+    const lock = this.level.gateSwitch
+      ? `<g class="gate-lock" transform="translate(${lockX},${lockY})">
+          <path d="M-10-3v-7a10 10 0 0 1 20 0v7" fill="none" stroke="#fff1c9" stroke-width="6"/>
+          <rect x="-15" y="-4" width="30" height="25" rx="7" fill="#e2574c" stroke="#7f2924" stroke-width="4"/>
+          <circle cx="0" cy="7" r="4" fill="#fff1c9"/>
+        </g>`
+      : '';
+    return `<g class="gate" data-testid="gate">${panels}${lock}</g>`;
   }
 
   // ---------- позиционирование ----------
@@ -399,13 +488,19 @@ export class BoardView {
       this.exitTimer = null;
       this.animLock = false;
     }
+    this.tvMove = null;
+    this.rangeLayer.innerHTML = '';
+    this.pieceEls.forEach((el) => el.classList.remove('tv-active'));
     this.pieceEls.forEach((el) => el.classList.remove('exiting'));
     this.state = s;
     this.clearHint();
     this.syncPieces(animate);
     this.refreshCrateBadges();
     this.updateStarVisibility();
+    this.updateGateSwitch(animate);
     this.updateGate(true);
+    if (this.state.pieces[this.selectedPiece]?.gone) this.selectedPiece = this.firstVisiblePiece();
+    this.updateTVSelection();
   }
 
   refreshCrateBadges(): void {
@@ -424,7 +519,24 @@ export class BoardView {
     this.starEl.classList.toggle('collected', this.state.starCollected);
   }
 
+  private updateGateSwitch(animate: boolean): void {
+    if (!this.gateSwitchEl) return;
+    const wasPressed = this.gateSwitchEl.classList.contains('pressed');
+    const pressed = this.state.gateUnlocked;
+    this.gateSwitchEl.classList.toggle('pressed', pressed);
+    this.gateSwitchEl.setAttribute('data-pressed', String(pressed));
+    if (animate && pressed && !wasPressed) {
+      this.gateSwitchEl.classList.remove('just-pressed');
+      void this.gateSwitchEl.getBoundingClientRect();
+      this.gateSwitchEl.classList.add('just-pressed');
+    } else if (!pressed) {
+      this.gateSwitchEl.classList.remove('just-pressed');
+    }
+  }
+
   private updateGate(sound: boolean): void {
+    const unlocked = !this.level.gateSwitch || this.state.gateUnlocked;
+    this.svg.querySelector<SVGGElement>('.gate-lock')?.classList.toggle('unlocked', unlocked);
     const open = exitSteps(this.level, this.state) >= 0 || this.state.won;
     if (open === this.gateOpen) return;
     this.gateOpen = open;
@@ -476,7 +588,261 @@ export class BoardView {
 
   // ---------- ввод ----------
 
-  private toSvg(e: PointerEvent): { x: number; y: number } {
+  private firstVisiblePiece(): number {
+    const index = this.state.pieces.findIndex((piece) => !piece.gone);
+    return Math.max(0, index);
+  }
+
+  private updateTVSelection(): void {
+    this.pieceEls.forEach((element, index) => {
+      const selected = index === this.selectedPiece && !this.state.pieces[index].gone;
+      element.classList.toggle('tv-selected', selected);
+      if (selected) element.setAttribute('aria-current', 'true');
+      else element.removeAttribute('aria-current');
+    });
+  }
+
+  private selectPiece(index: number): void {
+    if (index < 0 || this.state.pieces[index]?.gone) return;
+    this.selectedPiece = index;
+    this.updateTVSelection();
+  }
+
+  private pieceCenter(index: number): { x: number; y: number } {
+    const def = this.level.pieces[index];
+    const state = this.state.pieces[index];
+    return {
+      x: state.x + (def.dir === 'h' ? def.len / 2 : 0.5),
+      y: state.y + (def.dir === 'v' ? def.len / 2 : 0.5)
+    };
+  }
+
+  private navigatePiece(dx: number, dy: number): void {
+    const visible = this.state.pieces.map((piece, index) => (!piece.gone ? index : -1)).filter((index) => index >= 0);
+    if (visible.length === 0) return;
+    if (!visible.includes(this.selectedPiece)) {
+      this.selectPiece(visible[0]);
+      return;
+    }
+    const from = this.pieceCenter(this.selectedPiece);
+    let best = -1;
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (const index of visible) {
+      if (index === this.selectedPiece) continue;
+      const to = this.pieceCenter(index);
+      const primary = (to.x - from.x) * dx + (to.y - from.y) * dy;
+      if (primary <= 0) continue;
+      const lateral = Math.abs((to.x - from.x) * dy - (to.y - from.y) * dx);
+      const score = primary + lateral * 3;
+      if (score < bestScore) {
+        best = index;
+        bestScore = score;
+      }
+    }
+    if (best < 0) {
+      const current = visible.indexOf(this.selectedPiece);
+      const delta = dx + dy > 0 ? 1 : -1;
+      best = visible[(current + delta + visible.length) % visible.length];
+    }
+    this.selectPiece(best);
+  }
+
+  private beginTVMove(): void {
+    if (!this.interactive || this.animLock || this.state.won) return;
+    const idx = this.selectedPiece;
+    const def = this.level.pieces[idx];
+    const grid = buildGrid(this.level, this.state);
+    const neg = {
+      x: maxSteps(this.level, this.state, idx, -1, 0, grid),
+      y: maxSteps(this.level, this.state, idx, 0, -1, grid)
+    };
+    const pos = {
+      x: maxSteps(this.level, this.state, idx, 1, 0, grid),
+      y: maxSteps(this.level, this.state, idx, 0, 1, grid)
+    };
+    if (neg.x + neg.y + pos.x + pos.y === 0) {
+      this.bumpPiece(idx, def.dir === 'v' ? 'y' : 'x');
+      this.events.onBump();
+      return;
+    }
+    const vector = exitVector(this.level.exit);
+    const exitK = exitSteps(this.level, this.state);
+    const isTarget = targetIndex(this.level) === idx;
+    const exitAxis = isTarget && exitK > 0 ? (vector.dx !== 0 ? 'x' : 'y') : null;
+    const exitSign = vector.dx + vector.dy;
+    const inNeg = { ...neg };
+    const inPos = { ...pos };
+    if (exitAxis && exitSign > 0) inPos[exitAxis] = Math.max(0, exitK - def.len);
+    if (exitAxis && exitSign < 0) inNeg[exitAxis] = Math.max(0, exitK - def.len);
+    this.tvMove = {
+      idx,
+      axis: def.dir === 'h' ? 'x' : def.dir === 'v' ? 'y' : null,
+      offset: 0,
+      neg,
+      pos,
+      inNeg,
+      inPos,
+      exitAxis,
+      exitSign,
+      exitK
+    };
+    const rangeNeg = exitAxis && exitSign < 0 ? { ...neg, [exitAxis]: exitK } : neg;
+    const inBoardPos = exitAxis && exitSign < 0 ? { ...inPos, [exitAxis]: inNeg[exitAxis] } : inPos;
+    this.showRange({
+      idx,
+      startX: 0,
+      startY: 0,
+      axis: this.tvMove.axis,
+      neg: rangeNeg,
+      pos,
+      visPos: pos,
+      inBoardPos,
+      exitAxis,
+      exitSign,
+      exitK,
+      bumpedPos: false,
+      bumpedNeg: false,
+      moved: false
+    });
+    this.pieceEls[idx].classList.add('tv-active');
+  }
+
+  private endTVMove(reset: boolean): void {
+    const move = this.tvMove;
+    if (!move) return;
+    if (reset) this.pieceEls[move.idx].style.transform = this.pieceTransform(move.idx);
+    this.pieceEls[move.idx].classList.remove('tv-active');
+    this.rangeLayer.innerHTML = '';
+    this.tvMove = null;
+  }
+
+  private previewTVMove(dx: number, dy: number): void {
+    const move = this.tvMove;
+    if (!move) return;
+    const axis: 'x' | 'y' = dx !== 0 ? 'x' : 'y';
+    const sign = dx + dy;
+    if (move.axis && move.axis !== axis) {
+      this.bumpPiece(move.idx, move.axis);
+      this.events.onBump();
+      return;
+    }
+    if (!move.axis) move.axis = axis;
+    let next = move.offset;
+    if (sign > 0) {
+      if (next < 0) {
+        if (move.exitAxis === axis && move.exitSign < 0 && next === -move.exitK) next = -move.inNeg[axis];
+        else next++;
+      } else if (next < move.inPos[axis]) next++;
+      else if (move.exitAxis === axis && move.exitSign > 0 && next < move.exitK) next = move.exitK;
+    } else if (next > 0) {
+      if (move.exitAxis === axis && move.exitSign > 0 && next === move.exitK) next = move.inPos[axis];
+      else next--;
+    } else if (-next < move.inNeg[axis]) next--;
+    else if (move.exitAxis === axis && move.exitSign < 0 && -next < move.exitK) next = -move.exitK;
+
+    if (next === move.offset) {
+      this.bumpPiece(move.idx, axis);
+      this.events.onBump();
+      return;
+    }
+    move.offset = next;
+    const state = this.state.pieces[move.idx];
+    const x = (state.x + (axis === 'x' ? next : 0)) * CELL;
+    const y = (state.y + (axis === 'y' ? next : 0)) * CELL;
+    this.pieceEls[move.idx].style.transform = `translate(${x}px, ${y}px)`;
+  }
+
+  private confirmTVMove(): void {
+    const move = this.tvMove;
+    if (!move || move.offset === 0 || !move.axis) {
+      this.endTVMove(true);
+      return;
+    }
+    const sign = Math.sign(move.offset);
+    const dx = move.axis === 'x' ? sign : 0;
+    const dy = move.axis === 'y' ? sign : 0;
+    const steps = Math.abs(move.offset);
+    const exit = move.exitAxis === move.axis && move.exitSign === sign && steps === move.exitK;
+    const result = applyMove(this.level, this.state, move.idx, dx, dy, steps);
+    if (!result) {
+      this.bumpPiece(move.idx, move.axis);
+      this.events.onBump();
+      this.endTVMove(true);
+      return;
+    }
+    const index = move.idx;
+    this.endTVMove(false);
+    this.commit(result, index, exit, dx, dy, steps);
+    if (result.state.pieces[index].gone) this.selectedPiece = this.firstVisiblePiece();
+    this.updateTVSelection();
+  }
+
+  private onTVFocus = (): void => {
+    if (this.state.pieces[this.selectedPiece]?.gone) this.selectedPiece = this.firstVisiblePiece();
+    this.updateTVSelection();
+  };
+
+  private onTVKeyDown = (event: KeyboardEvent): void => {
+    if (!this.interactive || this.animLock || this.state.won) return;
+    if (event.key === 'Enter') {
+      if (event.repeat) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (this.tvMove) this.confirmTVMove();
+      else this.beginTVMove();
+      return;
+    }
+    const direction =
+      event.key === 'ArrowLeft'
+        ? { dx: -1, dy: 0 }
+        : event.key === 'ArrowRight'
+          ? { dx: 1, dy: 0 }
+          : event.key === 'ArrowUp'
+            ? { dx: 0, dy: -1 }
+            : event.key === 'ArrowDown'
+              ? { dx: 0, dy: 1 }
+              : null;
+    if (!direction) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (this.tvMove) this.previewTVMove(direction.dx, direction.dy);
+    else this.navigatePiece(direction.dx, direction.dy);
+  };
+
+  private touchPoint(e: TouchEvent): InputPoint | null {
+    const touch = e.changedTouches[0] ?? e.touches[0];
+    if (!touch) return null;
+    return {
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      target: e.target,
+      preventDefault: () => e.preventDefault()
+    };
+  }
+
+  private onPointerDown = (e: PointerEvent): void => this.onDown(e);
+  private onPointerMove = (e: PointerEvent): void => this.onMove(e);
+  private onPointerUp = (e: PointerEvent): void => this.onUp(e);
+  private onTouchStart = (e: TouchEvent): void => {
+    this.lastTouchAt = Date.now();
+    const point = this.touchPoint(e);
+    if (point) this.onDown(point);
+  };
+  private onTouchMove = (e: TouchEvent): void => {
+    const point = this.touchPoint(e);
+    if (point) this.onMove(point);
+  };
+  private onTouchEnd = (e: TouchEvent): void => {
+    const point = this.touchPoint(e);
+    if (point) this.onUp(point);
+  };
+  private onMouseDown = (e: MouseEvent): void => {
+    if (Date.now() - this.lastTouchAt > 700) this.onDown(e);
+  };
+  private onMouseMove = (e: MouseEvent): void => this.onMove(e);
+  private onMouseUp = (e: MouseEvent): void => this.onUp(e);
+
+  private toSvg(e: InputPoint): { x: number; y: number } {
     const r = this.svg.getBoundingClientRect();
     const vbW = this.level.width * CELL + 2 * M;
     const vbH = this.level.height * CELL + 2 * M;
@@ -486,12 +852,14 @@ export class BoardView {
     return { x: (e.clientX - r.left - ox) / scale - M, y: (e.clientY - r.top - oy) / scale - M };
   }
 
-  private onDown = (e: PointerEvent): void => {
+  private onDown(e: InputPoint): void {
     if (!this.interactive || this.animLock || this.state.won || this.drag) return;
     const target = e.target as Element;
     const g = target.closest<SVGGElement>('g[data-idx]');
     if (!g) return;
     const idx = Number(g.dataset.idx);
+    this.endTVMove(true);
+    this.selectPiece(idx);
     const def = this.level.pieces[idx];
     const grid = buildGrid(this.level, this.state);
     const neg = {
@@ -548,15 +916,15 @@ export class BoardView {
     this.showRange(this.drag);
     g.classList.add('dragging', 'held');
     try {
-      this.svg.setPointerCapture(e.pointerId);
+      if (e.pointerId !== undefined) this.svg.setPointerCapture(e.pointerId);
     } catch {
       // синтетические события (тесты) не имеют активного указателя
     }
     this.events.onPick();
     e.preventDefault();
-  };
+  }
 
-  private currentOffset(e: PointerEvent): { axis: 'x' | 'y'; off: number } | null {
+  private currentOffset(e: InputPoint): { axis: 'x' | 'y'; off: number } | null {
     const d = this.drag;
     if (!d) return null;
     const p = this.toSvg(e);
@@ -571,7 +939,7 @@ export class BoardView {
     return { axis, off: axis === 'x' ? dx : dy };
   }
 
-  private onMove = (e: PointerEvent): void => {
+  private onMove(e: InputPoint): void {
     const d = this.drag;
     if (!d) return;
     const cur = this.currentOffset(e);
@@ -601,9 +969,9 @@ export class BoardView {
     const ty = (ps.y + (axis === 'y' ? clamped : 0)) * CELL;
     this.pieceEls[d.idx].style.transform = `translate(${tx}px, ${ty}px)`;
     e.preventDefault();
-  };
+  }
 
-  private onUp = (e: PointerEvent): void => {
+  private onUp(e: InputPoint): void {
     const d = this.drag;
     if (!d) return;
     const el = this.pieceEls[d.idx];
@@ -640,7 +1008,7 @@ export class BoardView {
     }
     // снап назад
     el.style.transform = this.pieceTransform(d.idx);
-  };
+  }
 
   private commit(res: MoveResult, idx: number, exit: boolean, dx: number, dy: number, steps: number): void {
     const before = this.state.pieces[idx];
@@ -673,7 +1041,13 @@ export class BoardView {
     }
     this.refreshCrateBadges();
     this.updateStarVisibility();
-    if (res.starCollected && this.starEl) this.starEl.classList.add('collected');
+    if (res.starCollected && this.starEl && this.level.star) {
+      this.starEl.classList.add('collected');
+      this.spawnSparkles(this.level.star.x * CELL + CELL / 2, this.level.star.y * CELL + CELL / 2);
+    }
+    if (exit) this.spawnExitPuff();
+    this.updateGateSwitch(res.gateActivated);
+    if (res.gateActivated) this.events.onGateSwitch();
     this.updateGate(true);
     this.flutterChickens();
     this.events.onCommit(res, idx);
@@ -745,6 +1119,41 @@ export class BoardView {
     g.innerHTML = html;
     this.tracksLayer.appendChild(g);
     window.setTimeout(() => g.remove(), 900);
+  }
+
+  /** Бёрст искр при сборе звезды (единственные частицы-награда по дизайну). */
+  private spawnSparkles(cx: number, cy: number): void {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    let html = '';
+    for (let i = 0; i < 8; i++) {
+      const a = (Math.PI * 2 * i) / 8 + Math.random() * 0.4;
+      const dist = 26 + Math.random() * 22;
+      const dx = Math.cos(a) * dist;
+      const dy = Math.sin(a) * dist;
+      const r = 3 + Math.random() * 3;
+      html += `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(1)}" class="sparkle"
+        style="--dx:${dx.toFixed(1)}px;--dy:${dy.toFixed(1)}px;animation-delay:${i * 12}ms"/>`;
+    }
+    g.innerHTML = html;
+    // поверх фигур: добавляем в конец SVG, чтобы искры не перекрывались машиной
+    this.svg.appendChild(g);
+    window.setTimeout(() => g.remove(), 800);
+  }
+
+  /** Облачко пыли в проёме ворот, когда целевая машина выезжает. */
+  private spawnExitPuff(): void {
+    const W = this.level.width * CELL;
+    const H = this.level.height * CELL;
+    const lane = this.level.exit.index * CELL + CELL / 2;
+    const mouth =
+      this.level.exit.side === 'right'
+        ? { x: W, y: lane }
+        : this.level.exit.side === 'left'
+          ? { x: 0, y: lane }
+          : this.level.exit.side === 'bottom'
+            ? { x: lane, y: H }
+            : { x: lane, y: 0 };
+    this.spawnDust(mouth.x, mouth.y);
   }
 
   private bumpPiece(idx: number, axis: 'x' | 'y'): void {

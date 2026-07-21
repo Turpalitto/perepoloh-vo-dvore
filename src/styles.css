@@ -1442,18 +1442,18 @@ html[data-daytime='night'] .yard-lamp-light {
   animation-fill-mode: both;
 }
 ::view-transition-old(root) {
-  animation-name: screen-out;
+  animation-name: vt-screen-out;
 }
 ::view-transition-new(root) {
-  animation-name: screen-in;
+  animation-name: vt-screen-in;
 }
-@keyframes screen-out {
+@keyframes vt-screen-out {
   to {
     opacity: 0;
     transform: scale(0.98);
   }
 }
-@keyframes screen-in {
+@keyframes vt-screen-in {
   from {
     opacity: 0;
     transform: scale(1.015);

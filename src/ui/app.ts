@@ -611,27 +611,14 @@ export class App {
                   : `🎁 ${t('gift.claim', { n: giftAmount })}`
               }</button>
             </div>
-            <div class="weekly-quests" data-testid="weekly-quests">
-              <div class="weekly-quests-title">${t('weekly.title')}</div>
-              ${weeklyQuests
-                .map(
-                  ({ quest, progress, done, claimed }) => `
-                <div class="weekly-quest${done ? ' done' : ''}" data-testid="weekly-quest-${quest.key}">
-                  <span class="weekly-quest-icon">${quest.icon}</span>
-                  <span class="weekly-quest-label">${t(`weekly.${quest.key}`)} · ${progress}/${quest.goal}</span>
-                  <button class="btn btn-small weekly-claim" data-testid="weekly-claim-${quest.key}"
-                    data-quest="${quest.key}" ${done && !claimed ? '' : 'disabled'}>${
-                    claimed ? `✓ ${t('weekly.claimed')}` : `💡 ${t('weekly.claim')}`
-                  }</button>
-                </div>`
-                )
-                .join('')}
-            </div>
             <div class="menu-meta-row">
               <button class="btn" data-testid="menu-leaderboard">🏆 ${t('menu.leaderboard')}</button>
               <button class="btn" data-testid="menu-achievements" aria-label="${t(
                 'achievements.title'
               )}">🏅 ${achievementCount}/${ACHIEVEMENTS.length}</button>
+              <button class="btn${weeklyQuests.some((q) => q.done && !q.claimed) ? ' has-ready' : ''}" data-testid="menu-weekly" aria-label="${t(
+                'weekly.title'
+              )}">🎯 ${weeklyQuests.filter((q) => q.claimed).length}/${weeklyQuests.length}</button>
             </div>
           </div>
           <div class="skin-row" data-testid="skin-row">${visibleSkins.map(({ skin: s, index: i }) => {
@@ -685,6 +672,10 @@ export class App {
       this.audio.play('click');
       this.showAchievements();
     });
+    this.q('[data-testid=menu-weekly]').addEventListener('click', () => {
+      this.audio.play('click');
+      this.showWeeklyQuestsDialog(week, weeklyQuests);
+    });
     this.q('[data-testid=menu-gift]').addEventListener('click', () => {
       if (!this.store.claimDailyGift(dailyKey, giftAmount)) return;
       this.audio.play('star');
@@ -702,17 +693,6 @@ export class App {
         this.store.setTargetSkin(i);
         this.audio.play('click');
         this.showMenu();
-      })
-    );
-    this.root.querySelectorAll<HTMLButtonElement>('.weekly-claim:not([disabled])').forEach((b) =>
-      b.addEventListener('click', () => {
-        const key = b.dataset.quest!;
-        const entry = weeklyQuests.find((q) => q.quest.key === key);
-        if (!entry) return;
-        const claimed = this.store.claimWeeklyQuest(week, key, entry.done, WEEKLY_QUEST_REWARD_HINTS);
-        if (!claimed) return;
-        this.audio.play('star');
-        this.showMenuInner();
       })
     );
     window.requestAnimationFrame(() => {
@@ -866,6 +846,62 @@ export class App {
     this.q('.overlay-slot').appendChild(overlay);
     overlay.querySelector('[data-testid=gift-close]')!.addEventListener('click', () => overlay.remove());
     if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=gift-close]')!.focus({ preventScroll: true });
+  }
+
+  /**
+   * Диалог, а не встроенный в меню блок: три интерактивные кнопки-цели
+   * (44px touch target каждая) не помещаются в бюджет высоты меню на
+   * маленьких портретных экранах — диалог сам умеет скроллиться.
+   */
+  private showWeeklyQuestsDialog(
+    week: string,
+    quests: { quest: ReturnType<typeof selectWeeklyQuests>[number]; progress: number; done: boolean; claimed: boolean }[]
+  ): void {
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.setAttribute('data-testid', 'weekly-overlay');
+    const render = () => {
+      overlay.innerHTML = `
+        <div class="dialog weekly-dialog">
+          <h2>${t('weekly.title')}</h2>
+          <div class="weekly-quests-list">
+            ${quests
+              .map(
+                ({ quest, progress, done, claimed }) => `
+              <div class="weekly-quest${done ? ' done' : ''}" data-testid="weekly-quest-${quest.key}">
+                <span class="weekly-quest-icon">${quest.icon}</span>
+                <span class="weekly-quest-label">${t(`weekly.${quest.key}`)} · ${progress}/${quest.goal}</span>
+                <button class="btn btn-small weekly-claim" data-testid="weekly-claim-${quest.key}"
+                  data-quest="${quest.key}" ${done && !claimed ? '' : 'disabled'}>${
+                  claimed ? `✓ ${t('weekly.claimed')}` : `💡 ${t('weekly.claim')}`
+                }</button>
+              </div>`
+              )
+              .join('')}
+          </div>
+          <button class="btn btn-primary btn-big" data-testid="weekly-close">${t('rules.close')}</button>
+        </div>`;
+      overlay.querySelectorAll<HTMLButtonElement>('.weekly-claim:not([disabled])').forEach((b) =>
+        b.addEventListener('click', () => {
+          const key = b.dataset.quest!;
+          const entry = quests.find((q) => q.quest.key === key);
+          if (!entry) return;
+          if (!this.store.claimWeeklyQuest(week, key, entry.done, WEEKLY_QUEST_REWARD_HINTS)) return;
+          entry.claimed = true;
+          this.audio.play('star');
+          render();
+          this.q('[data-testid=menu-weekly]').textContent = `🎯 ${quests.filter((q) => q.claimed).length}/${quests.length}`;
+          this.q('[data-testid=menu-weekly]').classList.toggle('has-ready', quests.some((q) => q.done && !q.claimed));
+        })
+      );
+      overlay.querySelector('[data-testid=weekly-close]')!.addEventListener('click', () => {
+        this.audio.play('click');
+        overlay.remove();
+      });
+      if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=weekly-close]')!.focus({ preventScroll: true });
+    };
+    render();
+    this.q('.overlay-slot').appendChild(overlay);
   }
 
   private showRules(): void {

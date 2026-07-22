@@ -803,11 +803,11 @@
       }
     ],
     "star": {
-      "x": 1,
+      "x": 2,
       "y": 0
     },
     "par": 7,
-    "par2": 11,
+    "par2": 9,
     "difficulty": "medium",
     "mechanics": [
       "truck",
@@ -1412,23 +1412,6 @@
         "dir": "v"
       },
       {
-        "id": "C",
-        "kind": "crate",
-        "x": 1,
-        "y": 5,
-        "len": 1,
-        "dir": "any",
-        "maxMoves": 2
-      },
-      {
-        "id": "D",
-        "kind": "truck",
-        "x": 3,
-        "y": 3,
-        "len": 3,
-        "dir": "h"
-      },
-      {
         "id": "E",
         "kind": "tractor",
         "x": 3,
@@ -1488,13 +1471,11 @@
       "x": 0,
       "y": 1
     },
-    "par": 8,
-    "par2": 10,
+    "par": 7,
+    "par2": 9,
     "difficulty": "medium",
     "mechanics": [
-      "truck",
       "tractor",
-      "crate",
       "star",
       "gate-switch"
     ],

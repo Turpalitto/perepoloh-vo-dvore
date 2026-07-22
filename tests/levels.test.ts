@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import { validateLevel } from '../src/core/validator';
+import { BOSSES } from '../src/game/boss';
 
 const LEVELS = levelsJson as LevelDef[];
 
@@ -35,9 +36,18 @@ describe('уровни игры', () => {
   });
 
   it('боссы не становятся легче предыдущего босса', () => {
-    const bosses = LEVELS.filter((level) => level.id % 12 === 0).map((level) => level.par);
+    const bossIds = new Set(BOSSES.map((boss) => boss.id));
+    const bosses = LEVELS.filter((level) => bossIds.has(level.id)).map((level) => level.par);
+    expect(bosses).toHaveLength(BOSSES.length);
     for (let i = 1; i < bosses.length; i++) expect(bosses[i]).toBeGreaterThanOrEqual(bosses[i - 1]);
     expect(bosses.at(-1)).toBeGreaterThan(bosses.at(-2)!);
+  });
+
+  it('кнопка ворот вводится без одновременного повторного ввода грузовика и ящика', () => {
+    const intro = LEVELS.find((level) => level.mechanics.includes('gate-switch'));
+    expect(intro?.id).toBe(17);
+    expect(intro?.mechanics).toEqual(['tractor', 'star', 'gate-switch']);
+    expect(intro?.pieces.length).toBeLessThanOrEqual(8);
   });
 
   it('не содержит повторяющихся раскладок', () => {

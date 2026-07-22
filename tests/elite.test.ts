@@ -135,21 +135,26 @@ describe('Высшая лига — 25 мастер-испытаний вали�
     }
   });
 
-  it('золото достижимо: оптимум решателя укладывается в gold.maxMoves', () => {
-    for (const c of ELITE_CHALLENGES) {
-      const level = sourceLevel(c);
-      const res = solve(level);
-      expect(res.solvable).toBe(true);
-      // gold.maxMoves = par (оптимум) — решатель должен уложиться
-      expect(res.optimal).toBeLessThanOrEqual(c.gold.maxMoves);
-      // серебро со звездой достижимо: решение со звездой в пределах silver
-      if (c.silver.requireStar && level.star) {
-        const withStar = solve(level, { requireStar: true });
-        expect(withStar.solvable).toBe(true);
-        expect(withStar.optimal).toBeLessThanOrEqual(c.silver.maxMoves);
+  it(
+    'золото достижимо: оптимум решателя укладывается в gold.maxMoves',
+    () => {
+      for (const c of ELITE_CHALLENGES) {
+        const level = sourceLevel(c);
+        const res = solve(level);
+        expect(res.solvable).toBe(true);
+        // gold.maxMoves = par (оптимум) — решатель должен уложиться
+        expect(res.optimal).toBeLessThanOrEqual(c.gold.maxMoves);
+        // серебро со звездой достижимо: решение со звездой в пределах silver
+        if (c.silver.requireStar && level.star) {
+          const withStar = solve(level, { requireStar: true });
+          expect(withStar.solvable).toBe(true);
+          expect(withStar.optimal).toBeLessThanOrEqual(c.silver.maxMoves);
+        }
       }
-    }
-  });
+    },
+    // solve() гоняется по 25 уровням — ~40с локально, CI-раннер медленнее дефолтных 60с
+    120_000
+  );
 
   it('золотой результат честно даёт 3 звезды исходного уровня (согласованность)', () => {
     const c = eliteChallenge(1)!;

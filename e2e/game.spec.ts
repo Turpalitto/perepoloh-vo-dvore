@@ -468,17 +468,24 @@ test.describe('Переполох во дворе', () => {
       const controls = await page.locator('button:visible').evaluateAll((buttons) =>
         buttons.map((button) => {
           const rect = button.getBoundingClientRect();
-          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+          return {
+            id: button.getAttribute('data-testid') || button.className || button.textContent?.slice(0, 30),
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height
+          };
         })
       );
       for (const control of controls) {
         // Chromium может вернуть 43.99998 для CSS-размера 44px из-за субпиксельного layout.
-        expect(control.width).toBeGreaterThanOrEqual(43.99);
-        expect(control.height).toBeGreaterThanOrEqual(43.99);
-        expect(control.x).toBeGreaterThanOrEqual(-1);
-        expect(control.y).toBeGreaterThanOrEqual(-1);
-        expect(control.x + control.width).toBeLessThanOrEqual(viewport.width + 1);
-        expect(control.y + control.height).toBeLessThanOrEqual(viewport.height + 1);
+        const ctx = `DEBUG ${JSON.stringify(viewport)} ${JSON.stringify(control)}`;
+        expect(control.width, ctx).toBeGreaterThanOrEqual(43.99);
+        expect(control.height, ctx).toBeGreaterThanOrEqual(43.99);
+        expect(control.x, ctx).toBeGreaterThanOrEqual(-1);
+        expect(control.y, ctx).toBeGreaterThanOrEqual(-1);
+        expect(control.x + control.width, ctx).toBeLessThanOrEqual(viewport.width + 1);
+        expect(control.y + control.height, ctx).toBeLessThanOrEqual(viewport.height + 1);
       }
 
       await page.getByTestId('menu-play').click();

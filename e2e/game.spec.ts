@@ -455,6 +455,9 @@ test.describe('Переполох во дворе', () => {
       await page.goto('/?mock=1&lang=ru&daytime=day');
       await expect(page.getByTestId('menu-play')).toBeInViewport();
       await expect(page.getByTestId('menu-rules')).toBeInViewport();
+      // .screen входит с анимацией screen-in (0.26s); ждём её завершения,
+      // иначе на медленном раннере координаты кнопок ловятся в промежуточном кадре.
+      await page.waitForTimeout(300);
       const overflow = await page.evaluate(() => ({
         x: document.documentElement.scrollWidth - window.innerWidth,
         y: document.documentElement.scrollHeight - window.innerHeight

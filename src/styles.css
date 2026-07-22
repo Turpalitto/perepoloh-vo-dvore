@@ -1631,7 +1631,11 @@ html[data-daytime='night'] .yard-lamp-light {
   }
 }
 
-@media (orientation: landscape) and (max-height: 360px) {
+/* Порог поднят с 360 до 400: при 361–400px .menu-meta-row (flex-wrap) мог
+   перенести кнопку на вторую строку из-за более широкого рендера кириллицы
+   системным шрифтом на Linux, и .menu-ui (align-content: center) выталкивал
+   контент за верхнюю границу видимой области. */
+@media (orientation: landscape) and (max-height: 400px) {
   .menu-ui {
     gap: 3px 12px;
     padding: 4px 70px 4px 10px;

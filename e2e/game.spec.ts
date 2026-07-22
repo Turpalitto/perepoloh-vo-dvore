@@ -455,9 +455,6 @@ test.describe('Переполох во дворе', () => {
       await page.goto('/?mock=1&lang=ru&daytime=day');
       await expect(page.getByTestId('menu-play')).toBeInViewport();
       await expect(page.getByTestId('menu-rules')).toBeInViewport();
-      // .screen входит с анимацией screen-in (0.26s); ждём её завершения,
-      // иначе на медленном раннере координаты кнопок ловятся в промежуточном кадре.
-      await page.waitForTimeout(300);
       const overflow = await page.evaluate(() => ({
         x: document.documentElement.scrollWidth - window.innerWidth,
         y: document.documentElement.scrollHeight - window.innerHeight
@@ -468,24 +465,17 @@ test.describe('Переполох во дворе', () => {
       const controls = await page.locator('button:visible').evaluateAll((buttons) =>
         buttons.map((button) => {
           const rect = button.getBoundingClientRect();
-          return {
-            id: button.getAttribute('data-testid') || button.className || button.textContent?.slice(0, 30),
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height
-          };
+          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
         })
       );
       for (const control of controls) {
         // Chromium может вернуть 43.99998 для CSS-размера 44px из-за субпиксельного layout.
-        const ctx = `DEBUG ${JSON.stringify(viewport)} ${JSON.stringify(control)}`;
-        expect(control.width, ctx).toBeGreaterThanOrEqual(43.99);
-        expect(control.height, ctx).toBeGreaterThanOrEqual(43.99);
-        expect(control.x, ctx).toBeGreaterThanOrEqual(-1);
-        expect(control.y, ctx).toBeGreaterThanOrEqual(-1);
-        expect(control.x + control.width, ctx).toBeLessThanOrEqual(viewport.width + 1);
-        expect(control.y + control.height, ctx).toBeLessThanOrEqual(viewport.height + 1);
+        expect(control.width).toBeGreaterThanOrEqual(43.99);
+        expect(control.height).toBeGreaterThanOrEqual(43.99);
+        expect(control.x).toBeGreaterThanOrEqual(-1);
+        expect(control.y).toBeGreaterThanOrEqual(-1);
+        expect(control.x + control.width).toBeLessThanOrEqual(viewport.width + 1);
+        expect(control.y + control.height).toBeLessThanOrEqual(viewport.height + 1);
       }
 
       await page.getByTestId('menu-play').click();

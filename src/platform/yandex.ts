@@ -10,6 +10,15 @@ import type { AdHandlers, LeaderboardEntry, Platform, PlatformConfig } from './t
 
 const STORAGE_KEY = 'parkovka.save.v1';
 
+/**
+ * Предохранитель на «немой» SDK: если реклама открылась, но соответствующий
+ * onClose/onError потерялся (свёрнутая вкладка, зависший iframe), промис не
+ * должен висеть вечно и держать adActive=true — иначе игра блокирует и подсказки,
+ * и следующую рекламу. По таймауту завершаем показ; для rewarded награда при
+ * этом НЕ выдаётся (rewarded остаётся false, если onRewarded не пришёл).
+ */
+const AD_SAFETY_TIMEOUT_MS = 30_000;
+
 interface YsdkPlayer {
   setData(data: Record<string, unknown>, flush?: boolean): Promise<void>;
   getData(keys?: string[]): Promise<Record<string, unknown>>;
@@ -335,13 +344,16 @@ export function createYandexPlatform(): Platform {
         adActive = true;
         let paused = false;
         let settled = false;
+        let timer = 0;
         const finish = () => {
           if (settled) return;
           settled = true;
+          if (timer) clearTimeout(timer);
           adActive = false;
           if (paused) h.onResume();
           resolve();
         };
+        timer = setTimeout(finish, AD_SAFETY_TIMEOUT_MS) as unknown as number;
         try {
           ysdk.adv.showFullscreenAdv({
             callbacks: {
@@ -375,13 +387,17 @@ export function createYandexPlatform(): Platform {
         let rewarded = false;
         let paused = false;
         let settled = false;
+        let timer = 0;
         const finish = () => {
           if (settled) return;
           settled = true;
+          if (timer) clearTimeout(timer);
           adActive = false;
           if (paused) h.onResume();
           resolve(rewarded);
         };
+        // По таймауту награду не выдаём: rewarded станет true только из onRewarded.
+        timer = setTimeout(finish, AD_SAFETY_TIMEOUT_MS) as unknown as number;
         try {
           ysdk.adv.showRewardedVideo({
             callbacks: {

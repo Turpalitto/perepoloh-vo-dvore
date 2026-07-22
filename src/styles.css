@@ -411,6 +411,12 @@ html.high-contrast .levels-grid {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* На низких (ландшафтных) экранах колонка иконок не помещается по высоте —
+     переносим во вторую колонку. wrap-reverse уводит её влево, а не за правый
+     край. Иконки нельзя ужимать: минимум 44px требуется touch-доступностью. */
+  flex-wrap: wrap-reverse;
+  max-height: calc(100vh - 28px);
+  align-content: flex-start;
 }
 
 /* ---------- выбор уровня ---------- */
@@ -1651,3 +1657,263 @@ html[data-daytime='night'] .yard-lamp-light {
     font-size: 13px;
   }
 }
+
+/* ---------- Высшая лига ---------- */
+.btn-elite {
+  font-size: 17px;
+  background: linear-gradient(135deg, #d8ae27, #1f6f52);
+  color: #fff7e6;
+}
+.skin-swatch.skin-elite {
+  outline: 2px solid #d8ae27;
+  outline-offset: 1px;
+}
+.elite-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  padding-bottom: 16px;
+}
+.elite-status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(216, 174, 39, 0.22), rgba(31, 111, 82, 0.22));
+  border: 2px solid rgba(216, 174, 39, 0.5);
+}
+.elite-rank-name {
+  display: block;
+  font-weight: 800;
+  font-size: 20px;
+  color: #6b4a1f;
+}
+.elite-rank-sub {
+  font-size: 13px;
+  opacity: 0.8;
+}
+.elite-figures {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  text-align: right;
+}
+.elite-section {
+  margin: 6px 14px;
+  color: #6b4a1f;
+}
+.elite-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  padding: 0 12px;
+}
+.elite-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+  min-height: 92px;
+  border: none;
+  border-radius: 14px;
+  background: #fff7e6;
+  box-shadow: 0 2px 0 rgba(93, 64, 25, 0.25);
+  cursor: pointer;
+  font: inherit;
+}
+.elite-card.medaled {
+  background: linear-gradient(135deg, #fff7e6, #ffe9b0);
+}
+.elite-card-medal {
+  font-size: 24px;
+  line-height: 1;
+}
+.elite-card-num {
+  font-weight: 700;
+  font-size: 14px;
+  color: #6b4a1f;
+}
+.elite-card-src {
+  font-size: 11px;
+  opacity: 0.7;
+  text-align: center;
+}
+.elite-mod {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(226, 87, 76, 0.16);
+  color: #a83a33;
+}
+.elite-result-medal {
+  font-size: 64px;
+  text-align: center;
+}
+.elite-intro-dialog .rules-list {
+  text-align: left;
+}
+/* Финальная сцена кампании */
+.ending-screen {
+  position: relative;
+  height: 100%;
+  background: radial-gradient(circle at 50% 30%, #2c4a34, #16261c);
+}
+.campaign-ending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.ending-scene {
+  width: min(92vw, 520px);
+  text-align: center;
+}
+.ending-cars {
+  width: 100%;
+  animation: ending-zoom 6s ease-out forwards;
+}
+@keyframes ending-zoom {
+  from { transform: scale(1.25); opacity: 0.4; }
+  to { transform: scale(1); opacity: 1; }
+}
+.ending-lines {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ending-line {
+  color: #fff7e6;
+  font-size: 20px;
+  font-weight: 600;
+  animation: ending-fade 0.8s ease both;
+}
+.ending-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #f6c445;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+.ending-reward {
+  color: #cdeadd;
+  font-size: 14px;
+  animation: ending-fade 0.8s ease both;
+}
+@keyframes ending-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ending-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  transition: opacity 0.6s ease;
+}
+.ending-return {
+  opacity: 0.75;
+}
+
+/* ---------- Живой двор: дед-комментатор ---------- */
+.grandpa {
+  position: absolute;
+  left: 8px;
+  bottom: 70px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+  max-width: min(62vw, 300px);
+}
+.grandpa-off { display: none; }
+.grandpa-portrait {
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 2px 2px rgba(61, 44, 30, 0.35));
+}
+.gp-face { width: 100%; height: 100%; }
+.gp-skin { fill: #e8b98f; }
+.gp-cap { fill: #6b4a1f; }
+.gp-beard { fill: #f2efe6; }
+.gp-mustache { fill: none; stroke: #dfdbce; stroke-width: 4; stroke-linecap: round; }
+.gp-brows rect { fill: #cfc9bb; }
+.gp-eye { fill: #33291c; }
+.gp-mouth { fill: #7a3b32; stroke: #7a3b32; stroke-width: 2.4; stroke-linecap: round; }
+.gp-celebrating .gp-skin, .gp-happy .gp-skin { fill: #eec19a; }
+.gp-grumpy .gp-skin { fill: #e0ae86; }
+.gp-face { animation: gp-bob 3.4s ease-in-out infinite; }
+@keyframes gp-bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-2px) } }
+.grandpa-bubble {
+  order: -1;
+  background: #fff7e6;
+  color: #4a3a24;
+  border: 2px solid #d8b874;
+  border-radius: 14px;
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1.25;
+  box-shadow: 0 3px 0 rgba(93, 64, 25, 0.25);
+  position: relative;
+}
+.grandpa-bubble::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  bottom: -9px;
+  width: 14px;
+  height: 14px;
+  background: #fff7e6;
+  border-right: 2px solid #d8b874;
+  border-bottom: 2px solid #d8b874;
+  transform: rotate(45deg);
+}
+.grandpa-bubble.pop { animation: gp-pop 0.32s cubic-bezier(0.2, 1.4, 0.5, 1) both; }
+@keyframes gp-pop { from { opacity: 0; transform: translateY(6px) scale(0.9) } to { opacity: 1; transform: none } }
+.grandpa-bubble.reduced { animation: none; }
+.liveyard-toggle.active { color: #4f9e50; }
+@media (prefers-reduced-motion: reduce) {
+  .gp-face { animation: none; }
+}
+
+/* ---------- сюжетные боссы ---------- */
+.boss-intro-screen {
+  background: radial-gradient(circle at 50% 30%, #3a2436, #1a1420);
+  height: 100%;
+}
+.boss-dialog {
+  text-align: center;
+  border: 2px solid #d8ae27;
+}
+.boss-badge {
+  font-size: 44px;
+  line-height: 1;
+  margin-bottom: 4px;
+  animation: gp-pop 0.4s cubic-bezier(0.2, 1.4, 0.5, 1) both;
+}
+.boss-badge-win { font-size: 56px; }
+.boss-intro-text, .boss-victory-text {
+  color: #6b4a1f;
+  font-size: 15px;
+  line-height: 1.35;
+  margin: 6px 0 12px;
+}
+.boss-phase-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  background: rgba(216, 174, 39, 0.28);
+  color: #7a5a15;
+  vertical-align: middle;
+}
+.boss-transition .dialog, .boss-victory .dialog { text-align: center; }

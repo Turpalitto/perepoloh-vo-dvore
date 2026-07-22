@@ -37,7 +37,8 @@ export function generateEndless(streak: number, seed: number): LevelDef {
   if (!found) throw new Error('не удалось сгенерировать уровень бесконечного двора');
   const level: LevelDef = found.level;
   level.id = 0;
-  level.name = `Бесконечный двор · ${streak + 1}`;
+  // Только номер круга: локализованный заголовок собирается в UI (i18n).
+  level.name = String(streak + 1);
   level.par = found.optimal;
   level.par2 = Math.max(found.optimal + 2, found.withStar);
   const kinds = new Set(level.pieces.map((p) => p.kind));

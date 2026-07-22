@@ -7,12 +7,13 @@ import { defineConfig } from 'vite';
  * может достучаться RPC-пингом (onTaskUpdate) — раньше это маскировалось
  * глобальным dangerouslyIgnoreUnhandledErrors (убран).
  *
- * ВАЖНО: singleFork:true здесь не годится — он сериализует ВСЕ файлы в один
- * долгоживущий процесс, и синхронное время блокировки накапливается по всей
- * сессии (elite 52с + boss 16с + endless 80с подряд = >148с в одном воркере),
- * пока RPC-пинг всё равно не поймает таймаут — именно так это и упало на CI.
- * maxForks:2 даёт каждому файлу более короткие, изолированные окна блокировки
- * в параллельных процессах — то же снижение CPU-конкуренции без накопления.
+ * Пробовали maxForks:2 (параллельно) — на CI (мало ядер) это создало
+ * CPU-конкуренцию между форками и уронило отдельные тесты по их собственному
+ * (более короткому) testTimeout. Серийное исполнение (singleFork) не даёт
+ * форкам конкурировать за CPU, но само по себе копило синхронное время
+ * блокировки на весь процесс — решается не топологией пула, а периодическим
+ * `await yieldToEventLoop()` внутри многоитерационных тестов (elite/boss/
+ * endless — см. tests/helpers.ts), чтобы репортёр успевал получать RPC-пинг.
  */
 export default defineConfig({
   test: {
@@ -25,7 +26,7 @@ export default defineConfig({
     exclude: ['**/node_modules/**', 'tests/fixtures/**'],
     environment: 'node',
     pool: 'forks',
-    poolOptions: { forks: { maxForks: 2 } },
+    poolOptions: { forks: { singleFork: true } },
     testTimeout: 180_000,
     hookTimeout: 180_000
   }

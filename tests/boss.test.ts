@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { yieldToEventLoop } from './helpers';
 import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import { solve } from '../src/core/solver';
@@ -35,21 +36,26 @@ describe('боссы — структура', () => {
 });
 
 describe('боссы — проходимость (решатель)', () => {
-  it('каждая фаза каждого босса решается штатным solver', () => {
-    for (const b of BOSSES) {
-      for (const p of b.phases) {
-        const level = levelById(p.sourceLevelId)!;
-        const res = solve(level);
-        expect(res.solvable, `boss ${b.id} phase ${p.id}`).toBe(true);
-        expect(res.optimal).toBeGreaterThan(0);
-        // если фаза требует звезду — решение со звездой тоже существует
-        if (p.objective.requireStar && level.star) {
-          const withStar = solve(level, { requireStar: true });
-          expect(withStar.solvable, `boss ${b.id} phase ${p.id} star`).toBe(true);
+  it(
+    'каждая фаза каждого босса решается штатным solver',
+    async () => {
+      for (const b of BOSSES) {
+        for (const p of b.phases) {
+          const level = levelById(p.sourceLevelId)!;
+          const res = solve(level);
+          expect(res.solvable, `boss ${b.id} phase ${p.id}`).toBe(true);
+          expect(res.optimal).toBeGreaterThan(0);
+          // если фаза требует звезду — решение со звездой тоже существует
+          if (p.objective.requireStar && level.star) {
+            const withStar = solve(level, { requireStar: true });
+            expect(withStar.solvable, `boss ${b.id} phase ${p.id} star`).toBe(true);
+          }
+          await yieldToEventLoop();
         }
       }
-    }
-  }, 120_000);
+    },
+    120_000
+  );
 });
 
 describe('боссы — контроллер фаз', () => {

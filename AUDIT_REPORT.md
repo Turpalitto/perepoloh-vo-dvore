@@ -5,6 +5,20 @@
 
 ---
 
+## АКТУАЛЬНЫЙ СТАТУС (обновлено: обе серии слиты в master)
+
+- **Ветка:** `master`, коммит `dde5c4d11915d913fc79e3c845ff94bc88a3d639`.
+- **PR/CI:**
+  - #2 `feature/complete-living-yard-bosses → master` — merged (squash `4c80476`), CI зелёный.
+  - #1 `feature/first-session-polish → feature/complete-living-yard-bosses` — закрыт, заменён #3 (после squash #2 diff/base-перенаправление конфликтовало из-за смены хэшей коммитов).
+  - #3 `feature/first-session-polish-clean → master` — merged (squash `dde5c4d`), чистый cherry-pick коммита полировки, CI зелёный.
+  - Push CI на итоговом `master` (`dde5c4d`) — зелёный (`check` + `e2e`).
+- **Проверки на `master` (локально, после merge):** typecheck ✅ · lint ✅ (2 предупреждения `no-explicit-any` в `e2e/game.spec.ts`, не ошибки) · unit **460 passed** · solve ✅ 100/100 · build ✅ · verify:dist ✅ **~865 КБ** · e2e **97 passed, 1 skipped**.
+- **BUG-5 (см. §3 ниже) — закрыт.** `promo/ai-icon-puzzle-v2-512.png`, `promo/ai-cover-puzzle-v2-800x470.png`, `screenshots/{desktop,mobile}-boss.png` были untracked — из-за этого `verify:dist` падал в CI (чистый чекаут). Файлы закоммичены в `feature/complete-living-yard-bosses` перед merge.
+- Раздел «АКТУАЛЬНЫЙ СТАТУС (обновлено: полировка первой сессии)» ниже и всё после него — снимок состояния **до** merge в master; сохранён как есть, не переписывался задним числом.
+
+---
+
 ## АКТУАЛЬНЫЙ СТАТУС (обновлено: полировка первой сессии)
 
 Всё, что ниже этого раздела — история аудита по мере работы (первичный отчёт → правки багов → живой двор/боссы → полировка первой сессии). Даты и цифры внутри старых разделов **не обновлялись задним числом**. Актуальные факты на конец этого этапа:

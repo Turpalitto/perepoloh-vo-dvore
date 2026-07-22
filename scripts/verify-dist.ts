@@ -2,7 +2,21 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, relative, resolve } from 'node:path';
 
 const root = resolve('dist');
-const forbidden = ['sdk.games.s3.yandex.net', 'Тестовая реклама', 'mock-ad', '?mock=1'];
+// Каждый маркер здесь — подтверждённая реальная утечка dev/e2e-кода в
+// production (проверено вручную на текущей сборке), а не гадание по имени
+// query-параметра или полю класса: например, `?grandpaDebug=1`/`?analyticsDebug=1`
+// сворачиваются сборщиком в булев литерал `false` ещё до этой проверки — сама
+// строка `grandpaDebug` в бандле не аргумент вызова, а просто имя приватного
+// поля класса (`useDefineForClassFields`), и запрет по этой подстроке был бы
+// ложным срабатыванием на минификацию, а не найденной уязвимостью.
+const forbidden = [
+  'sdk.games.s3.yandex.net',
+  'Тестовая реклама',
+  'mock-ad',
+  '?mock=1',
+  // e2e-only хук завершения уровня — реально отсутствует в prod (MODE==='e2e' guard).
+  '__e2eWinLevel'
+];
 // Только реальные внешние домены, которые допустимы в статике. Односложные
 // «хосты» без точки (a, b, x, xn--e1aybc) — артефакты извлечения URL из
 // минифицированного кода, а не домены; они отсекаются требованием точки ниже,
@@ -124,10 +138,16 @@ for (const file of files) {
   for (const marker of forbidden) {
     if (content.includes(Buffer.from(marker))) throw new Error(`Production содержит запрещённый маркер «${marker}»: ${name}`);
   }
+  if (extname(file) === '.map') throw new Error(`Sourcemap не должен попадать в production-архив: ${name}`);
   if (['.html', '.js', '.css', '.json'].includes(extname(file))) {
     const text = content.toString('utf8');
     if (/file:\/\/|(?:^|[^A-Za-z])[A-Za-z]:\\/m.test(text)) {
       throw new Error(`Production содержит ссылку на локальный диск: ${name}`);
+    }
+    // Абсолютный /audio/... от корня домена сломался бы в каталожном
+    // размещении (base не всегда '/') — все сэмплы должны идти через BASE_URL.
+    if (/["'`]\/audio\//.test(text)) {
+      throw new Error(`Production содержит абсолютный (не base-aware) путь /audio/...: ${name}`);
     }
     for (const match of text.matchAll(/https?:\/\/[^\s"'`\\)<]+/g)) {
       absoluteUrls.add(match[0].replace(/[.,;]+$/, ''));

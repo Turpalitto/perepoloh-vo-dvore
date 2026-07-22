@@ -809,7 +809,11 @@ test.describe('Боссы 25/50/75/100', () => {
   async function clearAllPhases(page: Page): Promise<void> {
     for (let guard = 0; guard < 6; guard++) {
       await expect(page.getByTestId('boss-phase')).toBeVisible();
-      await page.evaluate(() => (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel());
+      await page.evaluate(() =>
+        (window as unknown as { __e2eWinLevel: (opts?: { starCollected?: boolean }) => void }).__e2eWinLevel({
+          starCollected: true
+        })
+      );
       if (await page.getByTestId('boss-continue').isVisible().catch(() => false)) {
         await page.getByTestId('boss-continue').click();
         continue;
@@ -839,6 +843,64 @@ test.describe('Боссы 25/50/75/100', () => {
       expect(errors).toEqual([]);
     });
   }
+
+  test('босс 25: выезд без звезды на фазе requireStar не переводит на победу и не пишет прогресс', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedToBoss(page, 25);
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await page.getByTestId('boss-start').click();
+    // фаза 1 (lure) — без требования звезды
+    await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 1 из 2');
+    await page.evaluate(() => (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel());
+    await page.getByTestId('boss-continue').click();
+    // фаза 2 (gate) — требует звезду; выезд без звезды не засчитывается
+    await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 2 из 2');
+    await page.evaluate(() => (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel());
+    await expect(page.getByTestId('boss-objective-unmet')).toBeVisible();
+    await expect(page.getByTestId('boss-objective-unmet-text')).not.toBeEmpty();
+    await expect(page.getByTestId('boss-victory')).toHaveCount(0);
+    expect((await readSave(page)).bossDone ?? []).not.toContain(25);
+    // перезапуск фазы возвращает на ту же (2 из 2), доска снова видна
+    await page.getByTestId('boss-objective-retry').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 2 из 2');
+    // со звездой — фаза засчитывается, награда пишется один раз
+    await page.evaluate(() =>
+      (window as unknown as { __e2eWinLevel: (opts?: { starCollected?: boolean }) => void }).__e2eWinLevel({
+        starCollected: true
+      })
+    );
+    await expect(page.getByTestId('boss-victory')).toBeVisible();
+    const save = await readSave(page);
+    expect(save.bossDone).toContain(25);
+    expect(save.stars['25']).toBeGreaterThanOrEqual(1);
+    expect(errors).toEqual([]);
+  });
+
+  test('босс 100: финальная фаза без звезды не открывает Высшую лигу', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedToBoss(page, 100);
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await page.getByTestId('boss-start').click();
+    // фазы 1 и 2 (tractor/truck) — без требования звезды
+    for (let i = 0; i < 2; i++) {
+      await expect(page.getByTestId('boss-phase')).toBeVisible();
+      await page.evaluate(() => (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel());
+      await page.getByTestId('boss-continue').click();
+    }
+    // финальная фаза требует звезду
+    await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 3 из 3');
+    await page.evaluate(() => (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel());
+    await expect(page.getByTestId('boss-objective-unmet')).toBeVisible();
+    await expect(page.getByTestId('campaign-ending')).toHaveCount(0);
+    await expect(page.getByTestId('boss-victory')).toHaveCount(0);
+    const save = await readSave(page);
+    expect(save.campaignDone).not.toBe(true);
+    expect(save.bossDone ?? []).not.toContain(100);
+    expect(errors).toEqual([]);
+  });
 
   test('финальный босс 100 открывает Высшую лигу через финальную сцену (один раз)', async ({ page }) => {
     const errors = trackErrors(page);
@@ -1010,5 +1072,27 @@ test.describe('скриншоты', () => {
     await expect(page.getByTestId('win-overlay')).toBeVisible();
     await page.waitForTimeout(1200);
     await page.screenshot({ path: testInfo.outputPath('screenshots/win.png') });
+  });
+});
+
+test.describe('SDK fallback', () => {
+  test('sdkFail=1: игра загружается и играется локально, показывает уведомление, без mock-ad', async ({ page }) => {
+    const errors = trackErrors(page);
+    // Без ?mock=1 — реальная ветка createPlatform() (SDK недоступен в тестовом
+    // окружении в любом случае; sdkFail=1 делает отказ явным и детерминированным).
+    await page.goto('/?sdkFail=1&lang=ru&daytime=day');
+    await expect(page.getByTestId('menu-play')).toBeVisible();
+    await expect(page.getByTestId('platform-fallback-notice')).toBeVisible();
+    await expect(page.getByTestId('platform-fallback-notice')).not.toBeEmpty();
+    // геймплей не заблокирован
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await dragPiece(page, 'T', 5.7, 0);
+    await expect(page.getByTestId('win-overlay')).toBeVisible();
+    // без рекламы/лидербордов платформы
+    await expect(page.getByTestId('mock-ad')).toHaveCount(0);
+    // единственная ожидаемая запись — наш собственный лог отказа SDK (один раз, не молча)
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('[platform] SDK Яндекс Игр недоступен');
   });
 });

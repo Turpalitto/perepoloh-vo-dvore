@@ -6,6 +6,7 @@ import {
   BOSSES,
   advancePhase,
   bossFor,
+  bossObjectiveSatisfied,
   bossProgress,
   createBossRun,
   currentPhase,
@@ -86,5 +87,30 @@ describe('боссы — контроллер фаз', () => {
     expect(reviveBossRun({ bossId: 999, phaseIndex: 5 }, boss)).toEqual(createBossRun(boss));
     expect(reviveBossRun(null, boss)).toEqual(createBossRun(boss));
     expect(reviveBossRun({ bossId: 10, phaseIndex: 99 }, boss)).toEqual(createBossRun(boss));
+  });
+});
+
+describe('bossObjectiveSatisfied', () => {
+  it('requireStar не задан — обычное прохождение разрешено вне зависимости от звезды', () => {
+    const phase = { id: 'x', sourceLevelId: 1, objective: { kind: 'clear' as const } };
+    expect(bossObjectiveSatisfied(phase, { starCollected: false })).toBe(true);
+    expect(bossObjectiveSatisfied(phase, { starCollected: true })).toBe(true);
+  });
+
+  it('requireStar: true, звезда не собрана — запрещено', () => {
+    const phase = { id: 'x', sourceLevelId: 1, objective: { kind: 'clear' as const, requireStar: true } };
+    expect(bossObjectiveSatisfied(phase, { starCollected: false })).toBe(false);
+  });
+
+  it('requireStar: true, звезда собрана — разрешено', () => {
+    const phase = { id: 'x', sourceLevelId: 1, objective: { kind: 'clear' as const, requireStar: true } };
+    expect(bossObjectiveSatisfied(phase, { starCollected: true })).toBe(true);
+  });
+
+  it('фазы 25 (gate) и 100 (final) реально требуют звезду в данных', () => {
+    const boss25 = bossFor(25)!;
+    const boss100 = bossFor(100)!;
+    expect(boss25.phases.find((p) => p.id === 'gate')?.objective.requireStar).toBe(true);
+    expect(boss100.phases.find((p) => p.id === 'final')?.objective.requireStar).toBe(true);
   });
 });

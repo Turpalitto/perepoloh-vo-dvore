@@ -3,7 +3,7 @@ import type { SaveData } from '../game/save';
 import { sanitizeSave } from '../game/save';
 import { queryParam } from '../query';
 import { DEFAULT_PLATFORM_CONFIG } from './types';
-import type { AdHandlers, Platform } from './types';
+import type { AdHandlers, LeaderboardSnapshot, Platform } from './types';
 
 const STORAGE_KEY = 'parkovka.save.v1';
 
@@ -71,26 +71,24 @@ export function createMockPlatform(): Platform {
     async submitScore(board: 'yardstars' | 'dailystreak', value: number): Promise<void> {
       console.info(`[platform] лидерборд ${board} (mock): ${value}`);
     },
-    async getLeaderboard(board: 'yardstars' | 'dailystreak') {
+    async getLeaderboardSnapshot(board: 'yardstars' | 'dailystreak'): Promise<LeaderboardSnapshot> {
       const daily = board === 'dailystreak';
-      return [
+      const entries = [
         { rank: 1, name: 'Марфа', score: daily ? 21 : 184 },
         { rank: 2, name: 'Дед Егор', score: daily ? 14 : 142 },
         { rank: 3, name: 'Сосед', score: daily ? 9 : 97 }
       ];
-    },
-    async getMyRank(board: 'yardstars' | 'dailystreak') {
       const raw = localStorage.getItem(STORAGE_KEY);
       const save = raw ? sanitizeSave(JSON.parse(raw)) : null;
-      if (!save) return null;
-      const score =
-        board === 'dailystreak'
-          ? (save.daily?.streak ?? 0)
-          : Object.values(save.stars).reduce((sum, n) => sum + n, 0);
-      if (score <= 0) return null;
-      const rivals = (await this.getLeaderboard(board)).map((r) => r.score);
-      const rank = rivals.filter((s) => s > score).length + 1;
-      return { rank, name: 'Вы', score, isMe: true };
+      let me = null;
+      if (save) {
+        const score = daily ? (save.daily?.streak ?? 0) : Object.values(save.stars).reduce((sum, n) => sum + n, 0);
+        if (score > 0) {
+          const rank = entries.filter((r) => r.score > score).length + 1;
+          me = { rank, name: 'Вы', score, isMe: true };
+        }
+      }
+      return { entries, me };
     },
     async requestReview(): Promise<boolean> {
       console.info('[platform] запрос оценки (mock)');

@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-07-22 — Release audit findings (P1/P2)
+
+### Fixed
+- **Boss objective (`requireStar`) не проверялся** — выезд без звезды на фазе «gate» босса 25 и финальной фазе босса 100 засчитывался как победа. Добавлена чистая `bossObjectiveSatisfied()` (`src/game/boss.ts`), вызывается в `completeLevel()` до продвижения фазы/записи наград; при провале — локализованный экран с перезапуском фазы.
+- **Лидерборд делал 4 запроса вместо 2** (`getLeaderboard`+`getMyRank` дублировали один вызов). Новый `Platform.getLeaderboardSnapshot()` + TTL-кэш (`src/game/leaderboard-cache.ts`, 45с, dedupe, инвалидация по submit).
+- **`dangerouslyIgnoreUnhandledErrors: true`** глобально маскировал любые unhandled errors. Убран; тяжёлые solver-тесты — отдельная команда `npm run test:solver`.
+- **`getPlayer({ scopes: false })`** — `scopes` не документирован в актуальном SDK Яндекс Игр; заменено на `getPlayer()`.
+- **Сбой SDK останавливал игру целиком.** Новый `src/platform/local-fallback.ts`: localStorage-сейв, без рекламы/лидербордов, ненавязчивое уведомление.
+- **Audio hidden/pause не останавливал scheduler'ы** — ambient/music создавали AudioNode вхолостую при скрытой вкладке. Единая проверка `suspended()`.
+- **Абсолютные `/audio/...` пути** ломались бы при каталожном размещении — заменены на base-aware `${BASE_URL}audio/...`.
+
+### Added
+- `src/game/leaderboard-cache.ts`, `src/platform/local-fallback.ts`.
+- `vitest.solver.config.ts` (тяжёлые solver-тесты), `vitest.probe.config.ts` + `tests/unhandled-error-probe.test.ts` (гарантия, что unhandled rejection валит прогон).
+- `?sdkFail=1` (dev/e2e-only) — детерминированный тест сценария отказа SDK.
+- Усилен `verify:dist`: `__e2eWinLevel`, sourcemap, абсолютные `/audio/...` — запрещены в production.
+- Тесты: unit +28 (boss objective 4, leaderboard-cache 7, yandex snapshot rewrite, local-fallback 9, audio hidden/pause 6, audio base-path 1, unhandled-error-probe 1) → 488 (356 обычных + 132 solver, разнесены командами); e2e +4 → 103 (боссы 25/100 без звезды, SDK fallback).
+
+### Notes
+- Реальных аудиофайлов по-прежнему нет.
+- Человеческая UX-приёмка не выполнялась.
+- Промежуточное состояние босса по-прежнему не персистится.
+
 ## 2026-07-22 — Полировка первой сессии
 
 ### Fixed (найдено аудитом уровней 1-10, чтением кода)

@@ -82,3 +82,16 @@
 - [x] e2e: 8 новых сценариев первой сессии + правка 5 существующих тестов, сломанных намеренными изменениями таймингов/экономики подсказок — 97 всего
 - [x] Документы: FIRST_SESSION_DESIGN.md, UX_ACCEPTANCE_CHECKLIST.md (новые); README/GAME_DESIGN/TECHNICAL_DESIGN/PROJECT_HANDOFF/AUDIT_REPORT/CHANGELOG/AUDIO_ASSETS_REQUIRED обновлены
 - [x] typecheck+lint+test(460)+solve+build(865КБ)+verify:dist+e2e(97) — все зелёные
+
+## Release audit findings (реализовано)
+- [x] Boss objective: `bossObjectiveSatisfied()` (`src/game/boss.ts`), проверка в `completeLevel()` перед `onBossPhaseDone`; локализованный экран перезапуска фазы
+- [x] Leaderboard: `getLeaderboardSnapshot()` (1 запрос/таблицу вместо 2) + TTL-кэш (`src/game/leaderboard-cache.ts`)
+- [x] `dangerouslyIgnoreUnhandledErrors` убран; тяжёлые solver-тесты → `npm run test:solver` (`vitest.solver.config.ts`); probe-тест подтверждает реальный unhandled rejection валит прогон
+- [x] `getPlayer({ scopes: false })` → `getPlayer()`, сверено с актуальной документацией SDK
+- [x] `src/platform/local-fallback.ts` — production-safe fallback при сбое SDK, `?sdkFail=1` для теста
+- [x] Audio: `suspended()`-гейт перед созданием AudioNode при hidden/pause/duck
+- [x] Audio: base-aware `${BASE_URL}audio/...` вместо абсолютного `/audio/...`
+- [x] `verify:dist`: запрет `__e2eWinLevel`, sourcemap, абсолютных `/audio/...`
+- [x] Unit: +28 (boss objective, leaderboard-cache, yandex snapshot, local-fallback, audio hidden/pause, audio base-path, unhandled-error-probe) → 488 (356 + 132 solver)
+- [x] e2e: +4 (боссы 25/100 без звезды, SDK fallback) → 103
+- [x] typecheck+lint+test(356)+test:solver(132)+solve+build(~874КБ)+verify:dist+e2e(103) — все зелёные

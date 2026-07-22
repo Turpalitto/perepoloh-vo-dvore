@@ -12,6 +12,16 @@ import { createPlatform } from './platform';
 import { App } from './ui/app';
 import { setTargetSkin } from './ui/sprites';
 
+/** Ненавязчивое уведомление, что играем локально (SDK недоступен) — не блокирует UI. */
+function showFallbackNotice(): void {
+  const el = document.createElement('div');
+  el.className = 'platform-fallback-notice';
+  el.setAttribute('data-testid', 'platform-fallback-notice');
+  el.textContent = t('platform.fallbackNotice');
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 6000);
+}
+
 async function boot(): Promise<void> {
   // Только dev/e2e + явный query-параметр: no-op трекер остаётся в production
   // независимо от строки запроса, и никогда не отправляет данные наружу.
@@ -50,6 +60,8 @@ async function boot(): Promise<void> {
   platform.ready();
   // Sticky-баннер в свободных полях по краям широкого экрана; не блокирует запуск.
   if (!platform.isTV) void platform.showBanner();
+  // SDK недоступен (сбой загрузки/init) — ненавязчивое уведомление, не блокирует игру.
+  if (platform.name === 'local-fallback') showFallbackNotice();
   // первый запуск на Яндексе — сразу в геймплей (конверсия первой сессии);
   // локально и после любого прогресса — обычное меню
   if (platform.name === 'yandex' && totalStars(save) === 0 && !save.daily) {

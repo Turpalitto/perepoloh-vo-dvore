@@ -1,4 +1,5 @@
 import { createYandexPlatform } from './yandex';
+import { createLocalFallbackPlatform } from './local-fallback';
 import type { Platform } from './types';
 import { queryParam } from '../query';
 
@@ -41,9 +42,23 @@ export async function createPlatform(): Promise<Platform> {
     return mock;
   }
 
-  const loaded = await loadScript(SDK_URL, SDK_TIMEOUT_MS);
-  if (!loaded || !window.YaGames) throw new Error('Не удалось загрузить SDK Яндекс Игр');
-  const platform = createYandexPlatform();
-  await platform.init();
-  return platform;
+  // SDK-таймаут уже есть в loadScript (SDK_TIMEOUT_MS). Явная политика отказа:
+  // ошибка не проглатывается молча — логируется один раз, а игра продолжает
+  // работать локально (local-fallback.ts) вместо полной остановки boot().
+  // Тестовый сценарий отказа: `?sdkFail=1` в dev/e2e эмулирует и не загрузку
+  // скрипта, и падение init() — production-код к query-параметру не привязан,
+  // он лишь пропускает try/catch к тем же реальным веткам отказа.
+  try {
+    if ((import.meta.env.DEV || import.meta.env.MODE === 'e2e') && queryParam('sdkFail') === '1') {
+      throw new Error('sdkFail=1: искусственный отказ SDK для теста fallback');
+    }
+    const loaded = await loadScript(SDK_URL, SDK_TIMEOUT_MS);
+    if (!loaded || !window.YaGames) throw new Error('Не удалось загрузить SDK Яндекс Игр');
+    const platform = createYandexPlatform();
+    await platform.init();
+    return platform;
+  } catch (e) {
+    console.error('[platform] SDK Яндекс Игр недоступен, локальный fallback:', e);
+    return createLocalFallbackPlatform();
+  }
 }

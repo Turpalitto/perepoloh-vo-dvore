@@ -6,7 +6,7 @@
 import type { SaveData } from '../game/save';
 import { mergeSave, sanitizeSave } from '../game/save';
 import { DEFAULT_PLATFORM_CONFIG } from './types';
-import type { AdHandlers, LeaderboardEntry, Platform, PlatformConfig } from './types';
+import type { AdHandlers, LeaderboardSnapshot, Platform, PlatformConfig } from './types';
 
 const STORAGE_KEY = 'parkovka.save.v1';
 
@@ -88,7 +88,13 @@ interface Ysdk {
     getBannerAdvStatus?(): Promise<{ stickyAdvIsShowing: boolean; reason?: string }>;
     showBannerAdv?(): Promise<void>;
   };
-  getPlayer?(opts?: { scopes?: boolean }): Promise<YsdkPlayer>;
+  /**
+   * Актуальная сигнатура на 2026-07-22 (yandex.com/dev/games/doc/en/sdk/sdk-player):
+   * getPlayer(opts?: { signed?: boolean }). `scopes` в текущей документации не
+   * упоминается — используем только signed, и то не запрашиваем (нет бэкенда для
+   * проверки подписи). Без авторизации ответ содержит только ID (getUniqueID).
+   */
+  getPlayer?(opts?: { signed?: boolean }): Promise<YsdkPlayer>;
 }
 
 declare global {
@@ -168,7 +174,10 @@ export function createYandexPlatform(): Platform {
         console.warn('[platform] remote config недоступен:', e);
       }
       try {
-        player = (await ysdk.getPlayer?.({ scopes: false })) ?? null;
+        // Без опций: signed не нужен (нет серверной проверки подписи), а
+        // устаревший scopes в текущем SDK не документирован. getUniqueID() —
+        // рекомендованный способ получить постоянный ID (getID() deprecated).
+        player = (await ysdk.getPlayer?.()) ?? null;
         myId = player?.getUniqueID?.() ?? null;
       } catch {
         player = null; // без авторизации — работаем на localStorage
@@ -191,8 +200,15 @@ export function createYandexPlatform(): Platform {
       }
     },
 
-    async getLeaderboard(board: 'yardstars' | 'dailystreak'): Promise<LeaderboardEntry[]> {
-      if (!ysdk) return [];
+    /**
+     * Один запрос на таблицу (includeUser+quantityAround уже приносит игрока
+     * рядом с его местом) — верхние строки и своя строка извлекаются из одного
+     * ответа вместо двух отдельных вызовов getEntries. Своя строка находится
+     * сравнением player.getUniqueID() с entry.player.uniqueID в том же ответе.
+     * Без авторизации или вне окна ответа — me: null, без ошибки.
+     */
+    async getLeaderboardSnapshot(board: 'yardstars' | 'dailystreak'): Promise<LeaderboardSnapshot> {
+      if (!ysdk) return { entries: [], me: null };
       try {
         const lb = ysdk.leaderboards ?? (await ysdk.getLeaderboards?.());
         const result = await (lb?.getEntries ?? lb?.getLeaderboardEntries)?.call(lb, board, {
@@ -200,42 +216,25 @@ export function createYandexPlatform(): Platform {
           quantityTop: 10,
           quantityAround: 3
         });
-        return (result?.entries ?? []).map((entry, index) => ({
+        const raw = result?.entries ?? [];
+        const entries = raw.map((entry, index) => ({
           rank: (entry.rank ?? index) + 1,
           name: entry.player?.publicName ?? entry.publicName ?? 'Игрок',
           score: entry.score ?? 0
         }));
+        const mineRaw = myId ? raw.find((entry) => entry.player?.uniqueID === myId) : undefined;
+        const me = mineRaw
+          ? {
+              rank: (mineRaw.rank ?? 0) + 1,
+              name: mineRaw.player?.publicName ?? mineRaw.publicName ?? 'Игрок',
+              score: mineRaw.score ?? 0,
+              isMe: true
+            }
+          : null;
+        return { entries, me };
       } catch (e) {
         console.warn('[platform] чтение лидерборда недоступно:', e);
-        return [];
-      }
-    },
-
-    /**
-     * Своя строка находится сравнением player.getUniqueID() с entry.player.uniqueID
-     * в том же ответе (includeUser+quantityAround уже приносит игрока рядом с его
-     * местом). Без авторизации или вне окна ответа — null, без ошибки.
-     */
-    async getMyRank(board: 'yardstars' | 'dailystreak'): Promise<LeaderboardEntry | null> {
-      if (!ysdk || !myId) return null;
-      try {
-        const lb = ysdk.leaderboards ?? (await ysdk.getLeaderboards?.());
-        const result = await (lb?.getEntries ?? lb?.getLeaderboardEntries)?.call(lb, board, {
-          includeUser: true,
-          quantityTop: 10,
-          quantityAround: 3
-        });
-        const mine = (result?.entries ?? []).find((entry) => entry.player?.uniqueID === myId);
-        if (!mine) return null;
-        return {
-          rank: (mine.rank ?? 0) + 1,
-          name: mine.player?.publicName ?? mine.publicName ?? 'Игрок',
-          score: mine.score ?? 0,
-          isMe: true
-        };
-      } catch (e) {
-        console.warn('[platform] своё место в лидерборде недоступно:', e);
-        return null;
+        return { entries: [], me: null };
       }
     },
 

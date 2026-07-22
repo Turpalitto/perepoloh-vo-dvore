@@ -263,36 +263,40 @@ describe('адаптер Яндекс Игр', () => {
     await platform.init();
     await platform.submitScore('yardstars', 42);
     expect(setScore).toHaveBeenCalledWith('yardstars', 42);
-    await expect(platform.getLeaderboard('yardstars')).resolves.toEqual([{ rank: 1, name: 'Сосед', score: 42 }]);
+    await expect(platform.getLeaderboardSnapshot('yardstars')).resolves.toEqual({
+      entries: [{ rank: 1, name: 'Сосед', score: 42 }],
+      me: null
+    });
   });
 
-  it('находит своё место в лидерборде по uniqueID игрока', async () => {
+  it('находит своё место в лидерборде по uniqueID игрока из одного ответа (без второго запроса)', async () => {
+    const getEntries = vi.fn(async () => ({
+      entries: [
+        { rank: 0, score: 100, player: { publicName: 'Сосед', uniqueID: 'other' } },
+        { rank: 6, score: 42, player: { publicName: 'Я', uniqueID: 'me-123' } }
+      ]
+    }));
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
         YaGames: {
           init: async () => ({
             getPlayer: async () => ({ getUniqueID: () => 'me-123' }),
-            leaderboards: {
-              getEntries: async () => ({
-                entries: [
-                  { rank: 0, score: 100, player: { publicName: 'Сосед', uniqueID: 'other' } },
-                  { rank: 6, score: 42, player: { publicName: 'Я', uniqueID: 'me-123' } }
-                ]
-              })
-            }
+            leaderboards: { getEntries }
           })
         }
       }
     });
     const platform = createYandexPlatform();
     await platform.init();
-    await expect(platform.getMyRank('yardstars')).resolves.toEqual({
-      rank: 7,
-      name: 'Я',
-      score: 42,
-      isMe: true
-    });
+    const snapshot = await platform.getLeaderboardSnapshot('yardstars');
+    expect(snapshot.entries).toEqual([
+      { rank: 1, name: 'Сосед', score: 100 },
+      { rank: 7, name: 'Я', score: 42 }
+    ]);
+    expect(snapshot.me).toEqual({ rank: 7, name: 'Я', score: 42, isMe: true });
+    // один вызов на верхние строки И своё место — раньше это были два отдельных запроса
+    expect(getEntries).toHaveBeenCalledTimes(1);
   });
 
   it('без авторизации своё место в лидерборде — null, без ошибки', async () => {
@@ -302,7 +306,7 @@ describe('адаптер Яндекс Игр', () => {
     });
     const platform = createYandexPlatform();
     await platform.init();
-    await expect(platform.getMyRank('yardstars')).resolves.toBeNull();
+    await expect(platform.getLeaderboardSnapshot('yardstars')).resolves.toEqual({ entries: [], me: null });
   });
 
   it('запрашивает баннер только если он ещё не показан', async () => {

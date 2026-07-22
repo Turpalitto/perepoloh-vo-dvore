@@ -138,32 +138,67 @@ export function pickLine(
   ctx: PickContext,
   lines: GrandpaLine[] = GRANDPA_LINES
 ): GrandpaLine | null {
+  return pickLineVerbose(state, event, ctx, lines).line;
+}
+
+/** Почему конкретная реплика не подходит сейчас (null — подходит). Чистая функция. */
+function lineSkipReason(l: GrandpaLine, state: GrandpaState, event: GrandpaEvent, ctx: PickContext): string | null {
+  if (l.event !== event) return 'wrong-event';
+  if (l.minLevel !== undefined && ctx.level < l.minLevel) return `minLevel ${l.minLevel} > ${ctx.level}`;
+  if (l.maxLevel !== undefined && ctx.level > l.maxLevel) return `maxLevel ${l.maxLevel} < ${ctx.level}`;
+  if (l.once && state.seen.has(l.id)) return 'already seen (once)';
+  if (l.id === state.lastId) return 'same as last line (anti-repeat)';
+  const shownAt = state.shownAt[l.id];
+  if (l.cooldownMs !== undefined && shownAt !== undefined && ctx.now - shownAt < l.cooldownMs) {
+    return `cooldown ${l.cooldownMs - (ctx.now - shownAt)}ms left`;
+  }
+  return null;
+}
+
+export interface PickLineDebugInfo {
+  line: GrandpaLine | null;
+  /** Почему каждая НЕподошедшая реплика этого события была отсеяна. */
+  skipped: Array<{ id: string; reason: string }>;
+  /** Заполнено, если весь пул событий был заблокирован глобальным кулдауном. */
+  blockedByGlobalCooldown?: number;
+}
+
+/**
+ * Как `pickLine`, но с прозрачным объяснением решения — для `?grandpaDebug=1`.
+ * Логику не дублирует: `pickLine` — тонкая обёртка над этой функцией.
+ */
+export function pickLineVerbose(
+  state: GrandpaState,
+  event: GrandpaEvent,
+  ctx: PickContext,
+  lines: GrandpaLine[] = GRANDPA_LINES
+): PickLineDebugInfo {
   const rng = ctx.rng ?? Math.random;
-  const candidates = lines.filter((l) => {
-    if (l.event !== event) return false;
-    if (l.minLevel !== undefined && ctx.level < l.minLevel) return false;
-    if (l.maxLevel !== undefined && ctx.level > l.maxLevel) return false;
-    if (l.once && state.seen.has(l.id)) return false;
-    if (l.id === state.lastId) return false; // не повторяем подряд
-    const shownAt = state.shownAt[l.id];
-    if (l.cooldownMs !== undefined && shownAt !== undefined && ctx.now - shownAt < l.cooldownMs) return false;
-    return true;
-  });
-  if (candidates.length === 0) return null;
+  const skipped: Array<{ id: string; reason: string }> = [];
+  const candidates: GrandpaLine[] = [];
+  for (const l of lines) {
+    if (l.event !== event) continue; // не засоряем debug лог репликами других событий
+    const reason = lineSkipReason(l, state, event, ctx);
+    if (reason) skipped.push({ id: l.id, reason });
+    else candidates.push(l);
+  }
+  if (candidates.length === 0) return { line: null, skipped };
 
   const priority = Math.max(...candidates.map((l) => l.priority ?? 0));
   // Обычные (priority 0) реплики подчиняются глобальному кулдауну — дед не
   // комментирует каждый ход. Сюжетные (priority>0) его обходят.
-  if (priority === 0 && ctx.now - state.lastAt < GRANDPA_GLOBAL_COOLDOWN_MS) return null;
+  if (priority === 0 && ctx.now - state.lastAt < GRANDPA_GLOBAL_COOLDOWN_MS) {
+    return { line: null, skipped, blockedByGlobalCooldown: GRANDPA_GLOBAL_COOLDOWN_MS - (ctx.now - state.lastAt) };
+  }
 
   const pool = candidates.filter((l) => (l.priority ?? 0) === priority);
   const total = pool.reduce((s, l) => s + (l.weight ?? 1), 0);
   let r = rng() * total;
   for (const l of pool) {
     r -= l.weight ?? 1;
-    if (r < 0) return l;
+    if (r < 0) return { line: l, skipped };
   }
-  return pool[pool.length - 1];
+  return { line: pool[pool.length - 1], skipped };
 }
 
 /** Фиксирует показ реплики в состоянии (мутирует переданное state). */

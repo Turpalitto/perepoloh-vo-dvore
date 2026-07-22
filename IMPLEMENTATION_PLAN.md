@@ -72,3 +72,13 @@
 - [x] SaveData.bossDone (union merge)
 - [x] e2e: босс 10 (полный проход/restart/TV) + боссы 25/50/75/100 (интро→фазы→победа, прогресс только после победы) + босс 100 (открытие лиги / повтор без наград), desktop+mobile; хук завершения фазы гейтится MODE==='e2e'
 - [ ] Реальные аудио-сэмплы (см. AUDIO_ASSETS_REQUIRED.md)
+
+## Полировка первой сессии (реализовано)
+- [x] Аудит первых 10 уровней чтением кода — найдены и исправлены 3 P0/P1: наслоение приветствия деда на обучающий toast, платный токен на обучающей подсказке, reduced-motion не убирал анимацию onboarding-стрелки (терялось направление)
+- [x] `src/game/sound-registry.ts` — SampleLoader (тестируемый, инъекция fetch/decode), реестр 19 ключей, подключено 4 (star/gate/switch/grandpa)
+- [x] `src/game/analytics.ts` — типизированные события воронки, no-op default, debug-режим `?analyticsDebug=1`
+- [x] `?grandpaDebug=1` — pickLineVerbose с причинами отсева реплик
+- [x] Unit: sound-registry (5), analytics (4), grandpa pickLineVerbose (4) — 460 всего
+- [x] e2e: 8 новых сценариев первой сессии + правка 5 существующих тестов, сломанных намеренными изменениями таймингов/экономики подсказок — 97 всего
+- [x] Документы: FIRST_SESSION_DESIGN.md, UX_ACCEPTANCE_CHECKLIST.md (новые); README/GAME_DESIGN/TECHNICAL_DESIGN/PROJECT_HANDOFF/AUDIT_REPORT/CHANGELOG/AUDIO_ASSETS_REQUIRED обновлены
+- [x] typecheck+lint+test(460)+solve+build(865КБ)+verify:dist+e2e(97) — все зелёные

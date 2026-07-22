@@ -16,7 +16,7 @@ import {
   type GrandpaState,
   commitLine,
   createGrandpaState,
-  pickLine,
+  pickLineVerbose,
   textKeyOf
 } from '../game/grandpa';
 
@@ -54,6 +54,12 @@ export interface YardDirectorOptions {
   seen: Iterable<string>;
   /** Вызывается, когда набор seen пополнился (для персиста в сейв). */
   onSeen(id: string): void;
+  /**
+   * `?grandpaDebug=1` в dev/e2e: логирует в консоль выбранную реплику и причины
+   * отсева остальных кандидатов. Никогда не включается в production независимо
+   * от query-параметра — гейт по MODE делает вызывающий код (см. app.ts).
+   */
+  debug?: boolean;
 }
 
 export class YardDirector {
@@ -88,12 +94,28 @@ export class YardDirector {
 
   /** Событие двора → возможная реплика деда. Тихо игнорируется, если выключено. */
   react(event: GrandpaEvent, now: number = performance.now()): void {
-    if (!this.opts.enabled || this.paused) return;
-    const line = pickLine(this.state, event, { now, level: this.opts.level });
-    if (!line) return;
-    commitLine(this.state, line, now);
-    if (this.state.seen.has(line.id)) this.opts.onSeen(line.id);
-    this.show(t(textKeyOf(line)), line.mood, (line.priority ?? 0) >= 3);
+    if (!this.opts.enabled || this.paused) {
+      if (this.opts.debug) console.debug(`[grandpa] ${event}: skipped (director disabled/paused)`);
+      return;
+    }
+    const info = pickLineVerbose(this.state, event, { now, level: this.opts.level });
+    if (this.opts.debug) this.logDebug(event, info);
+    if (!info.line) return;
+    commitLine(this.state, info.line, now);
+    if (this.state.seen.has(info.line.id)) this.opts.onSeen(info.line.id);
+    this.show(t(textKeyOf(info.line)), info.line.mood, (info.line.priority ?? 0) >= 3);
+  }
+
+  private logDebug(event: GrandpaEvent, info: ReturnType<typeof pickLineVerbose>): void {
+    if (info.line) {
+      console.debug(
+        `[grandpa] ${event} -> "${info.line.id}" mood=${info.line.mood} cooldownMs=${info.line.cooldownMs ?? '—'} priority=${info.line.priority ?? 0}`
+      );
+    } else if (info.blockedByGlobalCooldown !== undefined) {
+      console.debug(`[grandpa] ${event} -> none: global cooldown, ${Math.round(info.blockedByGlobalCooldown)}ms left`);
+    } else {
+      console.debug(`[grandpa] ${event} -> none: no eligible line`, info.skipped);
+    }
   }
 
   private show(text: string, mood: GrandpaMood, sticky: boolean): void {

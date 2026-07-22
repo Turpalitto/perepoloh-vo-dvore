@@ -1387,6 +1387,11 @@ html[data-daytime='night'] .yard-lamp-light {
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
   animation: onboarding-swipe 1.3s ease-in-out infinite;
 }
+/* prefers-reduced-motion: без анимации, статичная стрелка направления. */
+.onboarding-hand-static {
+  animation: none;
+  opacity: 0.95;
+}
 @keyframes onboarding-swipe {
   0%,
   100% {

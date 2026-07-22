@@ -1,7 +1,12 @@
 /**
- * Все звуки синтезируются WebAudio — ассеты не нужны.
+ * Синтез WebAudio — рабочий fallback. Централизованный реестр (`sound-registry.ts`)
+ * умеет подхватывать реальные файлы по тем же ключам (`SoundFileKey`), когда они
+ * появятся: `playSample()` пробует сэмпл, а если его нет/не загрузился — играет
+ * синтезированную версию тем же вызовом, без дублирования кода на стороне UI.
  * Контекст создаётся лениво по первому пользовательскому вводу.
  */
+import { SOUND_FILE_URLS, SampleLoader, type SoundFileKey, createBrowserFetcher } from './sound-registry';
+
 export type SoundName =
   | 'click'
   | 'pick'
@@ -34,6 +39,10 @@ export class GameAudio {
   private musicTimer: number | null = null;
   private musicBar = 0;
   private mood: 'calm' | 'tense' = 'calm';
+  private sampleLoader: SampleLoader | null = null;
+  /** Ограничение параллельных сэмплов: слишком много source-нод разом — каша. */
+  private activeSamples = 0;
+  private static readonly MAX_CONCURRENT_SAMPLES = 6;
 
   constructor(
     public enabled: boolean,
@@ -55,6 +64,10 @@ export class GameAudio {
       this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = this.noiseBuf.getChannelData(0);
       for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      // Только dev: отсутствующий файл логируется один раз (не спамит консоль),
+      // и только в development — в production console.warn о недостающих
+      // сэмплах не нужен (файлов там либо нет совсем, либо они есть все).
+      this.sampleLoader = new SampleLoader(createBrowserFetcher(this.ctx), import.meta.env.DEV);
     } catch {
       this.ctx = null; // без звука игра остаётся играбельной
     }
@@ -235,6 +248,49 @@ export class GameAudio {
     lfo.stop(this.ctx.currentTime + 0.2);
   }
 
+  /**
+   * Пытается сыграть реальный сэмпл по ключу; если его нет (ещё не загружен,
+   * не найден, ошибка сети) — молча зовёт `fallback` (существующий синтез).
+   * Никогда не бросает и не блокирует вызывающий код ожиданием сети: если
+   * сэмпл ещё не в кэше, запускает его загрузку в фоне и играет fallback
+   * СЕЙЧАС — при следующем вызове того же ключа сэмпл, если успел
+   * подгрузиться, сыграет уже по-настоящему.
+   */
+  private playSample(key: SoundFileKey, vol: number, fallback: () => void): void {
+    if (!this.ctx || !this.master || !this.sampleLoader) {
+      fallback();
+      return;
+    }
+    const buffer = this.sampleLoader.get(key);
+    if (!buffer) {
+      if (!this.sampleLoader.hasFailed(key)) void this.sampleLoader.load(key, SOUND_FILE_URLS[key]);
+      fallback();
+      return;
+    }
+    if (this.activeSamples >= GameAudio.MAX_CONCURRENT_SAMPLES) return; // тихо пропускаем, не копим очередь
+    const t0 = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    // Небольшая вариация скорости — тот же приём, что и для синтеза (`vary`),
+    // чтобы повторяющийся сэмпл не звучал «под копирку».
+    src.playbackRate.value = 0.96 + Math.random() * 0.08;
+    const gain = this.ctx.createGain();
+    const fadeIn = Math.min(0.02, buffer.duration / 4);
+    const fadeOut = Math.min(0.05, buffer.duration / 4);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(vol, t0 + fadeIn);
+    gain.gain.setValueAtTime(vol, Math.max(t0 + fadeIn, t0 + buffer.duration - fadeOut));
+    gain.gain.linearRampToValueAtTime(0, t0 + buffer.duration); // без щелчка на конце
+    src.connect(gain).connect(this.master);
+    this.activeSamples++;
+    src.onended = () => {
+      this.activeSamples = Math.max(0, this.activeSamples - 1);
+      src.disconnect();
+      gain.disconnect();
+    };
+    src.start(t0);
+  }
+
   private tone(
     freq: number,
     dur: number,
@@ -319,16 +375,22 @@ export class GameAudio {
         this.tone(620, 0.28, 'sine', 0.12, 0, 330);
         break;
       case 'star':
-        this.tone(1319, 0.09, 'sine', 0.2);
-        this.tone(1760, 0.16, 'sine', 0.2, 0.08);
+        this.playSample('star_collect', 0.35, () => {
+          this.tone(1319, 0.09, 'sine', 0.2);
+          this.tone(1760, 0.16, 'sine', 0.2, 0.08);
+        });
         break;
       case 'switch':
-        this.tone(420, 0.08, 'square', 0.12, 0, 620);
-        this.tone(840, 0.14, 'sine', 0.16, 0.08, 1040);
+        this.playSample('button_click', 0.3, () => {
+          this.tone(420, 0.08, 'square', 0.12, 0, 620);
+          this.tone(840, 0.14, 'sine', 0.16, 0.08, 1040);
+        });
         break;
       case 'gate':
-        this.tone(200, 0.34, 'sawtooth', 0.055, 0, 300);
-        this.noise(0.32, 0.07, 900, 0, 260);
+        this.playSample('gate_creak', 0.3, () => {
+          this.tone(200, 0.34, 'sawtooth', 0.055, 0, 300);
+          this.noise(0.32, 0.07, 900, 0, 260);
+        });
         break;
       case 'honk':
         this.tone(392, 0.14, 'square', 0.16);
@@ -346,11 +408,16 @@ export class GameAudio {
         [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.18, 'triangle', 0.2, i * 0.11));
         break;
       case 'grandpa': {
-        // Короткое добродушное «бормотание» деда: пара низких слогов с лёгкой
-        // вариацией высоты — узнаётся как «дед сказал», не мешает музыке.
-        const base = 138 + Math.random() * 26;
-        this.tone(base, 0.11, 'sawtooth', 0.05, 0, base * 0.82);
-        this.tone(base * 1.18, 0.1, 'sawtooth', 0.045, 0.12, base * 0.95);
+        // Один из трёх сэмплов бормотания по кругу (если файлы появятся);
+        // иначе — короткое добродушное синтезированное «бормотание».
+        const mumbleKey = (['grandpa_mumble_1', 'grandpa_mumble_2', 'grandpa_mumble_3'] as const)[
+          Math.floor(Math.random() * 3)
+        ];
+        this.playSample(mumbleKey, 0.4, () => {
+          const base = 138 + Math.random() * 26;
+          this.tone(base, 0.11, 'sawtooth', 0.05, 0, base * 0.82);
+          this.tone(base * 1.18, 0.1, 'sawtooth', 0.045, 0.12, base * 0.95);
+        });
         break;
       }
       case 'cluck': {

@@ -1,9 +1,11 @@
 import './polyfills';
 import './styles.css';
+import { createDebugTracker, setAnalyticsTracker, track } from './game/analytics';
 import { GameAudio } from './game/audio';
 import { applyDaytime } from './game/daytime';
 import { initI18n, t } from './game/i18n';
 import { initReturnReminder } from './game/reminder';
+import { queryParam } from './query';
 import { applySeason } from './game/season';
 import { SaveStore, defaultSave, mergeSave, totalStars } from './game/save';
 import { createPlatform } from './platform';
@@ -11,6 +13,12 @@ import { App } from './ui/app';
 import { setTargetSkin } from './ui/sprites';
 
 async function boot(): Promise<void> {
+  // Только dev/e2e + явный query-параметр: no-op трекер остаётся в production
+  // независимо от строки запроса, и никогда не отправляет данные наружу.
+  if ((import.meta.env.DEV || import.meta.env.MODE === 'e2e') && queryParam('analyticsDebug') === '1') {
+    setAnalyticsTracker(createDebugTracker());
+  }
+  track({ type: 'game_start' });
   applyDaytime();
   applySeason();
   const platform = await createPlatform();

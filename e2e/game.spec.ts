@@ -314,16 +314,30 @@ test.describe('Переполох во дворе', () => {
     await expect(page.getByTestId('menu-gift')).toBeDisabled();
     await expect(page.getByTestId('menu-gift')).toContainText('2');
 
+    // Уровень 1 обучающий — подсказка на нём бесплатна и не тратит выданный
+    // токен (осознанно, полировка первой сессии): токен остаётся в копилке.
     await page.getByTestId('menu-play').click();
-    await expect(page.getByTestId('btn-hint')).toContainText('Подсказки: 2');
+    await expect(page.getByTestId('btn-hint')).toContainText('Бесплатная подсказка');
     await page.getByTestId('btn-hint').click();
-    await expect(page.getByTestId('btn-hint')).toContainText('Подсказки: 1');
+    await expect(page.locator('.hint-chevron').first()).toBeVisible();
+    await expect(page.getByTestId('btn-hint')).toContainText('Бесплатная подсказка');
     await expect(page.getByTestId('mock-ad')).toHaveCount(0);
+    const save = await page.evaluate(() => JSON.parse(localStorage.getItem('parkovka.save.v1') ?? '{}'));
+    expect(save.hintTokens).toBe(2); // токен из подарка не потрачен на обучающем уровне
     expect(errors).toEqual([]);
   });
 
   test('первая подсказка бесплатна, следующие — после rewarded-рекламы', async ({ page }) => {
     const errors = trackErrors(page);
+    // Как и выше: уровни 1-3 обучающие с безлимитной бесплатной подсказкой,
+    // экономику free/rewarded проверяем с уровня 4.
+    const stars: Record<string, number> = { '1': 3, '2': 3, '3': 3 };
+    await page.addInitScript((stars) => {
+      localStorage.setItem(
+        'parkovka.save.v1',
+        JSON.stringify({ v: 1, stars, sound: true, music: true, lang: 'ru', lastLevel: 3, targetSkin: 0 })
+      );
+    }, stars);
     await page.goto('/?mock=1&lang=ru');
     await page.getByTestId('menu-play').click();
     await page.getByTestId('btn-hint').click();
@@ -652,8 +666,10 @@ test.describe('Живой двор и дед', () => {
     await page.goto('/?mock=1&lang=ru');
     await page.getByTestId('menu-play').click();
     await expect(page.getByTestId('grandpa-portrait')).toBeVisible();
-    // стартовая реплика появляется (state-based, без привязки к мс анимации)
-    await expect(page.getByTestId('grandpa-bubble')).not.toBeEmpty();
+    // Уровень 1 обучающий — приветствие деда осознанно отложено до ~5с, чтобы
+    // не наслаиваться на обучающий hint-toast (не привязано к анимации — это
+    // фиксированная задержка `setTimeout`, ждём с запасом).
+    await expect(page.getByTestId('grandpa-bubble')).not.toBeEmpty({ timeout: 7000 });
     // управление доступно: уровень проходится, несмотря на пузырь
     await dragPiece(page, 'T', 5.7, 0);
     await expect(page.getByTestId('win-overlay')).toBeVisible();
@@ -664,14 +680,18 @@ test.describe('Живой двор и дед', () => {
     await page.goto('/?mock=1&lang=ru');
     await page.getByTestId('menu-play').click();
     await expect(page.getByTestId('grandpa-portrait')).toBeVisible();
-    // дёргаем фигуру туда-сюда — пузырь не должен молотить новую реплику каждый ход
     const textAfter = async () => (await page.getByTestId('grandpa-bubble').textContent()) ?? '';
-    await page.waitForTimeout(700);
-    const t1 = await textAfter();
+    // Первый ход на уровне 1 всегда вызывает разовую реакцию «first-move»
+    // (не подчиняется отложенному приветствию) — фиксируем её текст как базу.
     await dragPiece(page, 'T', 1, 0);
+    await expect.poll(textAfter).not.toBe('');
+    const t1 = await textAfter();
+    // Дёргаем фигуру ещё дважды — пузырь не должен молотить новую реплику
+    // на каждый ход (глобальный кулдаун деда).
+    await dragPiece(page, 'T', -1, 0);
     await dragPiece(page, 'T', 1, 0);
     const t2 = await textAfter();
-    expect(t2).toBe(t1); // реплика не сменилась от пары быстрых ходов
+    expect(t2).toBe(t1);
   });
 
   test('выключение «Живого двора» скрывает деда', async ({ page }) => {
@@ -685,6 +705,8 @@ test.describe('Живой двор и дед', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/?mock=1&lang=ru');
     await page.getByTestId('menu-play').click();
+    // Первый ход даёт мгновенную (не отложенную) реакцию 'first-move' на уровне 1.
+    await dragPiece(page, 'T', 1, 0);
     await expect(page.getByTestId('grandpa-bubble')).not.toBeEmpty();
     await expect(page.getByTestId('grandpa-bubble')).toHaveClass(/reduced/);
   });
@@ -847,6 +869,123 @@ test.describe('Боссы 25/50/75/100', () => {
     await expect(page.getByTestId('boss-victory')).toBeVisible();
     await expect(page.getByTestId('campaign-ending')).toHaveCount(0);
     expect(errors).toEqual([]);
+  });
+});
+
+test.describe('Первая сессия: онбординг, hint без токена, рекламный каденс', () => {
+  test('онбординг-рука на уровне 1 исчезает после первого хода', async ({ page }) => {
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('onboarding-hand')).toBeVisible();
+    await dragPiece(page, 'T', 1, 0);
+    await expect(page.getByTestId('onboarding-hand')).toHaveCount(0);
+  });
+
+  test('дед не перекрывает обучающий hint-toast: не появляется, пока тот виден', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('hint-toast')).toBeVisible();
+    // пока обучающий toast виден (0-4.8с), дед ещё не должен был появиться
+    await page.waitForTimeout(1200);
+    await expect(page.getByTestId('hint-toast')).toBeVisible();
+    const bubbleDuringToast = await page.getByTestId('grandpa-bubble').textContent();
+    expect(bubbleDuringToast).toBe('');
+    // после того как toast сошёл — дед может говорить
+    await page.waitForTimeout(4200);
+    await expect(page.getByTestId('grandpa-bubble')).not.toBeEmpty();
+    expect(errors).toEqual([]);
+  });
+
+  test('подсказка на уровнях 1-3 не тратит платный токен', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'parkovka.save.v1',
+        JSON.stringify({ v: 1, stars: {}, sound: true, music: true, lang: 'ru', lastLevel: 1, targetSkin: 0, hintTokens: 5 })
+      );
+    });
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('btn-hint')).toContainText('Бесплатная подсказка');
+    await page.getByTestId('btn-hint').click();
+    await page.waitForTimeout(300);
+    const save = await page.evaluate(() => JSON.parse(localStorage.getItem('parkovka.save.v1') ?? '{}'));
+    expect(save.hintTokens).toBe(5); // токен не потрачен на обучающем уровне
+  });
+
+  test('обычный (не обучающий) уровень 11 тратит токен как раньше', async ({ page }) => {
+    const stars: Record<string, number> = {};
+    for (let i = 1; i <= 10; i++) stars[String(i)] = 3;
+    await page.addInitScript((stars) => {
+      localStorage.setItem(
+        'parkovka.save.v1',
+        JSON.stringify({ v: 1, stars, sound: true, music: true, lang: 'ru', lastLevel: 10, targetSkin: 0, hintTokens: 5 })
+      );
+    }, stars);
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-levels').click();
+    await page.getByTestId('level-card-11').click();
+    await expect(page.getByTestId('btn-hint')).toContainText('Подсказки: 5');
+    await page.getByTestId('btn-hint').click();
+    await page.waitForTimeout(300);
+    const save = await page.evaluate(() => JSON.parse(localStorage.getItem('parkovka.save.v1') ?? '{}'));
+    expect(save.hintTokens).toBe(4);
+  });
+
+  test('нет рекламы (mock-ad) на уровнях 1-5 при быстром прохождении', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?mock=1&lang=ru');
+    for (let i = 0; i < 5; i++) {
+      await page.getByTestId(i === 0 ? 'menu-play' : 'btn-next').click();
+      await expect(page.getByTestId('board')).toBeVisible();
+      await expect(page.getByTestId('mock-ad')).toHaveCount(0);
+      const piece = page.locator('[data-piece="T"]');
+      const box = (await piece.boundingBox())!;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 700, box.y + box.height / 2, { steps: 8 });
+      await page.mouse.up();
+      await page.waitForTimeout(250);
+      // на некоторых уровнях требуется решатель — упрощаем: просто проверяем отсутствие рекламы,
+      // используя e2e-хук завершения там, где ручной drag не решает уровень.
+      if (!(await page.getByTestId('win-overlay').isVisible().catch(() => false))) {
+        await page.evaluate(() => (window as unknown as { __e2eWinLevel?: () => void }).__e2eWinLevel?.());
+      }
+      await expect(page.getByTestId('win-overlay')).toBeVisible();
+      await expect(page.getByTestId('mock-ad')).toHaveCount(0);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test('grandpaDebug=1 логирует выбор реплики только с query-параметром', async ({ page }) => {
+    const debugLogs: string[] = [];
+    page.on('console', (m) => {
+      if (m.type() === 'debug' && m.text().includes('[grandpa]')) debugLogs.push(m.text());
+    });
+    await page.goto('/?mock=1&lang=ru&grandpaDebug=1');
+    await page.getByTestId('menu-play').click();
+    await page.waitForTimeout(5300); // дождаться отложенной реплики-встречи
+    expect(debugLogs.length).toBeGreaterThan(0);
+  });
+
+  test('без query-параметра grandpaDebug лог деда не появляется', async ({ page }) => {
+    const debugLogs: string[] = [];
+    page.on('console', (m) => {
+      if (m.type() === 'debug' && m.text().includes('[grandpa]')) debugLogs.push(m.text());
+    });
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await page.waitForTimeout(5300);
+    expect(debugLogs.length).toBe(0);
+  });
+
+  test('reduced-motion: онбординг-стрелка статична (без цикла свайпа)', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    const hand = page.getByTestId('onboarding-hand');
+    await expect(hand).toBeVisible();
+    await expect(hand).toHaveClass(/onboarding-hand-static/);
   });
 });
 

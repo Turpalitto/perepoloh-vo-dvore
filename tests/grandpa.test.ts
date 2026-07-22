@@ -6,6 +6,7 @@ import {
   commitLine,
   createGrandpaState,
   pickLine,
+  pickLineVerbose,
   textKeyOf
 } from '../src/game/grandpa';
 import { RateLimiter, grandpaEventFor, isSharpMove } from '../src/game/yard-events';
@@ -117,5 +118,38 @@ describe('события двора', () => {
     expect(grandpaEventFor({ type: 'level-won', stars: 3 })).toBe('win-perfect');
     expect(grandpaEventFor({ type: 'level-won', stars: 2 })).toBe('win');
     expect(grandpaEventFor({ type: 'move-end' })).toBeNull();
+  });
+});
+
+describe('дед — debug-режим (?grandpaDebug=1)', () => {
+  it('для выбранной реплики отчёт содержит саму реплику, skipped пуст для неё самой', () => {
+    const state = createGrandpaState();
+    const info = pickLineVerbose(state, 'level-start', ctx({ now: 0, rng: () => 0 }));
+    expect(info.line).not.toBeNull();
+    expect(info.skipped.some((s) => s.id === info.line!.id)).toBe(false);
+  });
+
+  it('глобальный кулдаун репортится с оставшимся временем', () => {
+    const state = createGrandpaState();
+    commitLine(state, pickLine(state, 'star', ctx({ now: 1000 }))!, 1000);
+    const info = pickLineVerbose(state, 'gate', ctx({ now: 1000 + GRANDPA_GLOBAL_COOLDOWN_MS - 100 }));
+    expect(info.line).toBeNull();
+    expect(info.blockedByGlobalCooldown).toBeGreaterThan(0);
+    expect(info.blockedByGlobalCooldown).toBeLessThanOrEqual(100);
+  });
+
+  it('once-реплика, уже показанная, репортится с причиной "already seen"', () => {
+    const line: GrandpaLine = { id: 'once1', event: 'campaign-done', mood: 'celebrating', once: true, priority: 4 };
+    const state = createGrandpaState();
+    commitLine(state, line, 0);
+    const info = pickLineVerbose(state, 'campaign-done', ctx({ now: 999999 }), [line]);
+    expect(info.line).toBeNull();
+    expect(info.skipped[0]).toMatchObject({ id: 'once1', reason: expect.stringContaining('once') });
+  });
+
+  it('pickLine остаётся тонкой обёрткой — совпадает с .line из pickLineVerbose', () => {
+    const state = createGrandpaState();
+    const c = ctx({ now: 500 });
+    expect(pickLine(state, 'level-start', c)?.id).toBe(pickLineVerbose(state, 'level-start', c).line?.id);
   });
 });

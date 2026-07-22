@@ -5,6 +5,7 @@
 import levelsJson from '../levels/levels.json';
 import type { LevelDef } from '../core/types';
 import { GameState, createState, starsFor } from '../core/game';
+import { track } from '../game/analytics';
 import { hint, solve } from '../core/solver';
 import { ACHIEVEMENTS, achievementProgress, unlockedAchievementKeys } from '../game/achievements';
 import type { GameAudio } from '../game/audio';
@@ -59,6 +60,7 @@ import {
   currentPhase
 } from '../game/boss';
 import type { AdHandlers, LeaderboardEntry, Platform } from '../platform/types';
+import { queryParam } from '../query';
 import { BoardView } from './board';
 import { YardDirector } from './yard-reactions';
 import { showCampaignEnding } from './campaign-ending';
@@ -110,6 +112,15 @@ export class App {
   private tvFocusObserver: MutationObserver | null = null;
   private activeBoard: BoardView | null = null;
   private yardDirector: YardDirector | null = null;
+  /** Момент показа интро текущего босса — для аналитики `boss_complete.timeMs`. */
+  private bossStartedAt = 0;
+  /**
+   * `?grandpaDebug=1`: логирует в консоль выбор реплики деда и причины отсева
+   * остальных. Только dev/e2e — в production build (`import.meta.env.DEV`
+   * false, `MODE` не 'e2e') остаётся выключенным независимо от query-строки.
+   */
+  private readonly grandpaDebug =
+    (import.meta.env.DEV || import.meta.env.MODE === 'e2e') && queryParam('grandpaDebug') === '1';
   private onboardingHandEl: HTMLElement | null = null;
   private endlessStreak = 0;
   /** Первый экран сессии не анимируем — переходить не от чего, и он может
@@ -591,6 +602,11 @@ export class App {
   // ---------- меню ----------
 
   showMenu(): void {
+    // Откуда игрок вышел в меню — воронка «где выходят» (аналитика §11).
+    // Читаем testid текущего экрана ДО его замены, не разбрасывая track() по
+    // каждому «Меню»/«Назад»-обработчику (их десятки по всему App).
+    const fromScreen = this.root.querySelector<HTMLElement>('.screen[data-testid]')?.dataset.testid;
+    if (fromScreen && fromScreen !== 'screen-menu') track({ type: 'session_exit', screen: fromScreen });
     this.transitionScreen(() => this.showMenuInner());
   }
 
@@ -1096,6 +1112,7 @@ export class App {
   /** Запускает босса: вступление деда → первая фаза. */
   private startBoss(def: BossLevelDef): void {
     const run = createBossRun(def);
+    this.bossStartedAt = performance.now();
     this.disposeActiveBoard();
     this.setGameplay(false);
     this.audio.setMood(true);
@@ -1133,7 +1150,9 @@ export class App {
     this.setGameplay(false);
     this.audio.engineStop();
     const isLast = run.phaseIndex >= def.phases.length - 1;
+    track({ type: 'boss_phase_complete', levelId: def.id, phase: run.phaseIndex + 1 });
     if (isLast) {
+      track({ type: 'boss_complete', levelId: def.id, timeMs: Math.round(performance.now() - this.bossStartedAt) });
       // Прогресс кампании и завершение босса — только сейчас, после полной победы.
       const finalStars = starsFor(this.levelById(def.id), endState.moves, endState.starCollected);
       this.store.recordResult(def.id, finalStars);
@@ -1273,6 +1292,10 @@ export class App {
     if (challenge) modifier = challenge.modifier;
     // Отслеживаем «чистоту» прохождения для расчёта медали.
     const attempt: AttemptResult = { moves: 0, starCollected: false, usedHint: false, usedUndo: false, usedRestart: false };
+    const levelStartedAt = performance.now();
+    let firstMoveTracked = false;
+    track({ type: 'level_start', levelId: level.id });
+    if (boss && boss.run.phaseIndex === 0) track({ type: 'boss_start', levelId: boss.def.id });
     this.audio.setMood(endless || boss !== undefined || level.difficulty === 'hard');
     const isBoss = level.width > 6;
     const bossProg = boss ? bossProgress(boss.run, boss.def) : null;
@@ -1303,11 +1326,13 @@ export class App {
           <button class="btn" data-testid="btn-undo" disabled ${modifier === 'noUndo' ? 'hidden' : ''}>${t('btn.undo')}</button>
           <button class="btn" data-testid="btn-restart">${t('btn.restart')}</button>
           <button class="btn" data-testid="btn-hint" ${modifier === 'noHints' ? 'hidden' : ''}>${
-            (this.store.data.hintTokens ?? 0) > 0
-              ? `💡 ${t('btn.hintTokens', { n: this.store.data.hintTokens ?? 0 })}`
-              : this.freeHintsLeft > 0
-                ? t('btn.hintFree')
-                : t('btn.hintAd')
+            !daily && !challenge && level.id >= 1 && level.id <= 3
+              ? t('btn.hintFree')
+              : (this.store.data.hintTokens ?? 0) > 0
+                ? `💡 ${t('btn.hintTokens', { n: this.store.data.hintTokens ?? 0 })}`
+                : this.freeHintsLeft > 0
+                  ? t('btn.hintFree')
+                  : t('btn.hintAd')
           }</button>
           <button class="btn btn-skip" data-testid="btn-skip" style="display:none">${t('btn.skipAd')}</button>
         </div>
@@ -1380,6 +1405,10 @@ export class App {
       onCommit: (res, piece) => {
         undoStack.push(cur);
         cur = res.state;
+        if (!firstMoveTracked) {
+          firstMoveTracked = true;
+          track({ type: 'first_move', levelId: level.id, timeMs: Math.round(performance.now() - levelStartedAt) });
+        }
         this.audio.play('move');
         this.hideOnboardingHand();
         this.store.markTutorialSeen();
@@ -1412,6 +1441,13 @@ export class App {
       } else if (challenge) {
         this.finishEliteChallenge(challenge, { ...attempt, moves: cur.moves, starCollected: cur.starCollected });
       } else {
+        track({
+          type: 'level_complete',
+          levelId: level.id,
+          moves: cur.moves,
+          stars: starsFor(level, cur.moves, cur.starCollected),
+          timeMs: Math.round(performance.now() - levelStartedAt)
+        });
         this.finishLevel(level, cur, daily, dailyDate, endless);
       }
     };
@@ -1428,12 +1464,21 @@ export class App {
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
       enabled: this.store.liveYardEnabled(),
       seen: this.store.data.grandpaSeen ?? [],
-      onSeen: (id) => this.store.markGrandpaSeen(id)
+      onSeen: (id) => this.store.markGrandpaSeen(id),
+      debug: this.grandpaDebug
     });
-    // Реплика-встреча на старте (чуть погодя, чтобы не наложиться на обучение).
-    window.setTimeout(() => {
-      if (!finished) this.yardDirector?.react(level.id === 1 ? 'level-start' : (level.id - 1) % 12 === 0 ? 'chapter-start' : 'level-start');
-    }, 650);
+    // Реплика-встреча на старте. Если у уровня есть обучающий hint-toast (id
+    // 1-6, 10, ...), он уже занимает экран текстом до ~4.8с — ждём, пока он
+    // сойдёт, иначе игрок видит два конкурирующих текстовых сообщения в первую
+    // секунду (реальный баг: старый комментарий обещал «не наложится», но 650мс
+    // попадали прямо в окно показа toast'а). Без обучающего текста — как раньше.
+    const hasOnboardingToast = !!levelText('hint', level.hint);
+    window.setTimeout(
+      () => {
+        if (!finished) this.yardDirector?.react(level.id === 1 ? 'level-start' : (level.id - 1) % 12 === 0 ? 'chapter-start' : 'level-start');
+      },
+      hasOnboardingToast ? 5000 : 650
+    );
     this.setGameplay(true);
     if (this.platform.isTV) bv.svg.focus({ preventScroll: true });
 
@@ -1456,6 +1501,7 @@ export class App {
     this.q('[data-testid=btn-restart]').addEventListener('click', () => {
       if (finished || cur.won) return;
       attempt.usedRestart = true;
+      track({ type: 'level_restart', levelId: level.id, moves: cur.moves });
       undoStack.length = 0;
       cur = createState(level);
       bv.setState(cur);
@@ -1506,7 +1552,14 @@ export class App {
       bv.interactive = false;
       try {
         let ok = true;
-        if (this.store.spendHintToken()) {
+        let hintSource: 'free' | 'token' | 'rewarded' = 'free';
+        // Обучающие уровни кампании: подсказка бесплатна и не жжёт платный токен —
+        // это часть онбординга, не рекламной/платной экономики подсказок.
+        const isTutorialLevel = !daily && !challenge && level.id >= 1 && level.id <= 3;
+        if (isTutorialLevel) {
+          hintBtn.textContent = t('btn.hintFree');
+        } else if (this.store.spendHintToken()) {
+          hintSource = 'token';
           const tokens = this.store.data.hintTokens ?? 0;
           hintBtn.innerHTML =
             tokens > 0
@@ -1518,10 +1571,12 @@ export class App {
           this.freeHintsLeft--;
           hintBtn.textContent = t('btn.hintAd');
         } else {
+          hintSource = 'rewarded';
           ok = await this.platform.showRewarded(this.adHandlers());
         }
         if (ok) {
           attempt.usedHint = true;
+          track({ type: 'hint_used', levelId: level.id, source: hintSource });
           const move = hint(level, cur);
           if (move) bv.showHint(move);
           this.yardDirector?.react('hint');
@@ -1574,20 +1629,29 @@ export class App {
     }
   }
 
-  /** Первый в жизни игрок: анимированная рука поверх целевой машины на уровне 1. */
+  /**
+   * Первый в жизни игрок: подсказка направления поверх целевой машины на уровне 1.
+   * Обычно — покачивающаяся рука-свайп; при `prefers-reduced-motion` глобальное
+   * правило схлопывает `animation-iteration-count` до 1, из-за чего бесконечный
+   * свайп-цикл рисуется один раз и застывает БЕЗ смещения (opacity:1, transform:
+   * none) — направление вообще не считывается. Вместо анимации показываем
+   * статичную стрелку, направленную к воротам, без анимации совсем.
+   */
   private showOnboardingHand(bv: BoardView, level: LevelDef): void {
     const pieceEl = bv.svg.querySelector<SVGGElement>('[data-piece="T"]');
     if (!pieceEl) return;
     const v = { dx: level.exit.side === 'left' ? -1 : level.exit.side === 'right' ? 1 : 0, dy: level.exit.side === 'top' ? -1 : level.exit.side === 'bottom' ? 1 : 0 };
     const box = pieceEl.getBoundingClientRect();
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const hand = document.createElement('div');
-    hand.className = 'onboarding-hand';
+    hand.className = reducedMotion ? 'onboarding-hand onboarding-hand-static' : 'onboarding-hand';
     hand.setAttribute('data-testid', 'onboarding-hand');
     hand.style.setProperty('--dx', `${v.dx * 46}px`);
     hand.style.setProperty('--dy', `${v.dy * 46}px`);
     hand.style.left = `${box.x + box.width * (v.dx !== 0 ? 0.3 : 0.5)}px`;
     hand.style.top = `${box.y + box.height * (v.dy !== 0 ? 0.3 : 0.5)}px`;
-    hand.textContent = '👆';
+    const arrow = v.dx > 0 ? '➡️' : v.dx < 0 ? '⬅️' : v.dy > 0 ? '⬇️' : '⬆️';
+    hand.textContent = reducedMotion ? arrow : '👆';
     document.body.appendChild(hand);
     this.onboardingHandEl = hand;
   }

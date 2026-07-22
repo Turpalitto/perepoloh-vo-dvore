@@ -52,14 +52,17 @@ import {
 import { ELITE_CHALLENGES, type EliteChallenge, sourceLevel } from '../levels/elite-challenges';
 import {
   type BossLevelDef,
+  type BossPhase,
   type BossRun,
   advancePhase,
   bossFor,
+  bossObjectiveSatisfied,
   bossProgress,
   createBossRun,
   currentPhase
 } from '../game/boss';
 import type { AdHandlers, LeaderboardEntry, Platform } from '../platform/types';
+import { createLeaderboardCache, type LeaderboardCache } from '../game/leaderboard-cache';
 import { queryParam } from '../query';
 import { BoardView } from './board';
 import { YardDirector } from './yard-reactions';
@@ -129,12 +132,15 @@ export class App {
   private screenTransitionActive = false;
   /** Рестарты за сессию по уровням — после 3 предлагаем пропуск за рекламу. */
   private restartCounts = new Map<number, number>();
+  /** Один запрос на таблицу лидерборда за раз (TTL 45с) — см. leaderboard-cache.ts. */
+  private readonly leaderboardCache: LeaderboardCache;
 
   constructor(
     private readonly platform: Platform,
     private readonly store: SaveStore,
     private readonly audio: GameAudio
   ) {
+    this.leaderboardCache = createLeaderboardCache((board) => this.platform.getLeaderboardSnapshot(board));
     this.root = document.getElementById('app')!;
     this.root.classList.toggle('tv-mode', platform.isTV);
     this.root.addEventListener('contextmenu', (event) => event.preventDefault());
@@ -844,12 +850,14 @@ export class App {
   }
 
   private async loadLeaderboardContent(): Promise<void> {
-    const [stars, streak, myStars, myStreak] = await Promise.all([
-      this.platform.getLeaderboard('yardstars'),
-      this.platform.getLeaderboard('dailystreak'),
-      this.platform.getMyRank('yardstars'),
-      this.platform.getMyRank('dailystreak')
+    const [starsSnap, streakSnap] = await Promise.all([
+      this.leaderboardCache.get('yardstars'),
+      this.leaderboardCache.get('dailystreak')
     ]);
+    const stars = starsSnap.entries;
+    const streak = streakSnap.entries;
+    const myStars = starsSnap.me;
+    const myStreak = streakSnap.me;
     const content = this.root.querySelector<HTMLElement>('[data-testid=leaderboard-content]');
     if (!content) return;
     const row = (r: LeaderboardEntry, suffix: string) =>
@@ -1186,6 +1194,32 @@ export class App {
     if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=boss-continue]')!.focus({ preventScroll: true });
   }
 
+  /**
+   * Цель фазы (например, «забрать звезду») не выполнена при выезде — не боссовая
+   * реплика деда, а явный, локализованный, не зависящий от него блокирующий экран.
+   */
+  private showBossObjectiveUnmet(def: BossLevelDef, run: BossRun, phase: BossPhase): void {
+    const key = phase.objective.requireStar ? 'boss.objectiveStarRequired' : 'boss.objectiveUnmet';
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay boss-objective-unmet';
+    overlay.setAttribute('data-testid', 'boss-objective-unmet');
+    overlay.innerHTML = `
+      <div class="dialog boss-dialog">
+        <div class="boss-badge">★</div>
+        <p class="boss-intro-text" data-testid="boss-objective-unmet-text">${t(key)}</p>
+        <button class="btn btn-primary btn-big" data-testid="boss-objective-retry" data-tv-default>${t('boss.retryPhase')}</button>
+      </div>`;
+    this.q('.overlay-slot').appendChild(overlay);
+    overlay.querySelector('[data-testid=boss-objective-retry]')!.addEventListener('click', () => {
+      this.audio.play('click');
+      // Полный пересбор текущей фазы (та же run/phaseIndex) — надёжнее, чем клик
+      // по btn-restart: у только что выехавшей машины cur.won уже true и обычный
+      // restart-гард его бы заблокировал.
+      this.playBossPhase(def, run);
+    });
+    if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=boss-objective-retry]')!.focus({ preventScroll: true });
+  }
+
   /** Уникальная победная сцена босса. */
   private showBossVictory(def: BossLevelDef, stars: number): void {
     this.audio.play('win');
@@ -1435,12 +1469,21 @@ export class App {
     // Единая точка завершения уровня (реальный выезд машины и e2e-хук ведут сюда).
     const completeLevel = (): void => {
       if (finished) return;
-      finished = true;
       if (boss) {
+        const phase = currentPhase(boss.run, boss.def);
+        if (phase && !bossObjectiveSatisfied(phase, cur)) {
+          // Цель фазы (например, забрать звезду) не выполнена — выезд не засчитывается:
+          // прогресс/награды не пишутся, фаза не продвигается. Даём перезапустить фазу.
+          this.showBossObjectiveUnmet(boss.def, boss.run, phase);
+          return;
+        }
+        finished = true;
         this.onBossPhaseDone(boss.def, boss.run, cur);
       } else if (challenge) {
+        finished = true;
         this.finishEliteChallenge(challenge, { ...attempt, moves: cur.moves, starCollected: cur.starCollected });
       } else {
+        finished = true;
         track({
           type: 'level_complete',
           levelId: level.id,
@@ -1452,9 +1495,16 @@ export class App {
       }
     };
     // Только в e2e-сборке: детерминированно «выиграть» уровень, минуя ручной
-    // подбор решения многофазных пазлов. В production этот код отсутствует.
+    // подбор решения многофазных пазлов. Хук лишь подставляет тестовое состояние
+    // доски (opts.starCollected) — completeLevel всё равно валидирует objective
+    // фазы боем реальной проверкой, обойти её нельзя. В production этот код отсутствует.
     if (import.meta.env.MODE === 'e2e') {
-      (window as unknown as { __e2eWinLevel?: () => void }).__e2eWinLevel = completeLevel;
+      (window as unknown as { __e2eWinLevel?: (opts?: { starCollected?: boolean }) => void }).__e2eWinLevel = (
+        opts
+      ) => {
+        if (opts?.starCollected) cur = { ...cur, starCollected: true };
+        completeLevel();
+      };
     }
     this.activeBoard = bv;
     // «Живой двор»: дед-комментатор. Обычные уровни — да; на испытаниях лиги
@@ -1759,11 +1809,15 @@ export class App {
       dailyStreak = newDaily.streak;
       weeklyCup = weeklyTrophies(newDaily) > previousTrophies;
       void this.platform.submitScore('dailystreak', newDaily.streak);
+      this.leaderboardCache.invalidate('dailystreak');
     } else {
       const improved = this.store.recordResult(level.id, stars);
       const after = totalStars(this.store.data);
       unlocked = newlyUnlocked(before, after);
-      if (improved) void this.platform.submitScore('yardstars', after);
+      if (improved) {
+        void this.platform.submitScore('yardstars', after);
+        this.leaderboardCache.invalidate('yardstars');
+      }
       const maxTotal = LEVELS.length * 3;
       justMastered = before < maxTotal && after === maxTotal;
       if (justMastered) this.vibrate([20, 40, 20, 40, 60]);

@@ -27,27 +27,35 @@ export type SoundFileKey =
   | 'boss_phase'
   | 'victory_drive';
 
-/** URL по конвенции: /audio/<key>.mp3, ищутся в public/audio/. */
+/**
+ * URL по конвенции: <base>audio/<key>.mp3, файлы ищутся в public/audio/.
+ * base-aware (import.meta.env.BASE_URL), а не абсолютный /audio/... — игра
+ * собирается с `base: './'` и может быть размещена в подкаталоге (каталожное
+ * размещение на Яндекс Играх); абсолютный путь от корня домена сломался бы там.
+ * BASE_URL у Vite всегда оканчивается на '/', поэтому склейка без доп. слэша.
+ */
+const AUDIO_BASE = `${import.meta.env.BASE_URL}audio/`;
+
 export const SOUND_FILE_URLS: Record<SoundFileKey, string> = {
-  engine_idle: '/audio/engine_idle.mp3',
-  engine_low: '/audio/engine_low.mp3',
-  engine_high: '/audio/engine_high.mp3',
-  tractor_start: '/audio/tractor_start.mp3',
-  tractor_idle: '/audio/tractor_idle.mp3',
-  tractor_move: '/audio/tractor_move.mp3',
-  gate_creak: '/audio/gate_creak.mp3',
-  button_click: '/audio/button_click.mp3',
-  wood_hit: '/audio/wood_hit.mp3',
-  metal_hit: '/audio/metal_hit.mp3',
-  crate_slide: '/audio/crate_slide.mp3',
-  chickens_scatter: '/audio/chickens_scatter.mp3',
-  dog_bark: '/audio/dog_bark.mp3',
-  grandpa_mumble_1: '/audio/grandpa_mumble_1.mp3',
-  grandpa_mumble_2: '/audio/grandpa_mumble_2.mp3',
-  grandpa_mumble_3: '/audio/grandpa_mumble_3.mp3',
-  star_collect: '/audio/star_collect.mp3',
-  boss_phase: '/audio/boss_phase.mp3',
-  victory_drive: '/audio/victory_drive.mp3'
+  engine_idle: `${AUDIO_BASE}engine_idle.mp3`,
+  engine_low: `${AUDIO_BASE}engine_low.mp3`,
+  engine_high: `${AUDIO_BASE}engine_high.mp3`,
+  tractor_start: `${AUDIO_BASE}tractor_start.mp3`,
+  tractor_idle: `${AUDIO_BASE}tractor_idle.mp3`,
+  tractor_move: `${AUDIO_BASE}tractor_move.mp3`,
+  gate_creak: `${AUDIO_BASE}gate_creak.mp3`,
+  button_click: `${AUDIO_BASE}button_click.mp3`,
+  wood_hit: `${AUDIO_BASE}wood_hit.mp3`,
+  metal_hit: `${AUDIO_BASE}metal_hit.mp3`,
+  crate_slide: `${AUDIO_BASE}crate_slide.mp3`,
+  chickens_scatter: `${AUDIO_BASE}chickens_scatter.mp3`,
+  dog_bark: `${AUDIO_BASE}dog_bark.mp3`,
+  grandpa_mumble_1: `${AUDIO_BASE}grandpa_mumble_1.mp3`,
+  grandpa_mumble_2: `${AUDIO_BASE}grandpa_mumble_2.mp3`,
+  grandpa_mumble_3: `${AUDIO_BASE}grandpa_mumble_3.mp3`,
+  star_collect: `${AUDIO_BASE}star_collect.mp3`,
+  boss_phase: `${AUDIO_BASE}boss_phase.mp3`,
+  victory_drive: `${AUDIO_BASE}victory_drive.mp3`
 };
 
 /** Инъекция сетевого слоя и декодера — тестируется без реального браузера. */

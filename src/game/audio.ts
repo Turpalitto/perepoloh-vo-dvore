@@ -92,6 +92,18 @@ export class GameAudio {
     if (this.master) this.master.gain.value = this.ducked || this.hidden ? 0 : 0.5;
   }
 
+  /**
+   * Единая точка «сейчас нельзя создавать новые звуковые ноды» — hidden-вкладка,
+   * реклама (duck) или системная/пользовательская пауза (эти два уже мьютят
+   * через ducked/hidden выше по стеку вызовов). Громкость это уже покрывает
+   * (`applyMasterGain`), но раньше scheduler'ы ambient/music продолжали плодить
+   * OscillatorNode/AudioBufferSourceNode вхолостую, пока вкладка скрыта —
+   * тихо, но нагружает CPU и не освобождается вовреме.
+   */
+  private suspended(): boolean {
+    return this.hidden || this.ducked;
+  }
+
   /** Временный мьют на время рекламы (не трогает пользовательскую настройку). */
   duck(on: boolean): void {
     this.ducked = on;
@@ -110,7 +122,7 @@ export class GameAudio {
     this.ambientStarted = true;
     const loop = () => {
       window.setTimeout(loop, 3500 + Math.random() * 6500);
-      if (!this.enabled || this.ducked || !this.ctx) return;
+      if (!this.enabled || this.suspended() || !this.ctx) return;
       const base = 2200 + Math.random() * 1100;
       const n = 2 + Math.floor(Math.random() * 3);
       for (let i = 0; i < n; i++) {
@@ -149,7 +161,7 @@ export class GameAudio {
       const tense = this.mood === 'tense';
       const BAR = tense ? 1.9 : 2.6;
       this.musicTimer = window.setTimeout(playBar, BAR * 1000);
-      if (!this.ctx || !this.musicGain || this.ducked || !this.musicEnabled) return;
+      if (!this.ctx || !this.musicGain || this.suspended() || !this.musicEnabled) return;
       const chords = tense ? tenseChords : calmChords;
       const scale = tense ? tenseScale : calmScale;
       const chord = chords[Math.floor(this.musicBar / 2) % chords.length];
@@ -218,7 +230,7 @@ export class GameAudio {
 
   /** Урчание мотора, пока игрок тянет машину. */
   engineStart(): void {
-    if (!this.enabled || !this.ctx || !this.master || this.engine) return;
+    if (!this.enabled || this.suspended() || !this.ctx || !this.master || this.engine) return;
     const osc = this.ctx.createOscillator();
     osc.type = 'sawtooth';
     osc.frequency.value = 52 + Math.random() * 8;
@@ -349,7 +361,7 @@ export class GameAudio {
   }
 
   play(name: SoundName): void {
-    if (!this.enabled || !this.ctx) return;
+    if (!this.enabled || this.suspended() || !this.ctx) return;
     switch (name) {
       case 'click':
         this.tone(660, 0.06, 'square', 0.12);

@@ -1,5 +1,15 @@
 import type { Dir, LevelDef, PieceDef, PieceKind } from '../src/core/types';
 
+/**
+ * Отдаёт event loop между итерациями тяжёлых синхронных циклов (много solve()
+ * подряд в одном it()). Без этого воркер непрерывно занят десятки секунд, и
+ * репортёр не может достучаться RPC-пингом (onTaskUpdate) — ловится как
+ * unhandled error и валит прогон (см. vitest.solver.config.ts).
+ */
+export function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 export function piece(
   id: string,
   kind: PieceKind,

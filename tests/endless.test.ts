@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { yieldToEventLoop } from './helpers';
 import { endlessConfig, endlessFloor, generateEndless } from '../src/game/endless';
 import { solve } from '../src/core/solver';
 import { validateLevel } from '../src/core/validator';
@@ -34,9 +35,10 @@ describe('бесконечный двор', () => {
     expect(endlessConfig(8).pieceMax).toBeGreaterThan(endlessConfig(0).pieceMax); // плотнее
   });
 
-  it('генерирует проверенные решателем уровни на разных сериях', { timeout: 90_000 }, () => {
+  it('генерирует проверенные решателем уровни на разных сериях', { timeout: 90_000 }, async () => {
     for (const streak of [0, 2, 5, 8]) {
       assertVerified(streak, 12345 + streak * 777);
+      await yieldToEventLoop();
     }
   });
 
@@ -54,11 +56,12 @@ describe('бесконечный двор', () => {
     }
   });
 
-  it('умеет вводить нажимную кнопку ворот, сохраняя проходимость', { timeout: 120_000 }, () => {
+  it('умеет вводить нажимную кнопку ворот, сохраняя проходимость', { timeout: 120_000 }, async () => {
     let gated: ReturnType<typeof generateEndless> | null = null;
     for (let seed = 1; seed <= 20 && !gated; seed++) {
       const level = assertVerified(8, seed * 3300);
       if (level.gateSwitch) gated = level;
+      await yieldToEventLoop();
     }
     expect(gated, 'ни один seed не дал уровень с кнопкой ворот').not.toBeNull();
     expect(gated!.mechanics).toContain('gate-switch');

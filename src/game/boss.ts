@@ -92,6 +92,12 @@ export const BOSSES: BossLevelDef[] = [
   }
 ];
 
+/** Проверяет выполнение цели фазы по итоговому состоянию уровня (чистая функция, без DOM). */
+export function bossObjectiveSatisfied(phase: BossPhase, state: { starCollected: boolean }): boolean {
+  if (phase.objective.requireStar) return state.starCollected;
+  return true;
+}
+
 export function bossFor(levelId: number): BossLevelDef | undefined {
   return BOSSES.find((b) => b.id === levelId);
 }

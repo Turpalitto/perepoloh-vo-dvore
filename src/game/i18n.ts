@@ -288,7 +288,11 @@ const RU: Dict = {
   'boss.begin': 'Взяться за дело',
   'boss.phase': 'Фаза {n} из {m}',
   'boss.phaseCleared': 'Фаза {n} из {m} пройдена!',
-  'boss.next': 'Дальше · фаза {n}/{m}'
+  'boss.next': 'Дальше · фаза {n}/{m}',
+  'boss.objectiveStarRequired': 'Не считово! На этой фазе нужно забрать звезду перед выездом.',
+  'boss.objectiveUnmet': 'Цель фазы ещё не выполнена.',
+  'boss.retryPhase': 'Попробовать фазу заново',
+  'platform.fallbackNotice': 'Облачные функции временно недоступны. Прогресс сохраняется на устройстве.'
 };
 
 const EN: Dict = {
@@ -570,7 +574,11 @@ const EN: Dict = {
   'boss.begin': 'Get to work',
   'boss.phase': 'Phase {n} of {m}',
   'boss.phaseCleared': 'Phase {n} of {m} cleared!',
-  'boss.next': 'Next · phase {n}/{m}'
+  'boss.next': 'Next · phase {n}/{m}',
+  'boss.objectiveStarRequired': 'Not done yet! This phase needs the star collected before you exit.',
+  'boss.objectiveUnmet': 'Phase objective not met yet.',
+  'boss.retryPhase': 'Retry this phase',
+  'platform.fallbackNotice': 'Cloud features are temporarily unavailable. Progress is saved on this device.'
 };
 
 const TR: Dict = {
@@ -852,7 +860,11 @@ const TR: Dict = {
   'boss.begin': 'İşe koyul',
   'boss.phase': 'Aşama {n} / {m}',
   'boss.phaseCleared': 'Aşama {n} / {m} geçildi!',
-  'boss.next': 'Devam · aşama {n}/{m}'
+  'boss.next': 'Devam · aşama {n}/{m}',
+  'boss.objectiveStarRequired': 'Henüz olmadı! Bu aşamada çıkmadan önce yıldızı almalısın.',
+  'boss.objectiveUnmet': 'Aşama hedefi henüz tamamlanmadı.',
+  'boss.retryPhase': 'Aşamayı yeniden dene',
+  'platform.fallbackNotice': 'Bulut özellikleri geçici olarak kullanılamıyor. İlerleme bu cihazda saklanıyor.'
 };
 
 /**

@@ -1,5 +1,11 @@
 # TECHNICAL_DESIGN — «Переполох во дворе»
 
+> **Обновлено (release-audit-findings):**
+> - `Platform.getLeaderboard`+`getMyRank` (2×2 = 4 запроса на открытие экрана) заменены одним `getLeaderboardSnapshot(board)` (2 запроса) + TTL-кэш `src/game/leaderboard-cache.ts` (45с, инвалидация по submit, in-flight dedupe).
+> - Тяжёлые BFS-solver-тесты (`levels-solver-*`, `elite`, `endless`, `boss`) вынесены в отдельный `npm run test:solver` (`vitest.solver.config.ts`, `pool: forks`, `singleFork`) — `dangerouslyIgnoreUnhandledErrors` убран из `vite.config.ts` целиком, unhandled errors снова валят прогон (проверяется `tests/unhandled-error-probe.test.ts`).
+> - `src/platform/local-fallback.ts` — production-safe fallback, когда SDK не загрузился/упал на `init()` (`createPlatform()` в `src/platform/index.ts` больше не бросает наружу).
+> - `getPlayer({ scopes: false })` заменён на `getPlayer()` — `scopes` не документирован в актуальном SDK (yandex.com/dev/games/doc/en/sdk/sdk-player), актуальный опциональный параметр — `signed`.
+
 ## Выбор стека
 Сравнивались:
 | Вариант | Плюсы | Минусы | Вердикт |

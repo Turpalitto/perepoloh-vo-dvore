@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { yieldToEventLoop } from './helpers';
 import { defaultSave, mergeSave, sanitizeSave } from '../src/game/save';
 import type { SaveData } from '../src/game/save';
 import {
@@ -137,7 +138,7 @@ describe('Высшая лига — 25 мастер-испытаний вали�
 
   it(
     'золото достижимо: оптимум решателя укладывается в gold.maxMoves',
-    () => {
+    async () => {
       for (const c of ELITE_CHALLENGES) {
         const level = sourceLevel(c);
         const res = solve(level);
@@ -150,6 +151,7 @@ describe('Высшая лига — 25 мастер-испытаний вали�
           expect(withStar.solvable).toBe(true);
           expect(withStar.optimal).toBeLessThanOrEqual(c.silver.maxMoves);
         }
+        await yieldToEventLoop();
       }
     },
     // solve() гоняется по 25 уровням — ~40с локально, CI-раннер медленнее дефолтных 60с

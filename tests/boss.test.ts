@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { yieldToEventLoop } from './helpers';
 import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import { solve } from '../src/core/solver';
@@ -6,6 +7,7 @@ import {
   BOSSES,
   advancePhase,
   bossFor,
+  bossObjectiveSatisfied,
   bossProgress,
   createBossRun,
   currentPhase,
@@ -34,21 +36,26 @@ describe('боссы — структура', () => {
 });
 
 describe('боссы — проходимость (решатель)', () => {
-  it('каждая фаза каждого босса решается штатным solver', () => {
-    for (const b of BOSSES) {
-      for (const p of b.phases) {
-        const level = levelById(p.sourceLevelId)!;
-        const res = solve(level);
-        expect(res.solvable, `boss ${b.id} phase ${p.id}`).toBe(true);
-        expect(res.optimal).toBeGreaterThan(0);
-        // если фаза требует звезду — решение со звездой тоже существует
-        if (p.objective.requireStar && level.star) {
-          const withStar = solve(level, { requireStar: true });
-          expect(withStar.solvable, `boss ${b.id} phase ${p.id} star`).toBe(true);
+  it(
+    'каждая фаза каждого босса решается штатным solver',
+    async () => {
+      for (const b of BOSSES) {
+        for (const p of b.phases) {
+          const level = levelById(p.sourceLevelId)!;
+          const res = solve(level);
+          expect(res.solvable, `boss ${b.id} phase ${p.id}`).toBe(true);
+          expect(res.optimal).toBeGreaterThan(0);
+          // если фаза требует звезду — решение со звездой тоже существует
+          if (p.objective.requireStar && level.star) {
+            const withStar = solve(level, { requireStar: true });
+            expect(withStar.solvable, `boss ${b.id} phase ${p.id} star`).toBe(true);
+          }
+          await yieldToEventLoop();
         }
       }
-    }
-  }, 120_000);
+    },
+    120_000
+  );
 });
 
 describe('боссы — контроллер фаз', () => {
@@ -86,5 +93,30 @@ describe('боссы — контроллер фаз', () => {
     expect(reviveBossRun({ bossId: 999, phaseIndex: 5 }, boss)).toEqual(createBossRun(boss));
     expect(reviveBossRun(null, boss)).toEqual(createBossRun(boss));
     expect(reviveBossRun({ bossId: 10, phaseIndex: 99 }, boss)).toEqual(createBossRun(boss));
+  });
+});
+
+describe('bossObjectiveSatisfied', () => {
+  it('requireStar не задан — обычное прохождение разрешено вне зависимости от звезды', () => {
+    const phase = { id: 'x', sourceLevelId: 1, objective: { kind: 'clear' as const } };
+    expect(bossObjectiveSatisfied(phase, { starCollected: false })).toBe(true);
+    expect(bossObjectiveSatisfied(phase, { starCollected: true })).toBe(true);
+  });
+
+  it('requireStar: true, звезда не собрана — запрещено', () => {
+    const phase = { id: 'x', sourceLevelId: 1, objective: { kind: 'clear' as const, requireStar: true } };
+    expect(bossObjectiveSatisfied(phase, { starCollected: false })).toBe(false);
+  });
+
+  it('requireStar: true, звезда собрана — разрешено', () => {
+    const phase = { id: 'x', sourceLevelId: 1, objective: { kind: 'clear' as const, requireStar: true } };
+    expect(bossObjectiveSatisfied(phase, { starCollected: true })).toBe(true);
+  });
+
+  it('фазы 25 (gate) и 100 (final) реально требуют звезду в данных', () => {
+    const boss25 = bossFor(25)!;
+    const boss100 = bossFor(100)!;
+    expect(boss25.phases.find((p) => p.id === 'gate')?.objective.requireStar).toBe(true);
+    expect(boss100.phases.find((p) => p.id === 'final')?.objective.requireStar).toBe(true);
   });
 });

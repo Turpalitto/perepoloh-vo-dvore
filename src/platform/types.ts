@@ -28,12 +28,18 @@ export interface LeaderboardEntry {
   isMe?: boolean;
 }
 
+/** Один ответ платформы: верхние строки + место текущего игрока (если есть). */
+export interface LeaderboardSnapshot {
+  entries: LeaderboardEntry[];
+  me: LeaderboardEntry | null;
+}
+
 /**
  * Единственная точка контакта игры с платформой.
  * Реализации: mock (локальная разработка) и yandex (Яндекс Игры).
  */
 export interface Platform {
-  readonly name: 'mock' | 'yandex';
+  readonly name: 'mock' | 'yandex' | 'local-fallback';
   readonly config: PlatformConfig;
   /** Устройство определено SDK как телевизор. */
   readonly isTV: boolean;
@@ -42,10 +48,11 @@ export interface Platform {
   getLang(): string;
   /** Отправить результат в лидерборд (тихо игнорируется, если недоступно). */
   submitScore(board: 'yardstars' | 'dailystreak', value: number): Promise<void>;
-  /** Получить первые строки лидерборда. */
-  getLeaderboard(board: 'yardstars' | 'dailystreak'): Promise<LeaderboardEntry[]>;
-  /** Место текущего игрока (null — неизвестно/неавторизован). */
-  getMyRank(board: 'yardstars' | 'dailystreak'): Promise<LeaderboardEntry | null>;
+  /**
+   * Верхние строки + место текущего игрока — один сетевой запрос на таблицу
+   * (раньше getLeaderboard/getMyRank дублировали один и тот же запрос).
+   */
+  getLeaderboardSnapshot(board: 'yardstars' | 'dailystreak'): Promise<LeaderboardSnapshot>;
   /** Предложить оценить игру; true, если нативный диалог удалось вызвать. */
   requestReview(): Promise<boolean>;
   /** Серверное время платформы, fallback — время устройства. */

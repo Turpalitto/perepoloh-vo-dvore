@@ -2,6 +2,21 @@
 
 Самодостаточный документ для передачи проекта другому разработчику/IDE. История чата не нужна.
 
+## Актуальный статус (release-audit-findings)
+- Работа начата от актуального `master` (коммит `dde5c4d`).
+- `master` содержит: PR #2 (Elite League/живой двор/боссы, merged) и PR #3 (полировка первой сессии, merged, чистая замена закрытого PR #1).
+- Ветка `fix/release-audit-findings` (эта работа) исправляет 8 находок независимого релизного аудита:
+  1. **Boss objective**: `requireStar` теперь реально проверяется (`bossObjectiveSatisfied()`), выезд без звезды не засчитывается — см. `BOSS_SYSTEM.md`.
+  2. **Leaderboard API**: 4 запроса на открытие экрана → 2 (`getLeaderboardSnapshot`) + TTL-кэш — см. `TECHNICAL_DESIGN.md`.
+  3. **Unhandled errors**: `dangerouslyIgnoreUnhandledErrors` убран, тяжёлые solver-тесты изолированы в `npm run test:solver`, добавлен probe-тест.
+  4. **SDK fallback**: `src/platform/local-fallback.ts` — игра не останавливается при сбое SDK.
+  5. **Audio hidden/pause**: scheduler'ы ambient/music больше не плодят AudioNode, пока вкладка скрыта/на паузе.
+  6. **Audio base-aware paths**: `${BASE_URL}audio/...` вместо абсолютного `/audio/...`.
+  7. **SDK getPlayer typing**: `{ scopes: false }` → `getPlayer()` (сверено с yandex.com/dev/games/doc/en/sdk/sdk-player, `scopes` не документирован).
+  8. **verify:dist усилен**: проверка на `__e2eWinLevel`, sourcemap, абсолютные `/audio/...`.
+- **Тесты (локально):** typecheck ✅ · lint ✅ (2 предсуществующих warning) · unit **488 passed** (356 обычных + 132 solver) · e2e **103 passed, 1 skipped** · solve ✅ 100/100 · build ✅ · verify:dist ✅ **~874 КБ**.
+- **PR/CI:** см. финальный отчёт в чате для точного статуса на конец сессии (создание PR — последний шаг).
+
 ## Состояние проекта
 - **Версия:** 0.2.0 · **Ветка на момент работы:** см. `git branch --show-current`.
 - **Полностью готово и проверено:**

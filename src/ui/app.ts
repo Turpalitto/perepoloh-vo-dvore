@@ -38,11 +38,37 @@ import {
   unlockedUpgrades
 } from '../game/progression';
 import { SaveStore, totalStars } from '../game/save';
+import {
+  type AttemptResult,
+  type Medal,
+  elitePoints,
+  medalForAttempt,
+  medalOf,
+  medaledCount,
+  nextRank,
+  rankFor
+} from '../game/elite';
+import { ELITE_CHALLENGES, type EliteChallenge, sourceLevel } from '../levels/elite-challenges';
+import {
+  type BossLevelDef,
+  type BossRun,
+  advancePhase,
+  bossFor,
+  bossProgress,
+  createBossRun,
+  currentPhase
+} from '../game/boss';
 import type { AdHandlers, LeaderboardEntry, Platform } from '../platform/types';
 import { BoardView } from './board';
+import { YardDirector } from './yard-reactions';
+import { showCampaignEnding } from './campaign-ending';
 import { TARGET_SKINS, setTargetSkin } from './sprites';
 import { levelThumbnail } from './thumbnail';
 import { yardSVG } from './yard';
+
+const CAMPAIGN_LAST_ID = 100;
+const MEDAL_ICON: Record<Medal, string> = { 0: '', 1: '🥉', 2: '🥈', 3: '🥇' };
+const MEDAL_KEY: Record<Medal, string> = { 0: 'medal.none', 1: 'medal.bronze', 2: 'medal.silver', 3: 'medal.gold' };
 
 const LEVELS = levelsJson as LevelDef[];
 
@@ -83,6 +109,7 @@ export class App {
   private tvFocusTimer = 0;
   private tvFocusObserver: MutationObserver | null = null;
   private activeBoard: BoardView | null = null;
+  private yardDirector: YardDirector | null = null;
   private onboardingHandEl: HTMLElement | null = null;
   private endlessStreak = 0;
   /** Первый экран сессии не анимируем — переходить не от чего, и он может
@@ -131,6 +158,8 @@ export class App {
     }
     document.addEventListener('visibilitychange', () => {
       this.audio.setHidden(document.hidden);
+      if (document.hidden) this.yardDirector?.setPaused(true);
+      else this.syncAudioPause();
     });
     const unlockAudio = () => {
       this.audio.unlock();
@@ -320,7 +349,9 @@ export class App {
   }
 
   private syncAudioPause(): void {
-    this.audio.duck(this.platformPaused || this.userPaused || this.adPauseDepth > 0);
+    const paused = this.platformPaused || this.userPaused || this.adPauseDepth > 0;
+    this.audio.duck(paused);
+    this.yardDirector?.setPaused(paused);
   }
 
   private vibrate(pattern: number | number[]): void {
@@ -330,6 +361,8 @@ export class App {
   private disposeActiveBoard(): void {
     this.activeBoard?.destroy();
     this.activeBoard = null;
+    this.yardDirector?.destroy();
+    this.yardDirector = null;
     this.hideOnboardingHand();
   }
 
@@ -524,6 +557,21 @@ export class App {
     });
   }
 
+  private liveYardToggleHtml(testid: string): string {
+    const on = this.store.liveYardEnabled();
+    return `<button class="icon-btn liveyard-toggle${on ? ' active' : ''}" data-testid="${testid}" aria-pressed="${on}" aria-label="${t('audio.liveYard')}">🧑‍🌾</button>`;
+  }
+
+  private wireLiveYardToggle(el: HTMLElement): void {
+    el.addEventListener('click', () => {
+      const on = !this.store.liveYardEnabled();
+      this.store.setLiveYard(on);
+      el.classList.toggle('active', on);
+      el.setAttribute('aria-pressed', String(on));
+      this.audio.play('click');
+    });
+  }
+
   private contrastToggleHtml(testid: string): string {
     const on = this.store.data.highContrast === true;
     return `<button class="icon-btn contrast-toggle${on ? ' active' : ''}" data-testid="${testid}" aria-pressed="${on}" aria-label="${t('audio.contrast')}">${contrastIcon}</button>`;
@@ -564,8 +612,10 @@ export class App {
     const giftClaimed = this.store.data.lastGift === dailyKey;
     const season = currentSeason();
     const giftAmount = 2 + (season?.giftBonus ?? 0);
-    const visibleSkins = TARGET_SKINS.map((skin, index) => ({ skin, index })).filter(
-      ({ index }) => index < 5 || total >= TARGET_SKINS[index - 1].unlockStars
+    const campaignDone = this.store.data.campaignDone === true;
+    // Легендарный скин виден только после кампании; остальные — по звёздам.
+    const visibleSkins = TARGET_SKINS.map((skin, index) => ({ skin, index })).filter(({ skin, index }) =>
+      skin.elite ? campaignDone : index < 5 || total >= TARGET_SKINS[index - 1].unlockStars
     );
     const week = currentWeekKey();
     const weeklyQuests = selectWeeklyQuests(week).map((quest) => {
@@ -595,6 +645,11 @@ export class App {
                   : ''
             }</button>
             ${
+              campaignDone
+                ? `<button class="btn btn-big btn-elite" data-testid="menu-elite">🏅 ${t('elite.menu')}</button>`
+                : ''
+            }
+            ${
               this.store.starsOf(LEVELS[LEVELS.length - 1].id) > 0
                 ? `<button class="btn btn-big btn-endless" data-testid="menu-endless">${t('menu.endless')}${
                     (this.store.data.endlessBest ?? 0) > 0 ? ` · ${t('endless.best', { n: this.store.data.endlessBest ?? 0 })}` : ''
@@ -622,12 +677,13 @@ export class App {
             </div>
           </div>
           <div class="skin-row" data-testid="skin-row">${visibleSkins.map(({ skin: s, index: i }) => {
-            const unlockedSkin = total >= s.unlockStars;
+            const unlockedSkin = s.elite ? campaignDone : total >= s.unlockStars;
             const selected = this.store.data.targetSkin === i;
-            return `<button class="skin-swatch${selected ? ' selected' : ''}" data-skin="${i}"
+            const lockTitle = s.elite ? t('skin.legendLock') : t('skin.locked', { n: s.unlockStars });
+            return `<button class="skin-swatch${selected ? ' selected' : ''}${s.elite ? ' skin-elite' : ''}" data-skin="${i}"
               data-testid="skin-${i}" style="--c:${s.body}" ${unlockedSkin ? '' : 'disabled'}
-              aria-label="${t(s.nameKey)}" title="${unlockedSkin ? t(s.nameKey) : t('skin.locked', { n: s.unlockStars })}">${
-                unlockedSkin ? '' : `<span class="skin-lock">★${s.unlockStars}</span>`
+              aria-label="${t(s.nameKey)}" title="${unlockedSkin ? t(s.nameKey) : lockTitle}">${
+                unlockedSkin ? '' : `<span class="skin-lock">${s.elite ? '🏅' : `★${s.unlockStars}`}</span>`
               }</button>`;
           }).join('')}</div>
           <div class="menu-progress">
@@ -642,6 +698,7 @@ export class App {
           ${this.soundToggleHtml('sound-toggle')}
           ${this.musicToggleHtml('music-toggle')}
           ${this.vibrationToggleHtml('vibration-toggle')}
+          ${this.liveYardToggleHtml('liveyard-toggle')}
           ${this.contrastToggleHtml('contrast-toggle')}
           ${this.bellToggleHtml('bell-toggle')}
           <button class="icon-btn lang-toggle" data-testid="lang-toggle" aria-label="Language">🌐<span class="lang-code">${getLang().toUpperCase()}</span></button>
@@ -663,6 +720,10 @@ export class App {
     this.root.querySelector('[data-testid=menu-endless]')?.addEventListener('click', () => {
       this.audio.play('click');
       this.startEndless();
+    });
+    this.root.querySelector('[data-testid=menu-elite]')?.addEventListener('click', () => {
+      this.audio.play('click');
+      this.showEliteScreen();
     });
     this.q('[data-testid=menu-leaderboard]').addEventListener('click', () => {
       this.audio.play('click');
@@ -703,6 +764,7 @@ export class App {
     this.wireSoundToggle(this.q('[data-testid=sound-toggle]'));
     this.wireMusicToggle(this.q('[data-testid=music-toggle]'));
     this.wireVibrationToggle(this.q('[data-testid=vibration-toggle]'));
+    this.wireLiveYardToggle(this.q('[data-testid=liveyard-toggle]'));
     this.wireContrastToggle(this.q('[data-testid=contrast-toggle]'));
     const bellEl = this.root.querySelector<HTMLElement>('[data-testid=bell-toggle]');
     if (bellEl) this.wireBellToggle(bellEl);
@@ -999,7 +1061,152 @@ export class App {
       return;
     }
     this.store.setLastLevel(id);
+    // Сюжетный босс на этом слоте: играется как многофазное событие, где
+    // финальная фаза — сам уровень слота (прогресс кампании сохраняется).
+    const boss = bossFor(id);
+    if (boss) {
+      this.startBoss(boss);
+      return;
+    }
     this.runLevel(level, false);
+  }
+
+  // ---------- сюжетные боссы ----------
+
+  private levelById(id: number): LevelDef {
+    return LEVELS.find((l) => l.id === id)!;
+  }
+
+  /**
+   * Единая логика завершения кампании (уровень 100 — обычный или как финальный
+   * босс). Помечает кампанию пройденной (идемпотентно), и при самом первом разе
+   * показывает финальную сцену Высшей лиги, вернув true (вызывающий прекращает
+   * обычную/боссовую победу). Повторное прохождение → false, без повторных наград.
+   */
+  private completeCampaignFinale(): boolean {
+    const firstEver = this.store.markCampaignDone(this.dailyKey());
+    if (firstEver && !this.store.data.endingSeen) {
+      this.store.markEndingSeen();
+      this.showCampaignEnding();
+      return true;
+    }
+    return false;
+  }
+
+  /** Запускает босса: вступление деда → первая фаза. */
+  private startBoss(def: BossLevelDef): void {
+    const run = createBossRun(def);
+    this.disposeActiveBoard();
+    this.setGameplay(false);
+    this.audio.setMood(true);
+    this.root.innerHTML = `<div class="screen boss-intro-screen" data-testid="screen-boss-intro"><div class="overlay-slot"></div></div>`;
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay boss-intro';
+    overlay.setAttribute('data-testid', 'boss-intro');
+    overlay.innerHTML = `
+      <div class="dialog boss-dialog">
+        <div class="boss-badge">⚡</div>
+        <h2 data-testid="boss-name">${t(def.nameKey)}</h2>
+        <p class="boss-intro-text">${t(def.introKey)}</p>
+        <button class="btn btn-primary btn-big" data-testid="boss-start" data-tv-default>${t('boss.begin')}</button>
+      </div>`;
+    this.q('.overlay-slot').appendChild(overlay);
+    overlay.querySelector('[data-testid=boss-start]')!.addEventListener('click', () => {
+      this.audio.play('click');
+      this.playBossPhase(def, run);
+    });
+    if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=boss-start]')!.focus({ preventScroll: true });
+  }
+
+  /** Играет текущую фазу босса как обычный уровень с boss-контекстом. */
+  private playBossPhase(def: BossLevelDef, run: BossRun): void {
+    const phase = currentPhase(run, def);
+    if (!phase) {
+      this.showMenu();
+      return;
+    }
+    this.runLevel(this.levelById(phase.sourceLevelId), false, undefined, false, 'none', undefined, { def, run });
+  }
+
+  /** Фаза пройдена: сюжетная реплика, переход к следующей или финал. */
+  private onBossPhaseDone(def: BossLevelDef, run: BossRun, endState: GameState): void {
+    this.setGameplay(false);
+    this.audio.engineStop();
+    const isLast = run.phaseIndex >= def.phases.length - 1;
+    if (isLast) {
+      // Прогресс кампании и завершение босса — только сейчас, после полной победы.
+      const finalStars = starsFor(this.levelById(def.id), endState.moves, endState.starCollected);
+      this.store.recordResult(def.id, finalStars);
+      this.store.markBossDone(def.id);
+      // Финальный босс (слот 100) открывает Высшую лигу той же логикой, что и
+      // обычный уровень 100: при первом прохождении — финальная сцена вместо
+      // боссовой победы; повторно — обычная боссовая победа без повторных наград.
+      if (def.id === CAMPAIGN_LAST_ID && this.completeCampaignFinale()) return;
+      this.showBossVictory(def, finalStars);
+      return;
+    }
+    // Короткий переход между фазами — без перезагрузки страницы.
+    const nextRun = advancePhase(run, def);
+    this.yardDirector?.react('boss-phase');
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay boss-transition';
+    overlay.setAttribute('data-testid', 'boss-transition');
+    const prog = bossProgress(nextRun, def);
+    overlay.innerHTML = `
+      <div class="dialog boss-dialog">
+        <div class="boss-badge">✓</div>
+        <div class="dialog-sub" data-testid="boss-phase-cleared">${t('boss.phaseCleared', { n: run.phaseIndex + 1, m: def.phases.length })}</div>
+        <p class="boss-intro-text">${currentPhase(nextRun, def)?.grandpaLineKey ? t(currentPhase(nextRun, def)!.grandpaLineKey!) : ''}</p>
+        <button class="btn btn-primary btn-big" data-testid="boss-continue" data-tv-default>${t('boss.next', { n: prog.phase, m: prog.total })}</button>
+      </div>`;
+    this.q('.overlay-slot').appendChild(overlay);
+    overlay.querySelector('[data-testid=boss-continue]')!.addEventListener('click', () => {
+      this.audio.play('click');
+      this.playBossPhase(def, nextRun);
+    });
+    if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=boss-continue]')!.focus({ preventScroll: true });
+  }
+
+  /** Уникальная победная сцена босса. */
+  private showBossVictory(def: BossLevelDef, stars: number): void {
+    this.audio.play('win');
+    this.vibrate([28, 45, 28, 45, 70]);
+    this.yardDirector?.react('boss-win');
+    const confettiColors = ['#e2574c', '#f6c445', '#45968f', '#3f7fd1', '#e88fb6'];
+    const confetti = Array.from({ length: 40 }, () => {
+      const c = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+      return `<span style="--x:${Math.round(Math.random() * 100)}%;--d:${(Math.random() * 0.6).toFixed(2)}s;--r:${Math.round(180 + Math.random() * 420)}deg;background:${c}"></span>`;
+    }).join('');
+    const idx = LEVELS.findIndex((l) => l.id === def.id);
+    const next = idx >= 0 && idx < LEVELS.length - 1 ? LEVELS[idx + 1] : null;
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay boss-victory';
+    overlay.setAttribute('data-testid', 'boss-victory');
+    overlay.innerHTML = `
+      <div class="confetti">${confetti}</div>
+      <div class="dialog boss-dialog win-dialog">
+        <div class="boss-badge boss-badge-win">🏆</div>
+        <h2>${t(def.nameKey)}</h2>
+        <div class="win-stars" data-testid="win-stars" data-stars="${stars}">${starIcons(stars)}</div>
+        <p class="boss-victory-text" data-testid="boss-victory-text">${t(def.victoryKey)}</p>
+        ${next ? `<button class="btn btn-primary btn-big" data-testid="btn-next">${t('win.next')}</button>` : ''}
+        <button class="btn" data-testid="btn-win-menu">${t('win.menu')}</button>
+      </div>`;
+    this.q('.overlay-slot').appendChild(overlay);
+    overlay.querySelectorAll('.win-stars .star.full').forEach((s, i) => {
+      (s as HTMLElement).style.animationDelay = `${0.2 + i * 0.28}s`;
+      s.classList.add('pop');
+    });
+    overlay.querySelector('[data-testid=btn-next]')?.addEventListener('click', () => {
+      this.audio.play('click');
+      if (next) this.startLevel(next.id);
+    });
+    overlay.querySelector('[data-testid=btn-win-menu]')!.addEventListener('click', () => {
+      this.audio.play('click');
+      this.showMenu();
+    });
+    if (this.platform.isTV)
+      overlay.querySelector<HTMLElement>('[data-testid=btn-next], [data-testid=btn-win-menu]')!.focus({ preventScroll: true });
   }
 
   /** «Уровень дня»: Worker генерирует его из стабильного seed-дня. */
@@ -1055,24 +1262,37 @@ export class App {
     daily: boolean,
     dailyDate?: string,
     endless = false,
-    modifier: DailyModifier = 'none'
+    modifier: DailyModifier = 'none',
+    challenge?: EliteChallenge,
+    boss?: { def: BossLevelDef; run: BossRun }
   ): void {
     this.disposeActiveBoard();
     this.userPaused = false;
     this.syncAudioPause();
-    this.audio.setMood(endless || level.difficulty === 'hard');
+    // Мастер-испытание навязывает свой модификатор (без подсказок / без отмены).
+    if (challenge) modifier = challenge.modifier;
+    // Отслеживаем «чистоту» прохождения для расчёта медали.
+    const attempt: AttemptResult = { moves: 0, starCollected: false, usedHint: false, usedUndo: false, usedRestart: false };
+    this.audio.setMood(endless || boss !== undefined || level.difficulty === 'hard');
     const isBoss = level.width > 6;
-    const title = daily
-      ? `🔥 ${t('daily.title')}`
-      : endless
-        ? `🌀 ${level.name}`
-        : `${isBoss ? '👑 ' : ''}${level.id}. ${levelText('name', level.name)}`;
+    const bossProg = boss ? bossProgress(boss.run, boss.def) : null;
+    const title = boss
+      ? `⚡ ${t(boss.def.nameKey)}`
+      : challenge
+        ? `🏅 ${t('elite.challenge')} ${challenge.id}`
+        : daily
+          ? `🔥 ${t('daily.title')}`
+          : endless
+            ? `🌀 ${t('endless.title')} · ${level.name}`
+            : `${isBoss ? '👑 ' : ''}${level.id}. ${levelText('name', level.name)}`;
     const starHud = level.star ? `<span class="hud-star" data-testid="hud-star">★</span>` : '';
     this.root.innerHTML = `
       <div class="screen game-screen" data-testid="screen-game">
         <div class="hud hud-top">
           <button class="icon-btn" data-testid="btn-pause" aria-label="${t('pause.title')}">${pauseIcon}</button>
-          <div class="hud-level">${title}</div>
+          <div class="hud-level">${title}${
+            bossProg ? ` <span class="boss-phase-chip" data-testid="boss-phase">${t('boss.phase', { n: bossProg.phase, m: bossProg.total })}</span>` : ''
+          }</div>
           <div class="hud-right">
             ${starHud}
             <div class="hud-moves">${t('hud.moves')} <b data-testid="hud-moves">0</b><span class="hud-par">${t('hud.goal', { n: level.par2 })}</span></div>
@@ -1150,13 +1370,14 @@ export class App {
       onBump: () => {
         this.audio.play('thud');
         this.vibrate(14);
+        this.yardDirector?.react('collision');
       },
       onGateSwitch: () => {
         this.audio.play('switch');
         this.vibrate([18, 35, 24]);
       },
       onGateOpen: () => this.audio.play('gate'),
-      onCommit: (res) => {
+      onCommit: (res, piece) => {
         undoStack.push(cur);
         cur = res.state;
         this.audio.play('move');
@@ -1167,19 +1388,52 @@ export class App {
           this.vibrate(25);
           this.flyStarToHud();
         }
-        if (res.exited) this.audio.play('honk');
+        if (res.exited) {
+          this.audio.play('honk');
+          this.audio.play('exitRev');
+        }
         if (Math.random() < 0.25) this.audio.play('cluck');
+        // Живой двор: дед комментирует самое заметное событие хода.
+        if (res.starCollected) this.yardDirector?.react('star');
+        else if (res.gateActivated) this.yardDirector?.react('gate');
+        else if (level.pieces[piece]?.kind === 'tractor') this.yardDirector?.react('tractor');
+        else if (level.id === 1 && cur.moves === 1) this.yardDirector?.react('first-move');
         refreshHud();
         updateDeadlock();
       },
-      onExitDone: () => {
-        if (!finished) {
-          finished = true;
-          this.finishLevel(level, cur, daily, dailyDate, endless);
-        }
-      }
+      onExitDone: () => completeLevel()
     });
+    // Единая точка завершения уровня (реальный выезд машины и e2e-хук ведут сюда).
+    const completeLevel = (): void => {
+      if (finished) return;
+      finished = true;
+      if (boss) {
+        this.onBossPhaseDone(boss.def, boss.run, cur);
+      } else if (challenge) {
+        this.finishEliteChallenge(challenge, { ...attempt, moves: cur.moves, starCollected: cur.starCollected });
+      } else {
+        this.finishLevel(level, cur, daily, dailyDate, endless);
+      }
+    };
+    // Только в e2e-сборке: детерминированно «выиграть» уровень, минуя ручной
+    // подбор решения многофазных пазлов. В production этот код отсутствует.
+    if (import.meta.env.MODE === 'e2e') {
+      (window as unknown as { __e2eWinLevel?: () => void }).__e2eWinLevel = completeLevel;
+    }
     this.activeBoard = bv;
+    // «Живой двор»: дед-комментатор. Обычные уровни — да; на испытаниях лиги
+    // без подсказок он всё равно уместен, но во время рекламы/паузы молчит.
+    this.yardDirector = new YardDirector(this.q('.game-screen'), this.audio, {
+      level: level.id,
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      enabled: this.store.liveYardEnabled(),
+      seen: this.store.data.grandpaSeen ?? [],
+      onSeen: (id) => this.store.markGrandpaSeen(id)
+    });
+    // Реплика-встреча на старте (чуть погодя, чтобы не наложиться на обучение).
+    window.setTimeout(() => {
+      if (!finished) this.yardDirector?.react(level.id === 1 ? 'level-start' : (level.id - 1) % 12 === 0 ? 'chapter-start' : 'level-start');
+    }, 650);
     this.setGameplay(true);
     if (this.platform.isTV) bv.svg.focus({ preventScroll: true });
 
@@ -1187,6 +1441,7 @@ export class App {
       if (finished || cur.won) return; // не отменяем победный выезд
       const prev = undoStack.pop();
       if (!prev) return;
+      attempt.usedUndo = true;
       cur = prev;
       bv.setState(prev);
       this.audio.play('undo');
@@ -1200,6 +1455,7 @@ export class App {
     refreshSkip();
     this.q('[data-testid=btn-restart]').addEventListener('click', () => {
       if (finished || cur.won) return;
+      attempt.usedRestart = true;
       undoStack.length = 0;
       cur = createState(level);
       bv.setState(cur);
@@ -1207,8 +1463,10 @@ export class App {
       refreshHud();
       hideDeadlock();
       if (!daily) {
-        this.restartCounts.set(level.id, (this.restartCounts.get(level.id) ?? 0) + 1);
+        const count = (this.restartCounts.get(level.id) ?? 0) + 1;
+        this.restartCounts.set(level.id, count);
         refreshSkip();
+        if (count >= 2) this.yardDirector?.react('restart-repeat');
       }
     });
     skipBtn.addEventListener('click', async () => {
@@ -1263,8 +1521,10 @@ export class App {
           ok = await this.platform.showRewarded(this.adHandlers());
         }
         if (ok) {
+          attempt.usedHint = true;
           const move = hint(level, cur);
           if (move) bv.showHint(move);
+          this.yardDirector?.react('hint');
         }
       } finally {
         bv.interactive = true;
@@ -1416,6 +1676,10 @@ export class App {
     this.audio.engineStop();
     this.vibrate([28, 45, 28]);
     const stars = starsFor(level, endState.moves, endState.starCollected);
+    // Дед реагирует на победу: перебор ходов — поворчит, три звезды — похвалит.
+    this.yardDirector?.react(
+      stars >= 3 ? 'win-perfect' : endState.moves > level.par2 + 4 ? 'many-moves' : 'win'
+    );
     const achievementsBefore = unlockedAchievementKeys(this.store.data);
     const before = totalStars(this.store.data);
     let unlocked: ReturnType<typeof newlyUnlocked> = [];
@@ -1446,6 +1710,10 @@ export class App {
         }, 1600);
       }
     }
+    // Финал кампании: первое прохождение уровня 100 открывает Высшую лигу.
+    // При самом первом разе показываем отдельную финальную сцену вместо обычной
+    // победы; повторно — обычная победа с пометкой «лига уже открыта».
+    if (!daily && level.id === CAMPAIGN_LAST_ID && this.completeCampaignFinale()) return;
     const newAchievements = ACHIEVEMENTS.filter(
       (achievement) =>
         !achievementsBefore.has(achievement.key) && unlockedAchievementKeys(this.store.data).has(achievement.key)
@@ -1470,6 +1738,10 @@ export class App {
         ? `<div class="win-master chapter-complete" data-testid="win-chapter">${t('win.chapter', {
             n: Math.ceil(level.id / 12)
           })}</div>`
+        : '';
+    const eliteReplayNote =
+      !daily && level.id === CAMPAIGN_LAST_ID
+        ? `<div class="win-note ok" data-testid="win-elite-open">🏅 ${t('elite.alreadyOpen')}</div>`
         : '';
     const dailyNote = daily
       ? `<div class="win-upgrade" data-testid="win-daily-streak">${t('daily.winStreak', { n: dailyStreak })}</div>
@@ -1504,6 +1776,7 @@ export class App {
         ${starNote}
         ${masterNote}
         ${chapterNote}
+        ${eliteReplayNote}
         ${dailyNote}
         ${upgradeNote}
         ${achievementNote}
@@ -1664,6 +1937,170 @@ export class App {
     });
     if (this.platform.isTV)
       overlay.querySelector<HTMLElement>('[data-testid=btn-next]')?.focus({ preventScroll: true });
+  }
+
+  // ---------- Высшая лига ----------
+
+  /** Финальная сцена кампании (один раз). Вход в лигу / возврат во двор. */
+  private showCampaignEnding(): void {
+    this.disposeActiveBoard();
+    this.setGameplay(false);
+    this.audio.play('win');
+    this.audio.setMood(false);
+    this.root.innerHTML = `<div class="screen ending-screen" data-testid="screen-ending"><div class="overlay-slot"></div></div>`;
+    showCampaignEnding(this.q('.overlay-slot'), t, this.platform.isTV, {
+      onEnterLeague: () => {
+        this.audio.play('click');
+        this.showEliteScreen();
+      },
+      onReturn: () => {
+        this.audio.play('click');
+        this.showMenu();
+      },
+      onBeat: () => this.audio.play('star')
+    });
+  }
+
+  showEliteScreen(): void {
+    this.transitionScreen(() => this.showEliteInner());
+  }
+
+  private showEliteInner(): void {
+    this.disposeActiveBoard();
+    this.setGameplay(false);
+    const points = elitePoints(this.store.data);
+    const rank = rankFor(points);
+    const nx = nextRank(points);
+    const done = medaledCount(this.store.data);
+    const cards = ELITE_CHALLENGES.map((c) => {
+      const medal = medalOf(this.store.data, c.id);
+      const level = sourceLevel(c);
+      const mod = c.modifier !== 'none' ? `<span class="elite-mod">${t(`elite.mod.${c.modifier}`)}</span>` : '';
+      return `
+        <button class="elite-card${medal ? ' medaled' : ''}" data-testid="elite-card-${c.id}" data-challenge="${c.id}">
+          <span class="elite-card-medal">${MEDAL_ICON[medal] || '·'}</span>
+          <span class="elite-card-num">${t('elite.challenge')} ${c.id}</span>
+          <span class="elite-card-src">${escapeHTML(levelText('name', level.name) ?? level.name)}</span>
+          ${mod}
+        </button>`;
+    }).join('');
+    this.root.innerHTML = `
+      <div class="screen elite-screen" data-testid="screen-elite">
+        <div class="panel-top">
+          <button class="btn" data-testid="btn-back">${t('levels.back')}</button>
+          <h2>${t('elite.title')}</h2>
+          <span></span>
+        </div>
+        <div class="elite-status" data-testid="elite-status">
+          <div class="elite-rank"><span class="elite-rank-name" data-testid="elite-rank">${t(`rank.${rank.key}`)}</span>
+            <span class="elite-rank-sub">${
+              nx ? t('elite.nextRank', { rank: t(`rank.${nx.rank.key}`), n: nx.remaining }) : t('elite.maxRank')
+            }</span></div>
+          <div class="elite-figures">
+            <span data-testid="elite-points">🏅 ${t('elite.points')}: ${points}</span>
+            <span>🎖️ ${t('elite.medals')}: ${done}/${ELITE_CHALLENGES.length}</span>
+            ${(this.store.data.endlessBest ?? 0) > 0 ? `<span>🌀 ${t('elite.bestEndless', { n: this.store.data.endlessBest ?? 0 })}</span>` : ''}
+          </div>
+        </div>
+        <h3 class="elite-section">${t('elite.challenges')}</h3>
+        <div class="elite-grid">${cards}</div>
+      </div>`;
+    this.q('[data-testid=btn-back]').addEventListener('click', () => {
+      this.audio.play('click');
+      this.showMenu();
+    });
+    this.root.querySelectorAll<HTMLButtonElement>('.elite-card').forEach((b) =>
+      b.addEventListener('click', () => {
+        this.audio.play('click');
+        this.startEliteChallenge(Number(b.dataset.challenge));
+      })
+    );
+    // Короткое объяснение при первом заходе (пока нет ни одной медали).
+    if (done === 0) this.showEliteIntro();
+    if (this.platform.isTV) this.q<HTMLElement>('[data-testid=btn-back]').focus({ preventScroll: true });
+  }
+
+  private showEliteIntro(): void {
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.setAttribute('data-testid', 'elite-intro');
+    overlay.innerHTML = `
+      <div class="dialog elite-intro-dialog">
+        <h2>${t('elite.intro.title')}</h2>
+        <ul class="rules-list">
+          <li>${t('elite.intro.1')}</li>
+          <li>${t('elite.intro.2')}</li>
+          <li>${t('elite.intro.3')}</li>
+        </ul>
+        <button class="btn btn-primary btn-big" data-testid="elite-intro-close">${t('rules.close')}</button>
+      </div>`;
+    this.q('.elite-screen').appendChild(overlay);
+    overlay.querySelector('[data-testid=elite-intro-close]')!.addEventListener('click', () => {
+      this.audio.play('click');
+      overlay.remove();
+      if (this.platform.isTV) this.focusTVDefault(true);
+    });
+    if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=elite-intro-close]')!.focus({ preventScroll: true });
+  }
+
+  private startEliteChallenge(id: number): void {
+    const challenge = ELITE_CHALLENGES.find((c) => c.id === id);
+    if (!challenge) {
+      this.showEliteScreen();
+      return;
+    }
+    this.runLevel(sourceLevel(challenge), false, undefined, false, challenge.modifier, challenge);
+  }
+
+  private finishEliteChallenge(challenge: EliteChallenge, attempt: AttemptResult): void {
+    this.setGameplay(false);
+    this.audio.engineStop();
+    const earned = medalForAttempt(challenge, attempt);
+    const rankBefore = rankFor(elitePoints(this.store.data));
+    const { previous, next } = this.store.recordEliteMedal(challenge.id, earned);
+    const improved = next > previous;
+    const points = elitePoints(this.store.data);
+    const rank = rankFor(points);
+    const rankUp = rank.key !== rankBefore.key;
+    this.audio.play(earned === 3 ? 'win' : earned > 0 ? 'star' : 'thud');
+    this.vibrate(earned > 0 ? [28, 45, 28] : 14);
+
+    const medalNow = next as Medal;
+    const idx = ELITE_CHALLENGES.findIndex((c) => c.id === challenge.id);
+    const nextCh = idx >= 0 && idx < ELITE_CHALLENGES.length - 1 ? ELITE_CHALLENGES[idx + 1] : null;
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.setAttribute('data-testid', 'elite-result');
+    overlay.innerHTML = `
+      <div class="dialog elite-result-dialog">
+        <div class="elite-result-medal" data-testid="elite-result-medal" data-medal="${medalNow}">${MEDAL_ICON[medalNow] || '—'}</div>
+        <h2>${earned > 0 ? t('elite.result.title') : t('win.starMissed')}</h2>
+        <div class="dialog-sub">${
+          improved ? t('elite.result.newMedal', { medal: t(MEDAL_KEY[medalNow]) }) : t('elite.result.kept', { medal: t(MEDAL_KEY[medalNow]) })
+        }</div>
+        ${improved ? `<div class="win-upgrade">${t('elite.result.improved')}</div>` : ''}
+        <div class="win-note">🏅 ${t('elite.points')}: ${points}</div>
+        ${rankUp ? `<div class="win-master" data-testid="elite-rankup">${t('elite.result.rankUp', { rank: t(`rank.${rank.key}`) })}</div>` : ''}
+        <button class="btn btn-primary btn-big" data-testid="elite-retry">${t('win.again')}</button>
+        <div class="dialog-row">
+          ${nextCh ? `<button class="btn" data-testid="elite-next">${t('win.next')}</button>` : ''}
+          <button class="btn" data-testid="elite-back">${t('elite.menu')}</button>
+        </div>
+      </div>`;
+    this.q('.overlay-slot').appendChild(overlay);
+    overlay.querySelector('[data-testid=elite-retry]')!.addEventListener('click', () => {
+      this.audio.play('click');
+      this.startEliteChallenge(challenge.id);
+    });
+    overlay.querySelector('[data-testid=elite-next]')?.addEventListener('click', () => {
+      this.audio.play('click');
+      if (nextCh) this.startEliteChallenge(nextCh.id);
+    });
+    overlay.querySelector('[data-testid=elite-back]')!.addEventListener('click', () => {
+      this.audio.play('click');
+      this.showEliteScreen();
+    });
+    if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=elite-retry]')!.focus({ preventScroll: true });
   }
 
   private async shareText(text: string, button: HTMLButtonElement, doneLabel: string): Promise<void> {

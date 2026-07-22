@@ -23,6 +23,8 @@ export interface TargetSkin extends CarColors {
   /** Порог суммарных звёзд для открытия. */
   unlockStars: number;
   nameKey: string;
+  /** Эксклюзив Высшей лиги: открывается прохождением кампании, а не звёздами. */
+  elite?: boolean;
 }
 
 export const TARGET_SKINS: TargetSkin[] = [
@@ -34,7 +36,10 @@ export const TARGET_SKINS: TargetSkin[] = [
   { body: '#4f9e50', dark: '#347236', light: '#75b976', unlockStars: 155, nameKey: 'skin.green' },
   { body: '#eee1bd', dark: '#aa9365', light: '#fff4d5', unlockStars: 190, nameKey: 'skin.cream' },
   { body: '#b9252d', dark: '#81191f', light: '#dc4b52', unlockStars: 220, nameKey: 'skin.red' },
-  { body: '#d8ae27', dark: '#987713', light: '#f0cf5a', unlockStars: 250, nameKey: 'skin.gold' }
+  { body: '#d8ae27', dark: '#987713', light: '#f0cf5a', unlockStars: 250, nameKey: 'skin.gold' },
+  // Легендарный эксклюзив: unlockStars недостижимо (999) — открывается только
+  // флагом campaignDone, отдельной веткой в UI. Тёмно-изумрудный с золотом.
+  { body: '#1f6f52', dark: '#124232', light: '#3fa07a', unlockStars: 999, nameKey: 'skin.legend', elite: true }
 ];
 
 let targetSkinIdx = 0;

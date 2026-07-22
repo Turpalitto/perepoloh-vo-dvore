@@ -15,7 +15,9 @@ export type SoundName =
   | 'cluck'
   | 'bark'
   | 'meow'
-  | 'undo';
+  | 'undo'
+  | 'exitRev'
+  | 'grandpa';
 
 /** Лёгкая рандомизация высоты, чтобы звуки не были «из калькулятора». */
 const vary = (f: number) => f * (0.95 + Math.random() * 0.1);
@@ -332,9 +334,25 @@ export class GameAudio {
         this.tone(392, 0.14, 'square', 0.16);
         this.tone(494, 0.2, 'square', 0.16, 0.12);
         break;
+      case 'exitRev':
+        // Прощальный рёв мотора на выезде за ворота: sawtooth-свип вверх по
+        // тону (160→420Гц) — в отличие от тихого фонового гула engineStart()
+        // (52-60Гц, рассчитан на долгий drag), этот громче и в среднем
+        // диапазоне, чтобы не тонуть под honk и быть слышным на любых динамиках.
+        this.tone(160, 0.5, 'sawtooth', 0.16, 0, 420);
+        this.noise(0.4, 0.09, 1000, 0.03, 2200);
+        break;
       case 'win':
         [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.18, 'triangle', 0.2, i * 0.11));
         break;
+      case 'grandpa': {
+        // Короткое добродушное «бормотание» деда: пара низких слогов с лёгкой
+        // вариацией высоты — узнаётся как «дед сказал», не мешает музыке.
+        const base = 138 + Math.random() * 26;
+        this.tone(base, 0.11, 'sawtooth', 0.05, 0, base * 0.82);
+        this.tone(base * 1.18, 0.1, 'sawtooth', 0.045, 0.12, base * 0.95);
+        break;
+      }
       case 'cluck': {
         const base = 700 + Math.random() * 200;
         this.tone(base, 0.045, 'square', 0.05, 0, base * 0.8);

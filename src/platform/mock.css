@@ -1,0 +1,50 @@
+.mock-ad {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(20, 16, 10, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mock-ad-box {
+  background: #fff;
+  border-radius: 18px;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.mock-ad-label {
+  font-weight: 800;
+  font-size: 18px;
+}
+.mock-ad-kind {
+  font-size: 14px;
+  opacity: 0.6;
+}
+/* Резерв под sticky-баннер только на игровом экране: там нижние кнопки
+   (подсказка/отмена/рестарт) у самого края и уходят под баннер. Меню само
+   отступает от низа, ему резерв не нужен и он бы ломал вписывание в высоту.
+   Бокс .screen не трогаем (тесты ждут полный вьюпорт) — поднимаем контент
+   паддингом. */
+body.mock-banner-on .game-screen {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 50px);
+}
+.mock-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  height: 50px;
+  background: repeating-linear-gradient(45deg, #ffe08a, #ffe08a 12px, #f6c445 12px, #f6c445 24px);
+  border-top: 2px dashed #8a6114;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #5a4020;
+  pointer-events: none;
+}

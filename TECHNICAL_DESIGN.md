@@ -71,3 +71,23 @@ e2e/           Playwright: загрузка, прохождение, undo, со�
 
 ## Сборка и публикация
 - `npm run build` → `dist/` (цель ES2018, base './'). Архив для Яндекс Игр: содержимое `dist/` в zip (index.html в корне). Инструкция — в README.
+
+## Высшая лига двора (Stage A)
+
+**Данные (`SaveData`):** `campaignDone`, `campaignDoneAt`, `endingSeen`, `eliteMedals: Record<challengeId, 1|2|3>`. Всё опционально — старые сейвы грузятся без миграции. `sanitizeSave` валидирует медали (целые 1..3), `mergeSave` берёт максимум по каждому испытанию; очки лиги **деривируются** из медалей (`elitePoints = Σ MEDAL_POINTS[medal]`), поэтому награда не может быть выдана повторно — идемпотентность встроена в модель, а не в флаги «выдано».
+
+**Чистая логика (`src/game/elite.ts`):** `medalForAttempt(challenge, result)` (пороги проверяют moves/star/noHint/noUndo), `elitePoints`, `rankFor`/`nextRank` (пороги 0/80/220/450/750/1050). Всё без DOM, покрыто `tests/elite.test.ts`.
+
+**Испытания (`src/levels/elite-challenges.ts`):** не копируют уровень — ссылаются на `sourceLevelId`; пороги строятся из `par`/`par2` (`buildGoals`), поэтому золото = оптимум решателя (тест проверяет `solve(level).optimal ≤ gold.maxMoves` для всех 25).
+
+**UI:** `campaign-ending.ts` — самодостаточный модуль финальной сцены (только `textContent`, без innerHTML для строк). Экраны лиги/результата — методы `App` (тот же паттерн, что остальные экраны; вынос в контроллер — отложенный P3, чтобы не рефакторить god object перед релизом). Прохождение испытания переиспользует `runLevel` с существующим плечом модификаторов + отслеживанием usedHint/usedUndo/usedRestart.
+
+**Не реализовано:** Stage B (недельный `eliteweekly` + лидерборд), Stage C (endless-множитель + rewarded-восстановление + трофей во дворе), Stage D («Испытание деда»), аналитика `elite_*`.
+
+## Живой двор, дед, боссы
+
+**Поток событий:** core (`applyMove`→`MoveResult`, факты) → BoardView-колбэки (`onCommit/onBump/onGateSwitch`) → App классифицирует в `YardEvent`/`GrandpaEvent` → `YardDirector.react()` (UI). Core о DOM не знает.
+
+**Дед:** чистая логика в `src/game/grandpa.ts` (данные реплик + `pickLine`/`commitLine`, детерминируемо через инъекцию rng), состояние диалога — в UI, персист однократных реплик — `SaveData.grandpaSeen` (union при merge). `YardDirector` (`src/ui/yard-reactions.ts`) держит портрет+пузырь, уважает паузу (`setPaused` из `syncAudioPause` + visibilitychange), reduced-motion и работает субтитром (aria-live).
+
+**Боссы:** `src/game/boss.ts` — `BossLevelDef { phases: BossPhase[] }`, фаза ссылается на `sourceLevelId` (обычный уровень). Проходимость доказывается штатным `solve()` (тест). Состояние прохождения — `BossRun { bossId, phaseIndex, done }` (сериализуемо, `reviveBossRun` валидирует). Никаких изменений core/solver — это осознанно снимает риск для 100 уровней. **Все 5 боссов подключены и играбельны** через generic-оркестрацию в `app.ts` (`startBoss`/`playBossPhase`/`onBossPhaseDone`/`showBossVictory`, без ветвлений `id===N`): `startLevel(id)`→`bossFor(id)`→интро→фаза как `runLevel(subLevel, boss-контекст)`→`onExitDone→completeLevel→onBossPhaseDone`→переход или победа. HUD «Фаза N из M» в шапке. Прогресс кампании (`recordResult`, `markBossDone`) и финал (`completeCampaignFinale` для слота 100) — только после последней фазы. Undo не тянется через границу фаз (каждая фаза — свежий `runLevel`+undoStack); restart перезапускает текущую фазу. e2e-завершение фазы — хук `__e2eWinLevel`, гейтится `import.meta.env.MODE==='e2e'` (в production вырезается). Полное описание — `BOSS_SYSTEM.md`.

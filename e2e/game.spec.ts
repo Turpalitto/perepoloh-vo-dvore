@@ -581,6 +581,275 @@ test.describe('Переполох во дворе', () => {
   });
 });
 
+test.describe('Высшая лига', () => {
+  /** Заполняет сейв так, будто кампания пройдена (или нет). */
+  async function seedSave(page: Page, over: Record<string, unknown>): Promise<void> {
+    await page.addInitScript((data) => {
+      localStorage.setItem('parkovka.save.v1', JSON.stringify(data));
+    }, { v: 1, stars: { '100': 3 }, sound: true, music: true, lang: 'ru', lastLevel: 100, targetSkin: 0, ...over });
+  }
+
+  test('до прохождения кампании лига закрыта (кнопки нет)', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedSave(page, { stars: { '99': 3 }, lastLevel: 99, campaignDone: undefined });
+    await page.goto('/?mock=1&lang=ru');
+    await expect(page.getByTestId('menu-play')).toBeVisible();
+    await expect(page.getByTestId('menu-elite')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('после кампании: кнопка лиги, экран, ранг и персист после перезагрузки', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedSave(page, { campaignDone: true, campaignDoneAt: '2026-07-22', endingSeen: true });
+    await page.goto('/?mock=1&lang=ru');
+    await expect(page.getByTestId('menu-elite')).toBeVisible();
+    // легендарный скин виден (10-й свотч)
+    await expect(page.getByTestId('skin-9')).toBeVisible();
+    await page.getByTestId('menu-elite').click();
+    await expect(page.getByTestId('screen-elite')).toBeVisible();
+    await expect(page.getByTestId('elite-rank')).toHaveText('Новичок двора');
+    await expect(page.getByTestId('elite-points')).toContainText('0');
+    // закрываем интро и проверяем 25 карточек
+    await page.getByTestId('elite-intro-close').click();
+    await expect(page.getByTestId('elite-card-1')).toBeVisible();
+    await expect(page.getByTestId('elite-card-25')).toBeVisible();
+    // перезагрузка — лига остаётся открытой
+    await page.reload();
+    await expect(page.getByTestId('menu-elite')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('испытание запускается на доске с заголовком лиги', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedSave(page, { campaignDone: true, endingSeen: true });
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-elite').click();
+    await page.getByTestId('elite-intro-close').click();
+    await page.getByTestId('elite-card-1').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('screen-game')).toContainText('Испытание 1');
+    expect(errors).toEqual([]);
+  });
+
+  test('Android TV: лига доступна стрелками и Enter', async ({ page }) => {
+    await seedSave(page, { campaignDone: true, endingSeen: true });
+    await page.goto('/?mock=1&tv=1&lang=ru&daytime=day');
+    await expect(page.locator('#app')).toHaveClass(/tv-mode/);
+    // доходим до кнопки лиги стрелкой вниз и открываем
+    const elite = page.getByTestId('menu-elite');
+    for (let i = 0; i < 6 && !(await elite.evaluate((el) => el === document.activeElement)); i++) {
+      await page.keyboard.press('ArrowDown');
+    }
+    await expect(elite).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('screen-elite')).toBeVisible();
+  });
+});
+
+test.describe('Живой двор и дед', () => {
+  test('уровень 1: дед-портрет присутствует и произносит реплику, не блокируя управление', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('grandpa-portrait')).toBeVisible();
+    // стартовая реплика появляется (state-based, без привязки к мс анимации)
+    await expect(page.getByTestId('grandpa-bubble')).not.toBeEmpty();
+    // управление доступно: уровень проходится, несмотря на пузырь
+    await dragPiece(page, 'T', 5.7, 0);
+    await expect(page.getByTestId('win-overlay')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('частые движения не спамят репликами (глобальный кулдаун)', async ({ page }) => {
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('grandpa-portrait')).toBeVisible();
+    // дёргаем фигуру туда-сюда — пузырь не должен молотить новую реплику каждый ход
+    const textAfter = async () => (await page.getByTestId('grandpa-bubble').textContent()) ?? '';
+    await page.waitForTimeout(700);
+    const t1 = await textAfter();
+    await dragPiece(page, 'T', 1, 0);
+    await dragPiece(page, 'T', 1, 0);
+    const t2 = await textAfter();
+    expect(t2).toBe(t1); // реплика не сменилась от пары быстрых ходов
+  });
+
+  test('выключение «Живого двора» скрывает деда', async ({ page }) => {
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('liveyard-toggle').click();
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('grandpa')).toHaveClass(/grandpa-off/);
+  });
+
+  test('prefers-reduced-motion убирает анимацию пузыря', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('grandpa-bubble')).not.toBeEmpty();
+    await expect(page.getByTestId('grandpa-bubble')).toHaveClass(/reduced/);
+  });
+});
+
+test.describe('Босс уровня 10', () => {
+  /** Прогресс до уровня 10 (уровни 1..9 пройдены). */
+  async function seedToLevel10(page: Page): Promise<void> {
+    const stars: Record<string, number> = {};
+    for (let i = 1; i <= 9; i++) stars[String(i)] = 3;
+    await page.addInitScript((stars) => {
+      localStorage.setItem(
+        'parkovka.save.v1',
+        JSON.stringify({ v: 1, stars, sound: true, music: true, lang: 'ru', lastLevel: 9, targetSkin: 0 })
+      );
+    }, stars);
+  }
+  const readSave = (page: Page) =>
+    page.evaluate(() => JSON.parse(localStorage.getItem('parkovka.save.v1') ?? '{}'));
+
+  test('полный многофазный проход: интро → фазы → уникальная победа, прогресс только после победы', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedToLevel10(page);
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    // вступление деда
+    await expect(page.getByTestId('boss-intro')).toBeVisible();
+    await expect(page.getByTestId('boss-name')).toHaveText('Тракторный переполох');
+    await page.getByTestId('boss-start').click();
+    // фаза 1 из 2 + HUD
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 1 из 2');
+    // босс ещё НЕ пройден до полной победы
+    expect((await readSave(page)).bossDone ?? []).not.toContain(10);
+    // завершаем фазу 1 (e2e-хук)
+    await page.evaluate(() => (window as any).__e2eWinLevel());
+    await expect(page.getByTestId('boss-transition')).toBeVisible();
+    await expect(page.getByTestId('boss-phase-cleared')).toContainText('Фаза 1 из 2 пройдена');
+    // переход во вторую фазу без перезагрузки
+    await page.getByTestId('boss-continue').click();
+    await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 2 из 2');
+    // на свежей фазе отмена недоступна (undo не тянется через границу фаз)
+    await expect(page.getByTestId('btn-undo')).toBeDisabled();
+    // всё ещё не пройден
+    expect((await readSave(page)).bossDone ?? []).not.toContain(10);
+    // завершаем финальную фазу → уникальная победа
+    await page.evaluate(() => (window as any).__e2eWinLevel());
+    await expect(page.getByTestId('boss-victory')).toBeVisible();
+    await expect(page.getByTestId('boss-victory-text')).not.toBeEmpty();
+    // прогресс сохранён ТОЛЬКО теперь: босс пройден и уровень 10 засчитан
+    const save = await readSave(page);
+    expect(save.bossDone).toContain(10);
+    expect(save.stars['10']).toBeGreaterThanOrEqual(1);
+    expect(errors).toEqual([]);
+  });
+
+  test('restart на фазе возвращает ту же фазу, не сбрасывая босса на страницу', async ({ page }) => {
+    await seedToLevel10(page);
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await page.getByTestId('boss-start').click();
+    await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 1 из 2');
+    await page.getByTestId('btn-restart').click();
+    // остаёмся на той же фазе, доска на месте
+    await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 1 из 2');
+    await expect(page.getByTestId('board')).toBeVisible();
+  });
+
+  test('Android TV: интро и первая фаза босса проходятся пультом', async ({ page }) => {
+    await seedToLevel10(page);
+    await page.goto('/?mock=1&tv=1&lang=ru&daytime=day');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('boss-start')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 1 из 2');
+  });
+});
+
+test.describe('Боссы 25/50/75/100', () => {
+  const readSave = (page: Page) =>
+    page.evaluate(() => JSON.parse(localStorage.getItem('parkovka.save.v1') ?? '{}'));
+
+  /** Прогресс до слота босса (уровни 1..slot-1 пройдены на 3 звезды). */
+  async function seedToBoss(page: Page, slot: number, extra: Record<string, unknown> = {}): Promise<void> {
+    const stars: Record<string, number> = {};
+    for (let i = 1; i < slot; i++) stars[String(i)] = 3;
+    await page.addInitScript(
+      ({ stars, slot, extra }) => {
+        localStorage.setItem(
+          'parkovka.save.v1',
+          JSON.stringify({ v: 1, stars, sound: true, music: true, lang: 'ru', lastLevel: slot - 1, targetSkin: 0, ...extra })
+        );
+      },
+      { stars, slot, extra }
+    );
+  }
+
+  /** Проходит все фазы босса через e2e-хук; возвращается, когда виден финал. */
+  async function clearAllPhases(page: Page): Promise<void> {
+    for (let guard = 0; guard < 6; guard++) {
+      await expect(page.getByTestId('boss-phase')).toBeVisible();
+      await page.evaluate(() => (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel());
+      if (await page.getByTestId('boss-continue').isVisible().catch(() => false)) {
+        await page.getByTestId('boss-continue').click();
+        continue;
+      }
+      return; // финальная фаза пройдена — дальше победа/финальная сцена
+    }
+  }
+
+  for (const boss of [
+    { slot: 25, name: 'Куры у ворот' },
+    { slot: 50, name: 'Соседский грузовик' },
+    { slot: 75, name: 'Буря во дворе' }
+  ]) {
+    test(`босс ${boss.slot} «${boss.name}»: интро → фазы → победа, прогресс только после победы`, async ({ page }) => {
+      const errors = trackErrors(page);
+      await seedToBoss(page, boss.slot);
+      await page.goto('/?mock=1&lang=ru');
+      await page.getByTestId('menu-play').click();
+      await expect(page.getByTestId('boss-name')).toHaveText(boss.name);
+      await page.getByTestId('boss-start').click();
+      expect((await readSave(page)).bossDone ?? []).not.toContain(boss.slot);
+      await clearAllPhases(page);
+      await expect(page.getByTestId('boss-victory')).toBeVisible();
+      const save = await readSave(page);
+      expect(save.bossDone).toContain(boss.slot);
+      expect(save.stars[String(boss.slot)]).toBeGreaterThanOrEqual(1);
+      expect(errors).toEqual([]);
+    });
+  }
+
+  test('финальный босс 100 открывает Высшую лигу через финальную сцену (один раз)', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedToBoss(page, 100);
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('boss-name')).toHaveText('Великий переполох');
+    await page.getByTestId('boss-start').click();
+    await clearAllPhases(page);
+    // первый раз: финальная сцена кампании, а не обычная боссовая победа
+    await expect(page.getByTestId('campaign-ending')).toBeVisible();
+    const save = await readSave(page);
+    expect(save.campaignDone).toBe(true);
+    expect(save.endingSeen).toBe(true);
+    expect(save.bossDone).toContain(100);
+    expect(errors).toEqual([]);
+  });
+
+  test('повторное прохождение босса 100 не выдаёт награды заново (обычная победа)', async ({ page }) => {
+    const errors = trackErrors(page);
+    // кампания уже пройдена ранее
+    await seedToBoss(page, 100, { campaignDone: true, campaignDoneAt: '2026-07-20', endingSeen: true, bossDone: [100] });
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await page.getByTestId('boss-start').click();
+    await clearAllPhases(page);
+    // повтор: обычная боссовая победа, финальной сцены НЕТ
+    await expect(page.getByTestId('boss-victory')).toBeVisible();
+    await expect(page.getByTestId('campaign-ending')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+});
+
 test.describe('скриншоты', () => {
   test('основные экраны', async ({ page }, testInfo) => {
     await page.goto('/?mock=1&lang=ru&daytime=day');

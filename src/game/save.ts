@@ -35,6 +35,25 @@ export interface SaveData {
   tutorialSeen?: boolean;
   /** Прогресс недельных целей. */
   weekly?: WeeklyState;
+  /** Основная кампания (уровень 100) пройдена — открыта Высшая лига. */
+  campaignDone?: boolean;
+  /** Дата первого прохождения кампании (YYYY-MM-DD) — для порядка при merge. */
+  campaignDoneAt?: string;
+  /** Финальная сцена кампании показана (однократно). */
+  endingSeen?: boolean;
+  /**
+   * Лучшая медаль по каждому мастер-испытанию Высшей лиги: id -> 1|2|3
+   * (бронза/серебро/золото). Очки лиги ДЕРИВИРУЮТСЯ из этих медалей — отдельного
+   * счётчика очков нет, поэтому награда не может быть выдана повторно: merge
+   * берёт максимум медали по каждому испытанию, перезагрузка ничего не удваивает.
+   */
+  eliteMedals?: Record<string, number>;
+  /** Показанные однократные/сюжетные реплики деда (чтобы не повторять). */
+  grandpaSeen?: string[];
+  /** «Живой двор» (реакции деда) выключен игроком; по умолчанию включён. */
+  liveYard?: boolean;
+  /** Слоты пройденных сюжетных боссов (прогресс пишется только после победы). */
+  bossDone?: number[];
 }
 
 export function defaultSave(): SaveData {
@@ -101,11 +120,46 @@ export function sanitizeSave(raw: unknown): SaveData | null {
               ? [...new Set(r.weekly.claimed.filter((k): k is string => typeof k === 'string'))]
               : []
           }
-        : undefined
+        : undefined,
+    campaignDone: r.campaignDone === true ? true : undefined,
+    campaignDoneAt: typeof r.campaignDoneAt === 'string' ? r.campaignDoneAt : undefined,
+    endingSeen: r.endingSeen === true ? true : undefined,
+    eliteMedals: sanitizeMedals(r.eliteMedals),
+    grandpaSeen: Array.isArray(r.grandpaSeen)
+      ? (() => {
+          const list = [...new Set(r.grandpaSeen.filter((k): k is string => typeof k === 'string'))].slice(0, 200);
+          return list.length ? list : undefined;
+        })()
+      : undefined,
+    liveYard: r.liveYard === false ? false : undefined,
+    bossDone: Array.isArray(r.bossDone)
+      ? (() => {
+          const list = [...new Set(r.bossDone.filter((n): n is number => Number.isInteger(n) && n > 0))];
+          return list.length ? list : undefined;
+        })()
+      : undefined
   };
 }
 
-/** Слияние локального и облачного сейва: максимум звёзд по каждому уровню. */
+/** Медали Высшей лиги: только целые 1..3 по строковым id испытаний. */
+function sanitizeMedals(raw: unknown): Record<string, number> | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const n = Number(v);
+    if (Number.isInteger(n) && n >= 1 && n <= 3) out[k] = n;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * Слияние локального и облачного сейва: максимум звёзд по каждому уровню.
+ * Прогресс (звёзды, streak, кубки, endless, подсказки) объединяется без потерь
+ * через max/union. Настройки (звук, музыка, язык, скин) НЕ порядко-независимы:
+ * берутся из `b`. Вызов из loadData — mergeSave(local, cloud) ⇒ облако авторитетно
+ * для настроек, чтобы выбор с любого устройства был единым; локальный прогресс при
+ * этом не теряется. Осознанное решение, а не баг.
+ */
 export function mergeSave(a: SaveData, b: SaveData): SaveData {
   const stars: Record<string, number> = { ...a.stars };
   for (const [k, v] of Object.entries(b.stars)) stars[k] = Math.max(stars[k] ?? 0, v);
@@ -138,11 +192,32 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
     notifyOptIn: a.notifyOptIn || b.notifyOptIn || undefined,
     endlessBest: Math.max(a.endlessBest ?? 0, b.endlessBest ?? 0) || undefined,
     tutorialSeen: a.tutorialSeen || b.tutorialSeen || undefined,
-    weekly: mergeWeekly(a.weekly, b.weekly)
+    weekly: mergeWeekly(a.weekly, b.weekly),
+    campaignDone: a.campaignDone || b.campaignDone || undefined,
+    // Самая ранняя дата прохождения кампании (одноразовое событие «когда»).
+    campaignDoneAt: !a.campaignDoneAt
+      ? b.campaignDoneAt
+      : !b.campaignDoneAt
+        ? a.campaignDoneAt
+        : a.campaignDoneAt < b.campaignDoneAt
+          ? a.campaignDoneAt
+          : b.campaignDoneAt,
+    endingSeen: a.endingSeen || b.endingSeen || undefined,
+    eliteMedals: mergeMedals(a.eliteMedals, b.eliteMedals),
+    grandpaSeen: mergeSeen(a.grandpaSeen, b.grandpaSeen),
+    liveYard: a.liveYard === false || b.liveYard === false ? false : undefined,
+    bossDone: (() => {
+      const set = new Set([...(a.bossDone ?? []), ...(b.bossDone ?? [])]);
+      return set.size ? [...set] : undefined;
+    })()
   };
 }
 
-/** Та же неделя — суммируем/максимизируем счётчики и объединяем забранные награды; иначе берём более свежую. */
+/**
+ * Та же неделя — берём максимум по каждому счётчику (не сумму: так повторная
+ * синхронизация одного и того же прогресса не удваивает его) и объединяем
+ * забранные награды; разные недели — берём более свежую по ключу.
+ */
 function mergeWeekly(a: WeeklyState | undefined, b: WeeklyState | undefined): WeeklyState | undefined {
   if (!a) return b;
   if (!b) return a;
@@ -154,6 +229,28 @@ function mergeWeekly(a: WeeklyState | undefined, b: WeeklyState | undefined): We
     endlessBest: Math.max(a.endlessBest, b.endlessBest),
     claimed: [...new Set([...a.claimed, ...b.claimed])]
   };
+}
+
+/**
+ * Медали Высшей лиги — максимум по каждому испытанию. Так повторная синхронизация
+ * или переигровка не понижает результат и не «выдаёт» награду заново: очки лиги
+ * считаются из этих медалей (сумма), поэтому идемпотентность встроена.
+ */
+function mergeMedals(
+  a: Record<string, number> | undefined,
+  b: Record<string, number> | undefined
+): Record<string, number> | undefined {
+  if (!a && !b) return undefined;
+  const out: Record<string, number> = { ...(a ?? {}) };
+  for (const [k, v] of Object.entries(b ?? {})) out[k] = Math.max(out[k] ?? 0, v);
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Объединение множеств показанных реплик деда (union, без потерь). */
+function mergeSeen(a: string[] | undefined, b: string[] | undefined): string[] | undefined {
+  if (!a && !b) return undefined;
+  const set = new Set([...(a ?? []), ...(b ?? [])]);
+  return set.size ? [...set].slice(0, 200) : undefined;
 }
 
 export function totalStars(s: SaveData): number {
@@ -275,6 +372,68 @@ export class SaveStore {
     this.data.hintTokens = Math.min(99, (this.data.hintTokens ?? 0) + rewardHints);
     this.persist();
     return true;
+  }
+
+  /** Отмечает прохождение кампании; true — если это первый раз. */
+  markCampaignDone(dateKey: string): boolean {
+    if (this.data.campaignDone) return false;
+    this.data.campaignDone = true;
+    this.data.campaignDoneAt = dateKey;
+    this.persist();
+    return true;
+  }
+
+  markEndingSeen(): void {
+    if (this.data.endingSeen) return;
+    this.data.endingSeen = true;
+    this.persist();
+  }
+
+  /**
+   * Записывает результат мастер-испытания: медаль по id хранится как максимум.
+   * Возвращает предыдущую и новую медаль (для показа «улучшение»/«без изменений»).
+   * Награда деривируется из медали, поэтому повторная запись ничего не удваивает.
+   */
+  recordEliteMedal(challengeId: number, medal: number): { previous: number; next: number } {
+    const key = String(challengeId);
+    const previous = this.data.eliteMedals?.[key] ?? 0;
+    const next = Math.max(previous, medal);
+    if (next !== previous) {
+      this.data.eliteMedals = { ...(this.data.eliteMedals ?? {}), [key]: next };
+      this.persist();
+    }
+    return { previous, next };
+  }
+
+  liveYardEnabled(): boolean {
+    return this.data.liveYard !== false;
+  }
+
+  setLiveYard(on: boolean): void {
+    this.data.liveYard = on ? undefined : false;
+    this.persist();
+  }
+
+  isBossDone(bossId: number): boolean {
+    return (this.data.bossDone ?? []).includes(bossId);
+  }
+
+  /** Отмечает босса пройденным (прогресс — только после полной победы). */
+  markBossDone(bossId: number): void {
+    const set = new Set(this.data.bossDone ?? []);
+    if (set.has(bossId)) return;
+    set.add(bossId);
+    this.data.bossDone = [...set];
+    this.persist();
+  }
+
+  /** Запоминает показанную однократную/сюжетную реплику деда. */
+  markGrandpaSeen(id: string): void {
+    const seen = new Set(this.data.grandpaSeen ?? []);
+    if (seen.has(id)) return;
+    seen.add(id);
+    this.data.grandpaSeen = [...seen].slice(0, 200);
+    this.persist();
   }
 
   setLastLevel(id: number): void {

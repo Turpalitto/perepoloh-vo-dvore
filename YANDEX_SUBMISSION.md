@@ -17,6 +17,7 @@
 - Инап-покупки: Нет.
 - Лидерборды: `yardstars` и `dailystreak`, в обоих большее значение лучше.
 - Remote Config: `interstitial_every=6`, `interstitial_min_level=10`, `interstitial_min_session_ms=240000`, `free_hints_per_session=1`.
+- Sticky-баннер: Mobile portrait/landscape — снизу; Desktop — справа; TV — выключен.
 - Email разработчика: заполнить реальным адресом владельца аккаунта перед отправкой.
 
 ## Русский

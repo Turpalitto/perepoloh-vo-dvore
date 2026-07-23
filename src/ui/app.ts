@@ -764,7 +764,7 @@ export class App {
     });
     this.q('[data-testid=menu-leaderboard]').addEventListener('click', () => {
       this.audio.play('click');
-      void this.showLeaderboard();
+      this.showLeaderboard();
     });
     this.q('[data-testid=menu-achievements]').addEventListener('click', () => {
       this.audio.play('click');
@@ -845,11 +845,13 @@ export class App {
     if (this.platform.isTV) this.q<HTMLElement>('[data-testid=menu-play]').focus({ preventScroll: true });
   }
 
-  private async showLeaderboard(): Promise<void> {
+  private showLeaderboard(): void {
     this.disposeActiveBoard();
     this.setGameplay(false);
-    this.transitionScreen(() => this.showLeaderboardShell());
-    await this.loadLeaderboardContent();
+    this.transitionScreen(() => {
+      this.showLeaderboardShell();
+      void this.loadLeaderboardContent();
+    });
   }
 
   private showLeaderboardShell(): void {
@@ -1803,12 +1805,12 @@ export class App {
     overlay.className = 'overlay';
     overlay.setAttribute('data-testid', 'pause-overlay');
     overlay.innerHTML = `
-      <div class="dialog">
+      <div class="dialog pause-dialog">
         <h2>${t('pause.title')}</h2>
         <div class="dialog-sub">${daily ? t('daily.title') : `${level.id}. ${levelText('name', level.name)}`}</div>
         <button class="btn btn-primary btn-big" data-testid="btn-resume">${t('pause.resume')}</button>
         <button class="btn btn-big" data-testid="btn-pause-restart">${t('pause.restart')}</button>
-        <div class="dialog-row">
+        <div class="dialog-row pause-actions">
           ${this.soundToggleHtml('pause-sound')}
           ${this.musicToggleHtml('pause-music')}
           ${this.vibrationToggleHtml('pause-vibration')}

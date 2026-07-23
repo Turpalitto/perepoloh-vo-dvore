@@ -804,7 +804,7 @@ test.describe('Босс уровня 10', () => {
     // босс ещё НЕ пройден до полной победы
     expect((await readSave(page)).bossDone ?? []).not.toContain(10);
     // завершаем фазу 1 (e2e-хук)
-    await page.evaluate(() => (window as any).__e2eWinLevel());
+    await page.evaluate(() => (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel());
     await expect(page.getByTestId('boss-transition')).toBeVisible();
     await expect(page.getByTestId('boss-phase-cleared')).toContainText('Фаза 1 из 2 пройдена');
     // переход во вторую фазу без перезагрузки
@@ -816,7 +816,7 @@ test.describe('Босс уровня 10', () => {
     // всё ещё не пройден
     expect((await readSave(page)).bossDone ?? []).not.toContain(10);
     // завершаем финальную фазу → уникальная победа
-    await page.evaluate(() => (window as any).__e2eWinLevel());
+    await page.evaluate(() => (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel());
     await expect(page.getByTestId('boss-victory')).toBeVisible();
     await expect(page.getByTestId('boss-victory-text')).not.toBeEmpty();
     // прогресс сохранён ТОЛЬКО теперь: босс пройден и уровень 10 засчитан

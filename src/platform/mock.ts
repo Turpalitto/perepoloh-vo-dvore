@@ -44,7 +44,7 @@ function fakeAd(kind: 'interstitial' | 'rewarded', h: AdHandlers): Promise<boole
   });
 }
 
-/** Заглушка sticky-баннера для локальной разработки: одна из боковых полос. */
+/** Заглушка нижнего мобильного sticky-баннера для локальной разработки. */
 function showMockBanner(): void {
   if (document.querySelector('[data-testid=mock-banner]')) return;
   const el = document.createElement('div');
@@ -52,9 +52,9 @@ function showMockBanner(): void {
   el.setAttribute('data-testid', 'mock-banner');
   el.innerHTML = `<span>Баннер (mock)</span>`;
   document.body.appendChild(el);
-  // Резервируем высоту баннера, чтобы он не перекрывал нижние кнопки —
-  // так же, как sticky-баннер Яндекса не должен наезжать на управление.
+  // Общий layout-класс резервирует место на всех экранах и в оверлеях.
   document.body.classList.add('mock-banner-on');
+  document.body.classList.add('sticky-banner-bottom');
 }
 
 export function createMockPlatform(): Platform {

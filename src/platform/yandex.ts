@@ -86,7 +86,7 @@ interface Ysdk {
       };
     }): void;
     getBannerAdvStatus?(): Promise<{ stickyAdvIsShowing: boolean; reason?: string }>;
-    showBannerAdv?(): Promise<void>;
+    showBannerAdv?(): Promise<{ stickyAdvIsShowing: boolean; reason?: string } | void>;
   };
   /**
    * Актуальная сигнатура на 2026-07-22 (yandex.com/dev/games/doc/en/sdk/sdk-player):
@@ -111,9 +111,16 @@ export function createYandexPlatform(): Platform {
   let lifecycle: AdHandlers | null = null;
   let lifecyclePaused = false;
   let tv = false;
+  let deviceType: NonNullable<Ysdk['deviceInfo']>['type'] = 'desktop';
   let backHandler: (() => void) | null = null;
   let unsubscribeBack: (() => void) | null = null;
   let config: PlatformConfig = { ...DEFAULT_PLATFORM_CONFIG };
+
+  const syncStickyBannerLayout = (showing: boolean): void => {
+    if (typeof document === 'undefined') return;
+    const usesBottomBanner = deviceType === 'mobile' || deviceType === 'tablet';
+    document.body.classList.toggle('sticky-banner-bottom', showing && usesBottomBanner);
+  };
 
   const subscribeBack = (): void => {
     unsubscribeBack?.();
@@ -140,6 +147,7 @@ export function createYandexPlatform(): Platform {
     async init(): Promise<void> {
       if (!window.YaGames) throw new Error('YaGames SDK не загружен');
       ysdk = await window.YaGames.init();
+      deviceType = ysdk.deviceInfo?.type ?? 'desktop';
       tv = ysdk.deviceInfo?.isTV?.() ?? ysdk.deviceInfo?.type === 'tv';
       console.info('[platform] Яндекс SDK инициализирован');
       ysdk.on?.('game_api_pause', () => {
@@ -423,12 +431,20 @@ export function createYandexPlatform(): Platform {
     },
 
     async showBanner(): Promise<void> {
-      if (!ysdk?.adv?.showBannerAdv) return;
+      if (!ysdk?.adv?.showBannerAdv) {
+        syncStickyBannerLayout(false);
+        return;
+      }
       try {
         const status = await ysdk.adv.getBannerAdvStatus?.();
-        if (status?.stickyAdvIsShowing) return;
-        await ysdk.adv.showBannerAdv();
+        if (status?.stickyAdvIsShowing) {
+          syncStickyBannerLayout(true);
+          return;
+        }
+        const shown = await ysdk.adv.showBannerAdv();
+        syncStickyBannerLayout(shown?.stickyAdvIsShowing ?? true);
       } catch (e) {
+        syncStickyBannerLayout(false);
         console.warn('[platform] баннер недоступен:', e);
       }
     }

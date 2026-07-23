@@ -33,6 +33,12 @@ describe('боссы — структура', () => {
   it('каждая фаза ссылается на существующий уровень', () => {
     for (const b of BOSSES) for (const p of b.phases) expect(levelById(p.sourceLevelId)).toBeDefined();
   });
+
+  it('каждая фаза задаёт визуальное состояние двора', () => {
+    for (const b of BOSSES) {
+      for (const p of b.phases) expect(p.worldChange, `boss ${b.id} phase ${p.id}`).toMatch(/^boss-/);
+    }
+  });
 });
 
 describe('боссы — проходимость (решатель)', () => {

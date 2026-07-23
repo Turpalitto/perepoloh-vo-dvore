@@ -40,11 +40,22 @@ const QUEST_POOL: WeeklyQuestDef[] = [
 /** Награда за одну выполненную цель — подсказки в общей копилке (как ежедневный подарок). */
 export const WEEKLY_QUEST_REWARD_HINTS = 2;
 
-/** Три разные цели, детерминированные по неделе: не более одной пары на kind. */
-export function selectWeeklyQuests(currentWeekKey: string): WeeklyQuestDef[] {
+/**
+ * Три разные цели, детерминированные по неделе. До открытия Endless выбираем
+ * только достижимые кампанийные цели; после кампании добавляем одну Endless-цель.
+ */
+export function selectWeeklyQuests(currentWeekKey: string, endlessUnlocked = true): WeeklyQuestDef[] {
   const rng = mulberry32(hashDate(`${currentWeekKey}:weekly`));
   const byKind = new Map<WeeklyQuestKind, WeeklyQuestDef[]>();
   for (const q of QUEST_POOL) byKind.set(q.kind, [...(byKind.get(q.kind) ?? []), q]);
+  if (!endlessUnlocked) {
+    const available = QUEST_POOL.filter((quest) => quest.kind !== 'endless');
+    for (let i = available.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [available[i], available[j]] = [available[j], available[i]];
+    }
+    return available.slice(0, 3);
+  }
   const kinds: WeeklyQuestKind[] = ['win', 'perfect', 'endless'];
   return kinds.map((kind) => {
     const options = byKind.get(kind)!;

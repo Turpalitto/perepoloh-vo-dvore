@@ -20,6 +20,14 @@ describe('недельные цели', () => {
     expect(selectWeeklyQuests('2026-07-27')).not.toEqual(quests);
   });
 
+  it('до открытия Endless выбирает три достижимые кампанийные цели', () => {
+    const quests = selectWeeklyQuests('2026-07-20', false);
+    expect(quests).toHaveLength(3);
+    expect(quests.every((quest) => quest.kind !== 'endless')).toBe(true);
+    expect(new Set(quests.map((quest) => quest.key)).size).toBe(quests.length);
+    expect(selectWeeklyQuests('2026-07-20', false)).toEqual(quests);
+  });
+
   it('прогресс суммируется в пределах недели и обнуляется с новой неделей', () => {
     const week = '2026-07-20';
     let state = applyWeeklyEvent(undefined, week, 'win', 1);

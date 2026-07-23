@@ -56,7 +56,7 @@ export const BOSSES: BossLevelDef[] = [
     victoryKey: 'boss.chickens.victory',
     phases: [
       { id: 'lure', sourceLevelId: 24, objective: { kind: 'clear' }, grandpaLineKey: 'boss.chickens.p1', worldChange: 'boss-chickens' },
-      { id: 'gate', sourceLevelId: 25, objective: { kind: 'clear', requireStar: true }, grandpaLineKey: 'boss.chickens.p2' }
+      { id: 'gate', sourceLevelId: 25, objective: { kind: 'clear', requireStar: true }, grandpaLineKey: 'boss.chickens.p2', worldChange: 'boss-gate-rush' }
     ]
   },
   {
@@ -65,7 +65,7 @@ export const BOSSES: BossLevelDef[] = [
     introKey: 'boss.truck.intro',
     victoryKey: 'boss.truck.victory',
     phases: [
-      { id: 'free', sourceLevelId: 49, objective: { kind: 'clear' }, grandpaLineKey: 'boss.truck.p1' },
+      { id: 'free', sourceLevelId: 49, objective: { kind: 'clear' }, grandpaLineKey: 'boss.truck.p1', worldChange: 'boss-convoy' },
       { id: 'park', sourceLevelId: 50, objective: { kind: 'clear' }, grandpaLineKey: 'boss.truck.p2', worldChange: 'boss-neighbor' }
     ]
   },
@@ -87,7 +87,7 @@ export const BOSSES: BossLevelDef[] = [
     phases: [
       { id: 'tractor', sourceLevelId: 88, objective: { kind: 'clear' }, grandpaLineKey: 'boss.grand.p1', worldChange: 'boss-smoke' },
       { id: 'truck', sourceLevelId: 98, objective: { kind: 'clear' }, grandpaLineKey: 'boss.grand.p2', worldChange: 'boss-neighbor' },
-      { id: 'final', sourceLevelId: 100, objective: { kind: 'clear', requireStar: true }, grandpaLineKey: 'boss.grand.p3' }
+      { id: 'final', sourceLevelId: 100, objective: { kind: 'clear', requireStar: true }, grandpaLineKey: 'boss.grand.p3', worldChange: 'boss-finale' }
     ]
   }
 ];

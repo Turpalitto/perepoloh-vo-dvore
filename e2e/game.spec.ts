@@ -65,6 +65,21 @@ async function touchDragPiece(page: Page, pieceId: string, dxCells: number, dyCe
   await page.waitForTimeout(220);
 }
 
+async function seedCampaignBefore(page: Page, levelId: number, starsPerLevel = 1): Promise<void> {
+  await page.addInitScript(
+    ({ levelId, starsPerLevel }) => {
+      const stars = Object.fromEntries(
+        Array.from({ length: levelId - 1 }, (_, index) => [String(index + 1), starsPerLevel])
+      );
+      localStorage.setItem(
+        'parkovka.save.v1',
+        JSON.stringify({ v: 1, stars, sound: true, music: true, lang: 'ru', lastLevel: levelId, targetSkin: 0 })
+      );
+    },
+    { levelId, starsPerLevel }
+  );
+}
+
 test.describe('Переполох во дворе', () => {
   test('меню загружается без ошибок консоли', async ({ page }) => {
     const errors = trackErrors(page);
@@ -73,6 +88,24 @@ test.describe('Переполох во дворе', () => {
     await expect(page.getByTestId('screen-menu')).toContainText('Переполох');
     await expect(page.getByTestId('stars-total')).toContainText('★ 0 / 300');
     expect(errors).toEqual([]);
+  });
+
+  test('настройки меню собраны в компактную раскрывающуюся панель', async ({ page }) => {
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await expect(page.getByTestId('menu-settings')).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByTestId('menu-settings-panel')).toBeHidden();
+    await page.getByTestId('menu-settings').click();
+    await expect(page.getByTestId('menu-settings')).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('menu-settings-panel')).toBeVisible();
+    await expect(page.getByTestId('lang-toggle')).toBeVisible();
+    const panelBounds = await page.getByTestId('menu-settings-panel').evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: window.innerWidth, height: window.innerHeight };
+    });
+    expect(panelBounds.left).toBeGreaterThanOrEqual(0);
+    expect(panelBounds.top).toBeGreaterThanOrEqual(0);
+    expect(panelBounds.right).toBeLessThanOrEqual(panelBounds.width);
+    expect(panelBounds.bottom).toBeLessThanOrEqual(panelBounds.height);
   });
 
   test('уровень 1 проходится перетаскиванием и даёт 3 звезды', async ({ page }) => {
@@ -88,6 +121,24 @@ test.describe('Переполох во дворе', () => {
     await expect(page.getByTestId('win-achievement')).toContainText('Первый выезд');
     expect(errors).toEqual([]);
   });
+
+  for (const { levelId, chapterComplete } of [
+    { levelId: 42, chapterComplete: false },
+    { levelId: 48, chapterComplete: true }
+  ]) {
+    test(`завершение главы ${chapterComplete ? 'показывается' : 'не показывается'} после уровня ${levelId}`, async ({ page }) => {
+      await seedCampaignBefore(page, levelId);
+      await page.goto('/?mock=1&lang=ru');
+      await page.getByTestId('menu-play').click();
+      await expect(page.getByTestId('board')).toBeVisible();
+      await page.evaluate(() =>
+        (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel()
+      );
+      await expect(page.getByTestId('win-overlay')).toBeVisible();
+      if (chapterComplete) await expect(page.getByTestId('win-chapter')).toBeVisible();
+      else await expect(page.getByTestId('win-chapter')).toHaveCount(0);
+    });
+  }
 
   test('счётчик ходов, отмена и перезапуск работают', async ({ page }) => {
     const errors = trackErrors(page);
@@ -242,12 +293,15 @@ test.describe('Переполох во дворе', () => {
     const errors = trackErrors(page);
     await page.goto('/?mock=1');
     await expect(page.getByTestId('menu-play')).toHaveText('Play');
+    await page.getByTestId('menu-settings').click();
     await page.getByTestId('lang-toggle').click();
     await expect(page.getByTestId('menu-play')).toHaveText('Oyna');
     await page.reload();
     await expect(page.getByTestId('menu-play')).toHaveText('Oyna');
+    await page.getByTestId('menu-settings').click();
     await page.getByTestId('lang-toggle').click();
     await expect(page.getByTestId('menu-play')).toHaveText('Играть');
+    await page.getByTestId('menu-settings').click();
     await page.getByTestId('lang-toggle').click();
     await expect(page.getByTestId('menu-play')).toHaveText('Play');
     expect(errors).toEqual([]);
@@ -555,6 +609,12 @@ test.describe('Переполох во дворе', () => {
     await expect(page.locator('#app')).toHaveClass(/tv-mode/);
     await expect(page.getByTestId('menu-play')).toBeFocused();
 
+    await page.getByTestId('menu-settings').click();
+    await expect(page.getByTestId('menu-settings-panel')).toBeVisible();
+    await page.evaluate(() => window.dispatchEvent(new Event('mock-history-back')));
+    await expect(page.getByTestId('menu-settings-panel')).toBeHidden();
+    await expect(page.getByTestId('menu-play')).toBeFocused();
+
     await page.keyboard.press('ArrowDown');
     await expect(page.getByTestId('menu-levels')).toBeFocused();
     await page.keyboard.press('Enter');
@@ -696,6 +756,7 @@ test.describe('Живой двор и дед', () => {
 
   test('выключение «Живого двора» скрывает деда', async ({ page }) => {
     await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-settings').click();
     await page.getByTestId('liveyard-toggle').click();
     await page.getByTestId('menu-play').click();
     await expect(page.getByTestId('grandpa')).toHaveClass(/grandpa-off/);
@@ -739,6 +800,7 @@ test.describe('Босс уровня 10', () => {
     // фаза 1 из 2 + HUD
     await expect(page.getByTestId('board')).toBeVisible();
     await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 1 из 2');
+    await expect(page.getByTestId('screen-game')).toHaveClass(/boss-dust/);
     // босс ещё НЕ пройден до полной победы
     expect((await readSave(page)).bossDone ?? []).not.toContain(10);
     // завершаем фазу 1 (e2e-хук)
@@ -748,6 +810,7 @@ test.describe('Босс уровня 10', () => {
     // переход во вторую фазу без перезагрузки
     await page.getByTestId('boss-continue').click();
     await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 2 из 2');
+    await expect(page.getByTestId('screen-game')).toHaveClass(/boss-smoke/);
     // на свежей фазе отмена недоступна (undo не тянется через границу фаз)
     await expect(page.getByTestId('btn-undo')).toBeDisabled();
     // всё ещё не пройден
@@ -840,6 +903,11 @@ test.describe('Боссы 25/50/75/100', () => {
       const save = await readSave(page);
       expect(save.bossDone).toContain(boss.slot);
       expect(save.stars[String(boss.slot)]).toBeGreaterThanOrEqual(1);
+      expect(save.weekly).toMatchObject({ win: 1, perfect: 1 });
+      if (boss.slot === 50) {
+        await expect(page.getByTestId('win-upgrade')).toContainText('пруд');
+        await expect(page.getByTestId('win-achievement')).toContainText('Полдвора позади');
+      }
       expect(errors).toEqual([]);
     });
   }

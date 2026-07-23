@@ -87,6 +87,7 @@ const vibrateOffIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><rect x=
 const contrastIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 3 a9 9 0 0 1 0 18 Z" fill="currentColor"/></svg>`;
 const bellOnIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 3.5a5.5 5.5 0 0 0-5.5 5.5v3l-2 3.5h15l-2-3.5V9A5.5 5.5 0 0 0 12 3.5Z" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M9.5 18.5a2.5 2.5 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>`;
 const bellOffIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 3.5a5.5 5.5 0 0 0-5.5 5.5v3l-2 3.5h15l-2-3.5V9A5.5 5.5 0 0 0 12 3.5Z" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round" opacity="0.45"/><path d="M9.5 18.5a2.5 2.5 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" opacity="0.45"/><line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+const settingsIcon = `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5 7 7M17 17l1.5 1.5M18.5 5.5 17 7M7 17l-1.5 1.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="7.1" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
 
 function starIcons(n: number, of = 3): string {
   let s = '';
@@ -301,6 +302,15 @@ export class App {
 
   private handleTVBack = (): void => {
     if (!this.platform.isTV) return;
+    const settingsPanel = this.root.querySelector<HTMLElement>('[data-testid=menu-settings-panel]:not([hidden])');
+    if (settingsPanel) {
+      settingsPanel.hidden = true;
+      const settingsToggle = this.root.querySelector<HTMLElement>('[data-testid=menu-settings]');
+      settingsToggle?.classList.remove('active');
+      settingsToggle?.setAttribute('aria-expanded', 'false');
+      this.root.querySelector<HTMLElement>('[data-testid=menu-play]')?.focus({ preventScroll: true });
+      return;
+    }
     const exitOverlay = this.root.querySelector<HTMLElement>('[data-testid=tv-exit-overlay]');
     if (exitOverlay) {
       exitOverlay.remove();
@@ -640,7 +650,7 @@ export class App {
       skin.elite ? campaignDone : index < 5 || total >= TARGET_SKINS[index - 1].unlockStars
     );
     const week = currentWeekKey();
-    const weeklyQuests = selectWeeklyQuests(week).map((quest) => {
+    const weeklyQuests = selectWeeklyQuests(week, campaignDone).map((quest) => {
       const progress = weeklyQuestProgress(this.store.data.weekly, week, quest);
       const done = progress >= quest.goal;
       const claimed = isWeeklyQuestClaimed(this.store.data.weekly, week, quest.key);
@@ -657,15 +667,6 @@ export class App {
               hasProgress ? t('menu.continue') : t('menu.play')
             }</button>
             <button class="btn btn-big" data-testid="menu-levels">${t('menu.levels')}</button>
-            <button class="btn btn-big btn-daily" data-testid="menu-daily">🔥 ${t('daily.button')}${
-              dailyModifier(dailyKey) !== 'none' ? ' 🎯' : ''
-            }${
-              isDoneToday(this.store.data.daily, new Date(`${dailyKey}T12:00:00`))
-                ? ` · ${t('daily.done')}`
-                : currentStreak(this.store.data.daily) > 0
-                  ? ` · ${t('daily.streak', { n: currentStreak(this.store.data.daily) })}`
-                  : ''
-            }</button>
             ${
               campaignDone
                 ? `<button class="btn btn-big btn-elite" data-testid="menu-elite">🏅 ${t('elite.menu')}</button>`
@@ -678,24 +679,35 @@ export class App {
                   }</button>`
                 : ''
             }
-            <div class="retention-row">
-              <div class="weekly-progress" data-testid="weekly-progress">${t('daily.week', {
-                n: weekDone
-              })}${trophies > 0 ? ` · 🏆 ${trophies}` : ''}</div>
-              <button class="btn gift-btn" data-testid="menu-gift" ${giftClaimed ? 'disabled' : ''}>${
-                giftClaimed
-                  ? `💡 ${this.store.data.hintTokens ?? 0}`
-                  : `🎁 ${t('gift.claim', { n: giftAmount })}`
+            <div class="menu-events" data-testid="menu-events" aria-label="${t('menu.events')}">
+              <button class="btn btn-big btn-daily" data-testid="menu-daily">🔥 ${t('daily.button')}${
+                dailyModifier(dailyKey) !== 'none' ? ' 🎯' : ''
+              }${
+                isDoneToday(this.store.data.daily, new Date(`${dailyKey}T12:00:00`))
+                  ? ` · ${t('daily.done')}`
+                  : currentStreak(this.store.data.daily) > 0
+                    ? ` · ${t('daily.streak', { n: currentStreak(this.store.data.daily) })}`
+                    : ''
               }</button>
-            </div>
-            <div class="menu-meta-row">
-              <button class="btn" data-testid="menu-leaderboard">🏆 ${t('menu.leaderboard')}</button>
-              <button class="btn" data-testid="menu-achievements" aria-label="${t(
-                'achievements.title'
-              )}">🏅 ${achievementCount}/${ACHIEVEMENTS.length}</button>
-              <button class="btn${weeklyQuests.some((q) => q.done && !q.claimed) ? ' has-ready' : ''}" data-testid="menu-weekly" aria-label="${t(
-                'weekly.title'
-              )}">🎯 ${weeklyQuests.filter((q) => q.claimed).length}/${weeklyQuests.length}</button>
+              <div class="retention-row">
+                <div class="weekly-progress" data-testid="weekly-progress">${t('daily.week', {
+                  n: weekDone
+                })}${trophies > 0 ? ` · 🏆 ${trophies}` : ''}</div>
+                <button class="btn gift-btn" data-testid="menu-gift" ${giftClaimed ? 'disabled' : ''}>${
+                  giftClaimed
+                    ? `💡 ${this.store.data.hintTokens ?? 0}`
+                    : `🎁 ${t('gift.claim', { n: giftAmount })}`
+                }</button>
+              </div>
+              <div class="menu-meta-row">
+                <button class="btn" data-testid="menu-leaderboard">🏆 ${t('menu.leaderboard')}</button>
+                <button class="btn" data-testid="menu-achievements" aria-label="${t(
+                  'achievements.title'
+                )}">🏅 ${achievementCount}/${ACHIEVEMENTS.length}</button>
+                <button class="btn${weeklyQuests.some((q) => q.done && !q.claimed) ? ' has-ready' : ''}" data-testid="menu-weekly" aria-label="${t(
+                  'weekly.title'
+                )}">🎯 ${weeklyQuests.filter((q) => q.claimed).length}/${weeklyQuests.length}</button>
+              </div>
             </div>
           </div>
           <div class="skin-row" data-testid="skin-row">${visibleSkins.map(({ skin: s, index: i }) => {
@@ -716,14 +728,17 @@ export class App {
           </div>
           <button class="btn menu-rules-btn" data-testid="menu-rules">${t('menu.rules')}</button>
         </div>
-        <div class="menu-audio">
-          ${this.soundToggleHtml('sound-toggle')}
-          ${this.musicToggleHtml('music-toggle')}
-          ${this.vibrationToggleHtml('vibration-toggle')}
-          ${this.liveYardToggleHtml('liveyard-toggle')}
-          ${this.contrastToggleHtml('contrast-toggle')}
-          ${this.bellToggleHtml('bell-toggle')}
-          <button class="icon-btn lang-toggle" data-testid="lang-toggle" aria-label="Language">🌐<span class="lang-code">${getLang().toUpperCase()}</span></button>
+        <div class="menu-settings">
+          <button class="icon-btn settings-toggle" data-testid="menu-settings" aria-label="${t('menu.settings')}" aria-expanded="false" aria-controls="menu-settings-panel">${settingsIcon}</button>
+          <div class="menu-audio" id="menu-settings-panel" data-testid="menu-settings-panel" hidden>
+            ${this.soundToggleHtml('sound-toggle')}
+            ${this.musicToggleHtml('music-toggle')}
+            ${this.vibrationToggleHtml('vibration-toggle')}
+            ${this.liveYardToggleHtml('liveyard-toggle')}
+            ${this.contrastToggleHtml('contrast-toggle')}
+            ${this.bellToggleHtml('bell-toggle')}
+            <button class="icon-btn lang-toggle" data-testid="lang-toggle" aria-label="Language">🌐<span class="lang-code">${getLang().toUpperCase()}</span></button>
+          </div>
         </div>
         <div class="overlay-slot"></div>
       </div>`;
@@ -768,6 +783,18 @@ export class App {
         this.showMenuInner();
         this.showGiftDialog(giftAmount);
       });
+    });
+    const settingsToggle = this.q<HTMLButtonElement>('[data-testid=menu-settings]');
+    const settingsPanel = this.q<HTMLElement>('[data-testid=menu-settings-panel]');
+    settingsToggle.addEventListener('click', () => {
+      const opening = settingsPanel.hidden;
+      settingsPanel.hidden = !opening;
+      settingsToggle.classList.toggle('active', opening);
+      settingsToggle.setAttribute('aria-expanded', String(opening));
+      this.audio.play('click');
+      if (opening && this.platform.isTV) {
+        settingsPanel.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+      }
     });
     this.root.querySelectorAll<HTMLButtonElement>('.skin-swatch:not([disabled])').forEach((b) =>
       b.addEventListener('click', () => {
@@ -1163,13 +1190,27 @@ export class App {
       track({ type: 'boss_complete', levelId: def.id, timeMs: Math.round(performance.now() - this.bossStartedAt) });
       // Прогресс кампании и завершение босса — только сейчас, после полной победы.
       const finalStars = starsFor(this.levelById(def.id), endState.moves, endState.starCollected);
-      this.store.recordResult(def.id, finalStars);
+      const achievementsBefore = unlockedAchievementKeys(this.store.data);
+      const starsBefore = totalStars(this.store.data);
+      this.store.recordWeeklyEvent(currentWeekKey(), 'win', 1);
+      if (finalStars === 3) this.store.recordWeeklyEvent(currentWeekKey(), 'perfect', 1);
+      const improved = this.store.recordResult(def.id, finalStars);
+      const starsAfter = totalStars(this.store.data);
+      const unlocked = newlyUnlocked(starsBefore, starsAfter);
+      if (improved) {
+        void this.platform.submitScore('yardstars', starsAfter);
+        this.leaderboardCache.invalidate('yardstars');
+      }
+      const newAchievements = ACHIEVEMENTS.filter(
+        (achievement) =>
+          !achievementsBefore.has(achievement.key) && unlockedAchievementKeys(this.store.data).has(achievement.key)
+      );
       this.store.markBossDone(def.id);
       // Финальный босс (слот 100) открывает Высшую лигу той же логикой, что и
       // обычный уровень 100: при первом прохождении — финальная сцена вместо
       // боссовой победы; повторно — обычная боссовая победа без повторных наград.
       if (def.id === CAMPAIGN_LAST_ID && this.completeCampaignFinale()) return;
-      this.showBossVictory(def, finalStars);
+      this.showBossVictory(def, finalStars, unlocked, newAchievements);
       return;
     }
     // Короткий переход между фазами — без перезагрузки страницы.
@@ -1221,7 +1262,12 @@ export class App {
   }
 
   /** Уникальная победная сцена босса. */
-  private showBossVictory(def: BossLevelDef, stars: number): void {
+  private showBossVictory(
+    def: BossLevelDef,
+    stars: number,
+    unlocked: ReturnType<typeof newlyUnlocked>,
+    newAchievements: (typeof ACHIEVEMENTS)[number][]
+  ): void {
     this.audio.play('win');
     this.vibrate([28, 45, 28, 45, 70]);
     this.yardDirector?.react('boss-win');
@@ -1232,6 +1278,17 @@ export class App {
     }).join('');
     const idx = LEVELS.findIndex((l) => l.id === def.id);
     const next = idx >= 0 && idx < LEVELS.length - 1 ? LEVELS[idx + 1] : null;
+    const upgradeNote = unlocked
+      .map((upgrade) => `<div class="win-upgrade" data-testid="win-upgrade">🎉 ${t(`upgrade.${upgrade.key}`)}</div>`)
+      .join('');
+    const achievementNote = newAchievements
+      .map(
+        (achievement) =>
+          `<div class="win-achievement" data-testid="win-achievement">${achievement.icon} ${t(
+            'achievements.unlocked'
+          )}: ${t(`achievement.${achievement.key}.title`)}</div>`
+      )
+      .join('');
     const overlay = document.createElement('div');
     overlay.className = 'overlay boss-victory';
     overlay.setAttribute('data-testid', 'boss-victory');
@@ -1239,9 +1296,11 @@ export class App {
       <div class="confetti">${confetti}</div>
       <div class="dialog boss-dialog win-dialog">
         <div class="boss-badge boss-badge-win">🏆</div>
-        <h2>${t(def.nameKey)}</h2>
-        <div class="win-stars" data-testid="win-stars" data-stars="${stars}">${starIcons(stars)}</div>
-        <p class="boss-victory-text" data-testid="boss-victory-text">${t(def.victoryKey)}</p>
+         <h2>${t(def.nameKey)}</h2>
+         <div class="win-stars" data-testid="win-stars" data-stars="${stars}">${starIcons(stars)}</div>
+         <p class="boss-victory-text" data-testid="boss-victory-text">${t(def.victoryKey)}</p>
+         ${upgradeNote}
+         ${achievementNote}
         ${next ? `<button class="btn btn-primary btn-big" data-testid="btn-next">${t('win.next')}</button>` : ''}
         <button class="btn" data-testid="btn-win-menu">${t('win.menu')}</button>
       </div>`;
@@ -1332,7 +1391,9 @@ export class App {
     if (boss && boss.run.phaseIndex === 0) track({ type: 'boss_start', levelId: boss.def.id });
     this.audio.setMood(endless || boss !== undefined || level.difficulty === 'hard');
     const isBoss = level.width > 6;
+    const bossPhase = boss ? currentPhase(boss.run, boss.def) : null;
     const bossProg = boss ? bossProgress(boss.run, boss.def) : null;
+    const bossWorldClass = bossPhase?.worldChange ?? '';
     const title = boss
       ? `⚡ ${t(boss.def.nameKey)}`
       : challenge
@@ -1344,7 +1405,9 @@ export class App {
             : `${isBoss ? '👑 ' : ''}${level.id}. ${levelText('name', level.name)}`;
     const starHud = level.star ? `<span class="hud-star" data-testid="hud-star">★</span>` : '';
     this.root.innerHTML = `
-      <div class="screen game-screen" data-testid="screen-game">
+      <div class="screen game-screen${boss ? ` boss-game-screen ${bossWorldClass}` : ''}" data-testid="screen-game"${
+        boss ? ` data-boss-id="${boss.def.id}" data-boss-phase="${boss.run.phaseIndex + 1}"` : ''
+      }>
         <div class="hud hud-top">
           <button class="icon-btn" data-testid="btn-pause" aria-label="${t('pause.title')}">${pauseIcon}</button>
           <div class="hud-level">${title}${
@@ -1852,7 +1915,7 @@ export class App {
       : '';
     const masterNote = justMastered ? `<div class="win-master" data-testid="win-master">${t('win.master')}</div>` : '';
     const chapterNote =
-      !daily && level.width > 6
+      !daily && (level.id % 12 === 0 || level.id === CAMPAIGN_LAST_ID)
         ? `<div class="win-master chapter-complete" data-testid="win-chapter">${t('win.chapter', {
             n: Math.ceil(level.id / 12)
           })}</div>`

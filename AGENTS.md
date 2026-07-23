@@ -1,38 +1,78 @@
-# Переполох во дворе — правила проекта
+# AGENTS.md
 
-Парковочная головоломка (HTML5, Яндекс Игры). TypeScript strict + Vite, без игрового движка: поле — SVG, UI — DOM.
+## Проект
 
-## Команды
-- `npm run dev` — дев-сервер
-- `npm run typecheck` — tsc --noEmit
-- `npm run lint` — eslint (floating promises и т.п., что tsc не ловит)
-- `npm run check` — typecheck + lint + test одной командой; гонять перед коммитом
-- `npm test` — unit-тесты (vitest)
-- `npm run solve` — решатель по всем уровням (печатает оптимум)
-- `npm run build` — production-сборка в `dist/`
-- `npm run verify:dist` — проверка production-архива (запрещённые маркеры, домены, промо-PNG)
-- `npm run e2e` — браузерные тесты (playwright, требует `npm run build`)
+«Переполох во дворе» — браузерная TypeScript-головоломка для Яндекс Игр. Vite, SVG/DOM UI, без игрового движка.
 
-## Жёсткие правила
-- Игровая логика (`src/core/`) — чистые функции без DOM; всё состояние сериализуемо.
-- Уровни только в `src/levels/levels.json`; новый уровень не требует правок кода.
-- Каждый уровень обязан проходить валидатор и решатель; `par` в JSON должен совпадать с оптимумом решателя (проверяется тестом `levels.test.ts`).
-- Никакого прямого обращения к `YaGames` вне `src/platform/yandex.ts`; игра использует только интерфейс `Platform`.
-- Не ослаблять типизацию и не отключать тесты ради сборки.
-- Тексты интерфейса — русские.
-- Перед правкой `src/platform/yandex.ts` сверять точное имя метода/формат по актуальной документации Яндекс Игр (yandex.com/dev/games/doc), не по памяти и не по комментариям в коде — SDK менялся (например `setScore` вместо устаревшего `setLeaderboardScore`, rank у Яндекса 0-базовый).
+## Перед Любой Работой
 
-## `src/ui/app.ts` (god object, ~1700 строк)
-Известный риск, оставлен осознанно — не рефакторить заранее «про запас».
-- **Не разбивать целиком одним PR.** Выносить контроллер (`AdController`, `TVNavigationController`, `ScreenRouter`, ...) только тогда, когда добавляешь/меняешь фичу в этой конкретной области — рефактор обосновывается задачей, а не архитектурой самой по себе.
-- Первый кандидат при следующей причине тронуть рекламу — `AdController` (уже частично изолирован: `adHandlers`, `showInterstitial`/`showRewarded` вызовы). Второй — `TVNavigationController` (`moveTVFocus`/`focusTVDefault`/`onTVKeyDown` почти не трогают остальное состояние).
-- После любого выноса — обязательно `npm run check` и `npm run e2e` (49 тестов покрывают lifecycle экранов, paus/реклама, TV-навигацию — это единственная страховка от регрессий при разборке).
+Прочитай:
+
+- `README.md`
+- `PRODUCT_SPEC.md`
+- `GAME_DESIGN.md`
+- `TECHNICAL_DESIGN.md`
+
+Код и тесты являются источником истины, если документация устарела.
+
+## Главные Правила
+
+- Не менять core-правила без прямого разрешения.
+- Не ломать доказуемую проходимость уровней.
+- Не добавлять случайность в головоломочную логику.
+- Не добавлять агрессивную монетизацию.
+- Не менять формат сохранения без миграции.
+- Не переписывать проект на другой framework.
+- Не коммитить без успешных проверок.
+- Не обращаться к `YaGames` вне `src/platform/yandex.ts`.
+- Перед правкой Яндекс SDK сверять актуальную официальную документацию Яндекс Игр.
+
+## Обязательные Проверки
+
+Для обычного изменения:
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
+
+Для UI:
+
+```bash
+npm run e2e
+```
+
+Для уровней:
+
+```bash
+npm run solve
+npm test
+```
+
+Перед релизом:
+
+```bash
+npm run verify:dist
+```
+
+## Навыки
+
+Используй:
+
+- `$parkovka-game-design` — для геймдизайна.
+- `$parkovka-level-design` — для уровней.
+- `$parkovka-playtest-analysis` — для тестов игроков.
+- `$parkovka-game-feel` — для управления и обратной связи.
+- `$parkovka-code-review` — для ревью.
+- `$parkovka-yandex-release` — перед публикацией.
 
 ## Структура
-- `src/core/` — типы, правила движения, решатель, валидатор (покрыто unit-тестами)
-- `src/levels/` — данные уровней
-- `src/platform/` — интерфейс платформы, mock и Яндекс SDK
-- `src/ui/` — экраны, SVG-рендер поля, ввод
-- `src/game/` — звук, сохранения, конфиг прогрессии
-- `scripts/solve.ts` — отчёт решателя по уровням
-- `tests/`, `e2e/` — тесты
+
+- `src/core/` — чистые правила, solver, validator; без DOM.
+- `src/levels/` — данные уровней.
+- `src/platform/` — mock, fallback и Яндекс SDK.
+- `src/ui/` — экраны, SVG-поле, ввод.
+- `src/game/` — save, audio, i18n, progression, daily/weekly/endless/achievements/boss/elite.
+- `tests/`, `e2e/`, `scripts/` — проверки, браузерные тесты, сборочные/solver scripts.

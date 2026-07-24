@@ -18,6 +18,7 @@
     "generate": "tsx scripts/generate.ts",
     "rebalance": "tsx scripts/rebalance-levels.ts",
     "e2e": "npm run build:e2e && playwright test",
+    "analyze": "tsx scripts/analyze.ts",
     "screenshots:yandex": "tsx scripts/capture-yandex-screenshots.ts",
     "promo:puzzle": "tsx scripts/promo-puzzle-v2.ts"
   },

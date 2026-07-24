@@ -9,6 +9,7 @@
 - `npm run check` — typecheck + lint + test одной командой; гонять перед коммитом
 - `npm test` — unit-тесты (vitest)
 - `npm run solve` — решатель по всем уровням (печатает оптимум)
+- `npm run analyze` — сложность и дубликаты всей кампании (`-- --json out.json`; ~2.5 мин, exit 1 только при дефектах)
 - `npm run build` — production-сборка в `dist/`
 - `npm run verify:dist` — проверка production-архива (запрещённые маркеры, домены, промо-PNG)
 - `npm run e2e` — браузерные тесты (playwright, требует `npm run build`)

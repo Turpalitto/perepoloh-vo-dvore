@@ -47,12 +47,28 @@ const LABELS = {
   }
 } as const;
 
-export function installQaTools(active: boolean): void {
+export interface QaHooks {
+  playCustomLevel: (level: import('../core/types').LevelDef) => void;
+}
+
+export function installQaTools(active: boolean, hooks?: QaHooks): void {
   const root = document.getElementById('app');
   if (!root) return;
 
   const mount = () => {
     const panel = root.querySelector<HTMLElement>('[data-testid=menu-settings-panel]');
+    if (active && hooks && panel && !panel.querySelector('[data-testid=editor-open]')) {
+      const editorBtn = document.createElement('button');
+      editorBtn.className = 'icon-btn';
+      editorBtn.setAttribute('data-testid', 'editor-open');
+      editorBtn.setAttribute('aria-label', 'Редактор уровней (QA)');
+      editorBtn.title = 'Редактор уровней (QA)';
+      editorBtn.textContent = '🧱';
+      editorBtn.addEventListener('click', () => {
+        void import('../ui/editor').then((m) => m.openLevelEditor(hooks));
+      });
+      panel.appendChild(editorBtn);
+    }
     if (panel && !panel.querySelector('[data-testid=qa-toggle]')) {
       const labels = LABELS[getLang()];
       const button = document.createElement('button');

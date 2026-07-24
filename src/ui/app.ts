@@ -1176,6 +1176,14 @@ export class App {
 
   // ---------- игра ----------
 
+  /**
+   * Dev-only: запуск произвольного уровня из QA-редактора. Вызывается только
+   * qa-модулем (dev/e2e), в QA-режиме сохранение прогресса отключено платформой.
+   */
+  playCustomLevel(level: LevelDef): void {
+    this.runLevel(level, false);
+  }
+
   startLevel(id: number): void {
     const level = LEVELS.find((l) => l.id === id);
     if (!level) {
@@ -1508,6 +1516,7 @@ export class App {
         <div class="board-host" data-testid="board-host"></div>
         <div class="hud hud-bottom">
           <button class="btn" data-testid="btn-undo" disabled ${modifier === 'noUndo' ? 'hidden' : ''}>${t('btn.undo')}</button>
+          <button class="btn btn-redo" data-testid="btn-redo" disabled ${modifier === 'noUndo' ? 'hidden' : ''} aria-label="${t('btn.redo')}" title="${t('btn.redo')}">↪</button>
           <button class="btn" data-testid="btn-restart">${t('btn.restart')}</button>
           <button class="btn" data-testid="btn-hint" ${modifier === 'noHints' ? 'hidden' : ''}>${
             !daily && !challenge && level.id >= 1 && level.id <= 3
@@ -1530,11 +1539,14 @@ export class App {
 
     let cur: GameState = createState(level);
     const undoStack: GameState[] = [];
+    const redoStack: GameState[] = [];
+    const redoBtn = this.q<HTMLButtonElement>('[data-testid=btn-redo]');
     let finished = false;
 
     const refreshHud = () => {
       movesEl.textContent = String(cur.moves);
       undoBtn.disabled = undoStack.length === 0;
+      redoBtn.disabled = redoStack.length === 0;
       hudStar?.classList.toggle('collected', cur.starCollected);
     };
 
@@ -1588,6 +1600,7 @@ export class App {
       onGateOpen: () => this.audio.play('gate'),
       onCommit: (res, piece) => {
         undoStack.push(cur);
+        redoStack.length = 0; // новый ход открывает новую ветку истории
         cur = res.state;
         if (!firstMoveTracked) {
           firstMoveTracked = true;
@@ -1687,9 +1700,21 @@ export class App {
       const prev = undoStack.pop();
       if (!prev) return;
       attempt.usedUndo = true;
+      redoStack.push(cur);
       cur = prev;
       bv.setState(prev);
       this.audio.play('undo');
+      refreshHud();
+      updateDeadlock();
+    });
+    redoBtn.addEventListener('click', () => {
+      if (finished || cur.won) return;
+      const next = redoStack.pop();
+      if (!next) return;
+      undoStack.push(cur);
+      cur = next;
+      bv.setState(next);
+      this.audio.play('move');
       refreshHud();
       updateDeadlock();
     });
@@ -1703,6 +1728,7 @@ export class App {
       attempt.usedRestart = true;
       track({ type: 'level_restart', levelId: level.id, moves: cur.moves });
       undoStack.length = 0;
+      redoStack.length = 0;
       cur = createState(level);
       bv.setState(cur);
       this.audio.play('click');

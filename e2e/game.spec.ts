@@ -175,6 +175,36 @@ test.describe('Переполох во дворе', () => {
     expect(errors).toEqual([]);
   });
 
+  test('вернуть ход: redo восстанавливает отменённое, новый ход стирает redo-ветку', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('btn-redo')).toBeDisabled();
+    // ход → отмена → вернуть
+    await dragPiece(page, 'T', 1, 0);
+    await expect(page.getByTestId('hud-moves')).toHaveText('1');
+    await page.getByTestId('btn-undo').click();
+    await expect(page.getByTestId('hud-moves')).toHaveText('0');
+    await expect(page.getByTestId('btn-redo')).toBeEnabled();
+    await page.getByTestId('btn-redo').click();
+    await expect(page.getByTestId('hud-moves')).toHaveText('1');
+    await expect(page.getByTestId('btn-redo')).toBeDisabled();
+    // после redo снова можно отменить (redo кладёт ход обратно в undo-стек)
+    await expect(page.getByTestId('btn-undo')).toBeEnabled();
+    // отмена + новый ход стирают redo-ветку
+    await page.getByTestId('btn-undo').click();
+    await dragPiece(page, 'T', 2, 0);
+    await expect(page.getByTestId('btn-redo')).toBeDisabled();
+    // перезапуск чистит обе истории
+    await page.getByTestId('btn-undo').click();
+    await expect(page.getByTestId('btn-redo')).toBeEnabled();
+    await page.getByTestId('btn-restart').click();
+    await expect(page.getByTestId('btn-redo')).toBeDisabled();
+    await expect(page.getByTestId('btn-undo')).toBeDisabled();
+    expect(errors).toEqual([]);
+  });
+
   test('живая механика: машина нажимает кнопку, замок ворот открывается, отмена возвращает состояние', async ({ page }) => {
     const errors = trackErrors(page);
     await page.addInitScript(() => {

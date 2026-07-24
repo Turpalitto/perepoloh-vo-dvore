@@ -66,7 +66,7 @@ async function boot(): Promise<void> {
   app.showMenu();
   if (qaTools) {
     qaToolsModule ??= await import('./game/qa-mode');
-    qaToolsModule.installQaTools(qaMode);
+    qaToolsModule.installQaTools(qaMode, { playCustomLevel: (level) => app.playCustomLevel(level) });
   }
   document.getElementById('boot')?.remove();
   platform.ready();

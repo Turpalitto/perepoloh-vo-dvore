@@ -721,6 +721,13 @@ html.high-contrast .levels-grid {
 
 /* ---------- игровой экран ---------- */
 
+.btn-redo {
+  min-width: 44px;
+  padding-inline: 12px;
+  font-size: 18px;
+  line-height: 1;
+}
+
 .game-screen {
   background:
     radial-gradient(circle at 80% 0%, rgba(255, 247, 230, 0.12), transparent 40%),

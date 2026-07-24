@@ -28,7 +28,7 @@ test('заголовок меню не срезается на широких н
 
     // ключевые кнопки в кадре, без вертикального переполнения документа
     await expect(page.getByTestId('menu-play')).toBeInViewport();
-    await expect(page.getByTestId('menu-rules')).toBeInViewport();
+    await expect(page.getByTestId('menu-daily')).toBeInViewport();
     const overflowY = await page.evaluate(
       () => document.documentElement.scrollHeight - window.innerHeight
     );
@@ -43,7 +43,7 @@ test('меню ru/en/tr помещается на минимальном под�
     await page.goto(`/?mock=1&lang=${lang}&daytime=day`);
 
     await expect(page.getByTestId('menu-play')).toBeInViewport();
-    await expect(page.getByTestId('menu-rules')).toBeInViewport();
+    await expect(page.getByTestId('menu-daily')).toBeInViewport();
 
     const layout = await page.evaluate(() => {
       const buttons = [...document.querySelectorAll<HTMLButtonElement>('button')].filter(

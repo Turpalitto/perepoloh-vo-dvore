@@ -5,3 +5,6 @@ playwright-report/
 promo/ai-icon-src.png
 promo/ai-cover-src.png
 *.local
+
+# QA-скриншоты локальных проверок (не для публикации)
+qa-screenshots/

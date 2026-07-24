@@ -342,7 +342,7 @@ html.high-contrast .levels-grid {
   opacity: 0.9;
 }
 .btn-daily {
-  font-size: 17px;
+  font-size: 15px;
 }
 .btn-endless {
   font-size: 17px;
@@ -435,9 +435,11 @@ html.high-contrast .levels-grid {
   top: 0;
   right: 64px;
   display: grid;
-  grid-template-columns: repeat(4, 52px);
+  grid-template-columns: repeat(3, minmax(64px, auto));
   gap: 9px;
   padding: 10px;
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
   border: 2px solid rgba(125, 82, 39, 0.72);
   border-radius: 16px;
   background: rgba(255, 247, 230, 0.96);
@@ -445,6 +447,134 @@ html.high-contrast .levels-grid {
 }
 .menu-audio[hidden] {
   display: none;
+}
+.settings-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 64px;
+}
+.settings-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+  line-height: 1.15;
+  max-width: 76px;
+}
+
+/* ---------- переключатель режимов ---------- */
+
+.mode-switch {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 16px;
+  background: rgba(61, 44, 30, 0.5);
+}
+.mode-tab {
+  appearance: none;
+  border: none;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 5px 12px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--cream);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.15;
+}
+.mode-tab small {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+.mode-tab.active {
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow: 0 3px 0 rgba(61, 44, 30, 0.35);
+}
+.mode-tab.mode-tab-elite.active {
+  background: linear-gradient(135deg, #f0d287, #d8ae27);
+}
+
+/* ---------- гараж ---------- */
+
+.garage-dialog {
+  max-width: 380px;
+}
+.garage-grid {
+  flex-wrap: wrap;
+  max-width: 300px;
+  margin-inline: auto;
+  padding: 4px 0;
+}
+.garage-grid .skin-swatch {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+}
+.garage-hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  opacity: 0.75;
+}
+
+/* ---------- портретная композиция двора ----------
+   На узком портрете slice-обрезка viewBox 900x620 оставляет видимой только
+   центральную колонку (~x 310–590 на 360x800). Боковые объекты двора получают
+   отдельное позиционирование, чтобы ключевые награды не пропадали за кадром.
+   CSS transform заменяет transform-атрибут группы целиком. */
+@media (orientation: portrait) and (max-width: 540px) {
+  /* Дом — главный ориентир сцены: уменьшенный, но целиком в видимой колонке. */
+  .yard-svg .yard-house {
+    transform: translate(294px, 48px) scale(0.7);
+  }
+  .yard-svg [data-yard-obj='trophies'] {
+    transform: translate(316px, 86px) scale(0.8);
+  }
+  .yard-svg [data-yard-obj='workshop'] {
+    transform: translate(488px, 214px) scale(0.7);
+  }
+  .yard-svg [data-yard-detail='award-sign'] {
+    transform: translate(400px, 140px) scale(0.8);
+  }
+  .yard-svg [data-yard-detail='bench'] {
+    transform: translate(470px, 296px) scale(0.8);
+  }
+  .yard-svg [data-yard-detail='pergola'] {
+    transform: translate(370px, 340px) scale(0.8);
+  }
+  .yard-svg [data-yard-detail='work-corner'] {
+    transform: translate(322px, 368px) scale(0.85);
+  }
+  .yard-svg .yard-champion-arch {
+    transform: translate(0px, 77px) scale(0.9);
+  }
+  .yard-svg [data-yard-obj='kennel'] {
+    transform: translate(430px, 412px) scale(0.85);
+  }
+  .yard-svg [data-yard-obj='tree'] {
+    transform: translate(356px, 296px) scale(0.75);
+  }
+  .yard-svg [data-yard-obj='well'] {
+    transform: translate(556px, 380px) scale(0.75);
+  }
+  .yard-svg [data-yard-obj='garden'] {
+    transform: translate(318px, 500px) scale(0.8);
+  }
+  .yard-svg [data-yard-obj='pond'] {
+    transform: translate(524px, 544px) scale(0.75);
+  }
 }
 
 /* ---------- выбор уровня ---------- */
@@ -484,6 +614,27 @@ html.high-contrast .levels-grid {
   align-content: start;
   padding: 14px;
   overflow-y: auto;
+}
+/* Десктоп и планшет: больше колонок, карточки не мельче 88px (touch-зона). */
+@media (min-width: 640px) {
+  .levels-grid {
+    grid-template-columns: repeat(4, minmax(88px, 124px));
+  }
+}
+@media (min-width: 860px) {
+  .levels-grid {
+    grid-template-columns: repeat(5, minmax(88px, 124px));
+  }
+}
+@media (min-width: 1100px) {
+  .levels-grid {
+    grid-template-columns: repeat(6, minmax(88px, 124px));
+  }
+}
+@media (min-width: 1320px) {
+  .levels-grid {
+    grid-template-columns: repeat(7, minmax(88px, 124px));
+  }
 }
 .chapter-header {
   grid-column: 1 / -1;
@@ -1423,6 +1574,42 @@ html[data-daytime='night'] .yard-lamp-light {
   font-size: 15px;
   text-align: center;
 }
+.yard-stage-unlocked {
+  background: #e3f2ed;
+  border-color: #45968f;
+  color: #245e56;
+}
+
+/* Единая карточка наград: результат → звёзды → этап двора → улучшения →
+   достижения появляются последовательно, а не конкурируют друг с другом. */
+.win-rewards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-height: min(38vh, 300px);
+  overflow-y: auto;
+}
+.win-rewards > * {
+  animation: reward-in 0.35s ease backwards;
+}
+.win-rewards > *:nth-child(1) { animation-delay: 0.25s; }
+.win-rewards > *:nth-child(2) { animation-delay: 0.55s; }
+.win-rewards > *:nth-child(3) { animation-delay: 0.85s; }
+.win-rewards > *:nth-child(4) { animation-delay: 1.15s; }
+.win-rewards > *:nth-child(5) { animation-delay: 1.45s; }
+.win-rewards > *:nth-child(n + 6) { animation-delay: 1.7s; }
+@keyframes reward-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .win-rewards > * {
+    animation: none;
+  }
+}
 
 /* ---------- премиум-мелочи ---------- */
 
@@ -1591,7 +1778,7 @@ html[data-daytime='night'] .yard-lamp-light {
     scroll-snap-align: center;
   }
   .menu-audio {
-    grid-template-columns: repeat(3, 52px);
+    grid-template-columns: repeat(2, minmax(64px, auto));
   }
 }
 @media (max-height: 700px) and (orientation: portrait) {

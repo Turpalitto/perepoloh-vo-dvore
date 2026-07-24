@@ -23,6 +23,8 @@ function showFallbackNotice(): void {
 }
 
 async function boot(): Promise<void> {
+  const qaTools = (import.meta.env.DEV || import.meta.env.MODE === 'e2e') && queryParam('qaTools') === '1';
+  const qaMode = qaTools && queryParam('qa') === '1';
   // Только dev/e2e + явный query-параметр: no-op трекер остаётся в production
   // независимо от строки запроса, и никогда не отправляет данные наружу.
   if ((import.meta.env.DEV || import.meta.env.MODE === 'e2e') && queryParam('analyticsDebug') === '1') {
@@ -31,8 +33,9 @@ async function boot(): Promise<void> {
   track({ type: 'game_start' });
   applyDaytime();
   applySeason();
-  const platform = await createPlatform();
+  let platform = await createPlatform();
   let save = defaultSave();
+  let qaToolsModule: typeof import('./game/qa-mode') | null = null;
   let hadSave = false;
   try {
     const loaded = await platform.loadData();
@@ -42,6 +45,11 @@ async function boot(): Promise<void> {
     }
   } catch (e) {
     console.warn('Не удалось загрузить сохранение:', e);
+  }
+  if (qaMode) {
+    qaToolsModule = await import('./game/qa-mode');
+    save = qaToolsModule.createQaSave(save);
+    platform = qaToolsModule.createQaPlatform(platform);
   }
   // Первый запуск следует языку платформы; ручной выбор хранится в сейве.
   // ?lang= остаётся QA-переопределением и обрабатывается внутри initI18n.
@@ -56,6 +64,10 @@ async function boot(): Promise<void> {
   // Сначала создаём полностью интерактивный экран, затем снимаем загрузчик и
   // сообщаем Game Ready. Только после ready запускаем первый геймплей.
   app.showMenu();
+  if (qaTools) {
+    qaToolsModule ??= await import('./game/qa-mode');
+    qaToolsModule.installQaTools(qaMode);
+  }
   document.getElementById('boot')?.remove();
   platform.ready();
   // Sticky-баннер в свободных полях по краям широкого экрана; не блокирует запуск.

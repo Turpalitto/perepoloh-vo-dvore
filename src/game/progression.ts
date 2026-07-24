@@ -39,6 +39,19 @@ export function newlyUnlocked(before: number, after: number): UpgradeStage[] {
   return UPGRADES.filter((u) => u.stars > before && u.stars <= after);
 }
 
+/** Число пройденных уровней основной кампании. Не включает daily/endless/elite. */
+export function completedCampaignLevels(levels: LevelDef[], save: SaveData): number {
+  return levels.reduce((count, level) => count + ((save.stars[String(level.id)] ?? 0) > 0 ? 1 : 0), 0);
+}
+
+/**
+ * Визуальный этап двора: новая деталь каждые 10 пройденных уровней.
+ * Значение вычисляется из сейва и не требует отдельной миграции.
+ */
+export function yardMilestone(completedLevels: number): number {
+  return Math.min(10, Math.max(0, Math.floor(completedLevels / 10)));
+}
+
 /** Уровень открыт, если пройден предыдущий (первый открыт всегда). */
 export function isLevelUnlocked(levels: LevelDef[], save: SaveData, levelId: number): boolean {
   const idx = levels.findIndex((l) => l.id === levelId);

@@ -1,6 +1,6 @@
 /**
- * Двор-меню: сцена хорошеет по мере набора звёзд.
- * Каждому этапу из progression.ts соответствует визуальный слой.
+ * Двор-меню: звёзды открывают отдельные объекты, а прохождение кампании
+ * перестраивает саму сцену каждые десять уровней.
  */
 import { catArt, chickenArt, getTargetSkin } from './sprites';
 
@@ -15,7 +15,9 @@ function snowOverlay(): string {
     .join('')}</g>`;
 }
 
-export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
+export function yardSVG(u: Set<string>, trophies = 0, season?: string, stage = 0): string {
+  const milestone = Math.min(10, Math.max(0, Math.floor(stage)));
+  const era = Math.floor(milestone / 2);
   const fenceFixed = u.has('fence');
   const flowers = u.has('flowers');
   const gatePainted = u.has('gate');
@@ -29,6 +31,16 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
   const fair = u.has('fair');
   const celebration = u.has('celebration');
 
+  const houseWalls = ['#a9743f', '#c18b51', '#d3a663', '#e0b96f', '#e9c878', '#f0d287'];
+  const houseRoofs = ['#8a5a30', '#9c5c36', '#ad563b', '#bc5040', '#c84842', '#bd3f42'];
+  const skyColors = ['#c4d8d3', '#b9ddd6', '#abded6', '#9ddbd1', '#8ed5cb', '#80ccc4'];
+  const grassColors = ['#79a958', '#79ad55', '#75ae50', '#70ad4d', '#69aa49', '#62a545'];
+  const dirtColors = ['#c89f63', '#d0aa6c', '#d7b477', '#d9b878', '#dcbf80', '#e0c789'];
+  const houseWall = houseWalls[era];
+  const houseRoof = houseRoofs[era];
+  const skyColor = skyColors[era];
+  const grassColor = grassColors[era];
+  const dirtColor = dirtColors[era];
   const railColor = fenceFixed ? '#a9743f' : '#8f7048';
   const gateColor = gatePainted ? '#45968f' : '#8a5a30';
 
@@ -63,17 +75,36 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
     </g>`;
 
   const house = `
-    <rect x="52" y="150" width="230" height="160" rx="8" fill="#a9743f" stroke="#7d5227" stroke-width="5"/>
-    <line x1="52" y1="192" x2="282" y2="192" stroke="#7d5227" stroke-width="4"/>
-    <line x1="52" y1="232" x2="282" y2="232" stroke="#7d5227" stroke-width="4"/>
-    <line x1="52" y1="272" x2="282" y2="272" stroke="#7d5227" stroke-width="4"/>
-    <path d="M30 156 L167 66 L304 156 Z" fill="#8a5a30" stroke="#63401f" stroke-width="5" stroke-linejoin="round"/>
-    <rect x="238" y="84" width="26" height="52" fill="#7d5227"/>
+    <g class="yard-house yard-era-${era}">
+    <rect x="52" y="150" width="230" height="160" rx="8" fill="${houseWall}" stroke="#7d5227" stroke-width="5"/>
+    ${
+      era === 0
+        ? `<line x1="52" y1="192" x2="282" y2="192" stroke="#7d5227" stroke-width="4"/>
+           <line x1="52" y1="232" x2="282" y2="232" stroke="#7d5227" stroke-width="4"/>
+           <line x1="52" y1="272" x2="282" y2="272" stroke="#7d5227" stroke-width="4"/>`
+        : `<path d="M64 166H270M64 286H270" stroke="#f4dfaa" stroke-width="4" opacity=".65"/>`
+    }
+    <path d="M30 156 L167 66 L304 156 Z" fill="${houseRoof}" stroke="#63401f" stroke-width="5" stroke-linejoin="round"/>
+    <rect x="238" y="84" width="26" height="52" fill="${era >= 2 ? '#8f4c39' : '#7d5227'}"/>
+    ${era >= 3 ? `<path d="M245 80q-18-28 5-42q18 16 5 40" fill="#e9eef0" opacity=".7"/>` : ''}
     <rect class="house-window" x="118" y="208" width="66" height="58" rx="6" fill="#cfe9f2" stroke="#7d5227" stroke-width="5"/>
     <line x1="151" y1="208" x2="151" y2="266" stroke="#7d5227" stroke-width="4"/>
     <line x1="118" y1="237" x2="184" y2="237" stroke="#7d5227" stroke-width="4"/>
     <rect x="98" y="204" width="14" height="66" rx="4" fill="#45968f"/>
-    <rect x="190" y="204" width="14" height="66" rx="4" fill="#45968f"/>`;
+    <rect x="190" y="204" width="14" height="66" rx="4" fill="#45968f"/>
+    <rect x="222" y="194" width="42" height="116" rx="5" fill="${era >= 2 ? '#6f4930' : '#825735'}" stroke="#63401f" stroke-width="4"/>
+    <circle cx="252" cy="252" r="4" fill="#f6c445"/>
+    ${
+      era >= 2
+        ? `<rect x="208" y="292" width="72" height="14" rx="4" fill="#a9743f" stroke="#704723" stroke-width="4"/>
+           <path d="M216 306h58l-8 16h-42z" fill="#b98d55" stroke="#704723" stroke-width="3"/>
+           <g transform="translate(77,194)"><rect width="30" height="16" rx="4" fill="#8a5a30"/>
+             <circle cx="7" cy="5" r="5" fill="#e2574c"/><circle cx="17" cy="4" r="5" fill="#f6c445"/><circle cx="25" cy="7" r="5" fill="#e88fb6"/></g>`
+        : ''
+    }
+    ${era >= 4 ? `<path d="M42 160H292" stroke="#fff1d0" stroke-width="7" stroke-linecap="round"/>` : ''}
+    ${era >= 5 ? `<g transform="translate(164,176)"><path d="M0-18l7 10 12-2-5 11 7 10-12 1-9 9-9-9-12-1 7-10-5-11 12 2z" fill="#f6c445" stroke="#8a5a30" stroke-width="3"/><circle r="7" fill="#fff1d0"/></g>` : ''}
+    </g>`;
 
   const trash = flowers
     ? `<g transform="translate(364,436)">
@@ -91,7 +122,7 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
       </g>`;
 
   const kennel = doghouse
-    ? `<g transform="translate(742,420)">
+    ? `<g transform="translate(742,420)" data-yard-obj="kennel">
         <rect x="-52" y="-38" width="104" height="76" rx="8" fill="#c4453c" stroke="#93302a" stroke-width="5"/>
         <path d="M-62 -34 L0 -74 L62 -34 Z" fill="#8a5a30" stroke="#63401f" stroke-width="5" stroke-linejoin="round"/>
         <path d="M-20 38 L-20 -8 A20 20 0 0 1 20 -8 L20 38 Z" fill="#3d2c1e"/>
@@ -107,7 +138,7 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
           <path d="M0 -10 q2 6 6 6" stroke="#e2574c" stroke-width="3" fill="none" stroke-linecap="round"/>
         </g></g>
       </g>`
-    : `<g transform="translate(742,432)">
+    : `<g transform="translate(742,432)" data-yard-obj="kennel">
         <rect x="-46" y="-30" width="92" height="62" rx="6" fill="#8f7048" stroke="#6e5a3d" stroke-width="5" transform="rotate(-4)"/>
         <path d="M-54 -28 L0 -58 L54 -28 Z" fill="#6e5a3d" transform="rotate(-4)"/>
         <path d="M-16 30 L-16 -4 A16 16 0 0 1 16 -4 L16 30 Z" fill="#4a3a28" transform="rotate(-4)"/>
@@ -133,7 +164,7 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
     : '';
 
   const tree = appletree
-    ? `<g transform="translate(836,318)">
+    ? `<g transform="translate(836,318)" data-yard-obj="tree">
         <rect x="-10" y="-30" width="20" height="90" rx="8" fill="#7d5227"/>
         <circle cx="-30" cy="-56" r="34" fill="#5f9c3c"/>
         <circle cx="24" cy="-64" r="38" fill="#6cae46"/>
@@ -148,11 +179,124 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
     : '';
 
   const yard = `
-    <ellipse cx="470" cy="470" rx="330" ry="110" fill="#dbb271"/>
-    <ellipse cx="470" cy="470" rx="330" ry="110" fill="none" stroke="rgba(93,64,25,0.2)" stroke-width="4" stroke-dasharray="16 14"/>`;
+    <ellipse cx="470" cy="470" rx="330" ry="110" fill="${dirtColor}"/>
+    <ellipse cx="470" cy="470" rx="330" ry="110" fill="none" stroke="rgba(93,64,25,0.2)" stroke-width="4" stroke-dasharray="${milestone >= 4 ? '4 12' : '16 14'}"/>
+    ${
+      milestone >= 2
+        ? `<path d="M240 300Q282 354 344 392Q390 420 450 452" fill="none" stroke="#d8c7a4" stroke-width="34" stroke-linecap="round"/>
+           <path d="M240 300Q282 354 344 392Q390 420 450 452" fill="none" stroke="#eee2c7" stroke-width="4" stroke-dasharray="10 16" stroke-linecap="round"/>`
+        : ''
+    }
+    ${
+      milestone >= 4
+        ? `<g fill="#b9ad91" stroke="#8f826b" stroke-width="2">
+            <ellipse cx="298" cy="340" rx="18" ry="9"/><ellipse cx="330" cy="372" rx="20" ry="10"/>
+            <ellipse cx="368" cy="402" rx="22" ry="11"/><ellipse cx="410" cy="430" rx="21" ry="10"/>
+          </g>`
+        : ''
+    }`;
+
+  const landscapeLayer = `
+    <g class="yard-landscape yard-era-${era}">
+      <path d="M0 252Q120 188 248 242T520 226T900 238V286H0Z" fill="${era >= 3 ? '#568f4d' : '#639a56'}"/>
+      <path d="M0 254Q150 226 302 258T610 246T900 252V292H0Z" fill="${era >= 4 ? '#6aa34f' : '#70a856'}"/>
+      ${
+        milestone >= 1
+          ? `<g opacity=".7" stroke="#e7d595" stroke-width="5" fill="none">
+               <path d="M348 236q58-34 116 0M380 248q52-30 104 0M706 236q52-30 104 0"/>
+             </g>`
+          : ''
+      }
+      ${
+        milestone >= 6
+          ? `<g transform="translate(610,178)" fill="#d9b56f" stroke="#775335" stroke-width="4">
+               <rect x="0" y="34" width="94" height="54" rx="5"/>
+               <path d="M-8 38L47 2l55 36z" fill="#a94f3c"/>
+               <rect x="38" y="54" width="20" height="34" fill="#6f4930"/>
+             </g>`
+          : ''
+      }
+    </g>`;
+
+  const progressLayer = `
+    <g class="yard-campaign-progress" data-yard-stage="${milestone}">
+      ${
+        milestone >= 1
+          ? `<g transform="translate(350,520)" data-yard-detail="woodpile">
+               <rect x="-54" y="28" width="108" height="9" rx="4" fill="#715035"/>
+               ${[-40, -14, 12, 38].map((x) => `<circle cx="${x}" cy="17" r="15" fill="#a9743f" stroke="#684426" stroke-width="4"/><circle cx="${x}" cy="17" r="6" fill="none" stroke="#d5a567" stroke-width="2"/>`).join('')}
+             </g>`
+          : ''
+      }
+      ${
+        milestone >= 3
+          ? `<g transform="translate(418,262)" data-yard-detail="birdhouse">
+               <rect x="-5" y="-48" width="10" height="80" rx="4" fill="#704a2b"/>
+               <rect x="-26" y="-72" width="52" height="42" rx="6" fill="#d75b48" stroke="#7d3d31" stroke-width="4"/>
+               <path d="M-34-68L0-94l34 26z" fill="#8a5a30" stroke="#63401f" stroke-width="4"/>
+               <circle cx="0" cy="-51" r="9" fill="#3d2c1e"/>
+             </g>`
+          : ''
+      }
+      ${
+        milestone >= 5
+          ? `<g transform="translate(340,316)" data-yard-detail="work-corner">
+               <rect x="-36" y="-32" width="72" height="64" rx="6" fill="#9a6a42" stroke="#684426" stroke-width="4"/>
+               <path d="M-24-13H24M-24 5H24M-24 23H8" stroke="#dfc28b" stroke-width="5" stroke-linecap="round"/>
+               <path d="M43-22v54M35-6h22M39 18h16" stroke="#6f918f" stroke-width="6" stroke-linecap="round"/>
+             </g>`
+          : ''
+      }
+      ${
+        milestone >= 6
+          ? `<g transform="translate(456,520)" data-yard-detail="planter">
+               <ellipse rx="64" ry="25" fill="#c9b28a" stroke="#89775c" stroke-width="4"/>
+               <ellipse rx="39" ry="13" fill="#e9dcc1"/>
+               <g transform="translate(-78,-7)"><rect x="-18" y="-16" width="36" height="34" rx="8" fill="#a95e42"/><circle cx="-8" cy="-18" r="13" fill="#e2574c"/><circle cx="9" cy="-20" r="14" fill="#f6c445"/></g>
+             </g>`
+          : ''
+      }
+      ${
+        milestone >= 7
+          ? `<g transform="translate(744,236)" data-yard-detail="bench">
+               <rect x="-58" y="0" width="116" height="16" rx="6" fill="#a9743f" stroke="#704723" stroke-width="4"/>
+               <rect x="-52" y="-35" width="104" height="13" rx="5" fill="#b98248" stroke="#704723" stroke-width="4"/>
+               <path d="M-43 14v35M43 14v35" stroke="#704723" stroke-width="8" stroke-linecap="round"/>
+             </g>`
+          : ''
+      }
+      ${
+        milestone >= 8
+          ? `<g transform="translate(554,286)" data-yard-detail="pergola">
+               <path d="M-78 6V-74M78 6V-74M-88-70H88" fill="none" stroke="#85572f" stroke-width="10" stroke-linecap="round"/>
+               <path d="M-76-65Q-40-96 0-66T76-65" fill="none" stroke="#4f8f43" stroke-width="10" stroke-linecap="round"/>
+               <circle cx="-52" cy="-75" r="8" fill="#e88fb6"/><circle cx="-12" cy="-78" r="8" fill="#f6c445"/>
+               <circle cx="30" cy="-72" r="8" fill="#e2574c"/><circle cx="63" cy="-76" r="8" fill="#f6c445"/>
+             </g>`
+          : ''
+      }
+      ${
+        milestone >= 9
+          ? `<g transform="translate(368,166)" data-yard-detail="award-sign">
+               <path d="M-48-30H48L39 28H-39Z" fill="#286f65" stroke="#f0d287" stroke-width="5"/>
+               <path d="M0-18l7 11 13 1-9 9 3 13-14-6-14 6 3-13-9-9 13-1z" fill="#f6c445"/>
+             </g>`
+          : ''
+      }
+      ${
+        milestone >= 10
+          ? `<g class="yard-champion-arch" data-yard-detail="champion-arch">
+               <path d="M480 292Q554 205 628 292" fill="none" stroke="#f0d287" stroke-width="16" stroke-linecap="round"/>
+               <path d="M480 292Q554 218 628 292" fill="none" stroke="#287d72" stroke-width="8" stroke-linecap="round"/>
+               <circle cx="554" cy="233" r="24" fill="#f6c445" stroke="#8a5a30" stroke-width="5"/>
+               <path d="M554 219l5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2z" fill="#fff1d0"/>
+             </g>`
+          : ''
+      }
+    </g>`;
 
   const workshopLayer = workshop
-    ? `<g transform="translate(290,188)">
+    ? `<g transform="translate(290,188)" data-yard-obj="workshop">
         <rect width="120" height="112" rx="7" fill="#bd8247" stroke="#7d5227" stroke-width="5"/>
         <path d="M-10 4 L60 -38 L130 4 Z" fill="#8a5a30" stroke="#63401f" stroke-width="5"/>
         <rect x="20" y="38" width="80" height="74" rx="5" fill="#6f918f" stroke="#5d4020" stroke-width="5"/>
@@ -161,7 +305,7 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
       </g>`
     : '';
   const wellLayer = well
-    ? `<g transform="translate(684,292)">
+    ? `<g transform="translate(684,292)" data-yard-obj="well">
         <ellipse cx="0" cy="28" rx="48" ry="19" fill="#8c9691" stroke="#626b68" stroke-width="5"/>
         <rect x="-48" y="0" width="96" height="30" fill="#9ca7a1" stroke="#626b68" stroke-width="5"/>
         <ellipse cx="0" cy="0" rx="48" ry="18" fill="#3f7184" stroke="#626b68" stroke-width="5"/>
@@ -170,13 +314,13 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
       </g>`
     : '';
   const gardenLayer = garden
-    ? `<g transform="translate(30,476)">
+    ? `<g transform="translate(30,476)" data-yard-obj="garden">
         ${[0, 26, 52].map((y) => `<path d="M0 ${y} Q70 ${y - 14} 140 ${y}" fill="none" stroke="#81552e" stroke-width="14" stroke-linecap="round"/>`).join('')}
         ${[18, 52, 86, 120].map((x, i) => `<g transform="translate(${x},${(i % 3) * 26 - 5})"><path d="M0 12V-4" stroke="#377334" stroke-width="5"/><circle cx="-6" cy="-5" r="8" fill="#5fa74e"/><circle cx="7" cy="-8" r="8" fill="#6db75b"/></g>`).join('')}
       </g>`
     : '';
   const pondLayer = pond
-    ? `<g transform="translate(684,530)">
+    ? `<g transform="translate(684,530)" data-yard-obj="pond">
         <ellipse rx="92" ry="38" fill="#64b9d1" stroke="#4a8da5" stroke-width="5"/>
         <path d="M-80 4Q-55-12-30 2T20 0T72 2" fill="none" stroke="#a9e4ee" stroke-width="4"/>
         <g transform="translate(20,-8)"><ellipse rx="20" ry="11" fill="#f4e1a8"/><circle cx="16" cy="-10" r="9" fill="#f4e1a8"/><path d="M23-10l12 4-12 4z" fill="#e39b2d"/><circle cx="18" cy="-12" r="2"/></g>
@@ -190,7 +334,7 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
     ? `<g fill="#fff2a8" opacity=".9">${[[360,80],[430,105],[520,70],[610,128],[735,160]].map(([x,y], i) => `<g transform="translate(${x},${y})"><circle r="5"/><path d="M0-18V18M-18 0H18M-13-13L13 13M13-13L-13 13" stroke="${['#f6c445','#e2574c','#45968f'][i%3]}" stroke-width="4"/></g>`).join('')}</g>`
     : '';
   const trophyLayer = trophies > 0
-    ? `<g transform="translate(214,174)"><rect x="-8" y="-12" width="${Math.min(trophies, 6) * 22 + 12}" height="32" rx="8" fill="rgba(61,44,30,.58)"/>${Array.from({ length: Math.min(trophies, 6) }, (_, i) => `<text x="${i * 22}" y="12" font-size="20">🏆</text>`).join('')}</g>`
+    ? `<g transform="translate(214,174)" data-yard-obj="trophies"><rect x="-8" y="-12" width="${Math.min(trophies, 6) * 22 + 12}" height="32" rx="8" fill="rgba(61,44,30,.58)"/>${Array.from({ length: Math.min(trophies, 6) }, (_, i) => `<text x="${i * 22}" y="12" font-size="20">🏆</text>`).join('')}</g>`
     : '';
 
   // машинка-«жигулёнок» едет по двору (цвет — выбранный скин игрока)
@@ -205,8 +349,8 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
       <circle cx="52" cy="-10" r="5" fill="#ffe9a8" stroke="${skin.dark}" stroke-width="2"/>
     </g></g>`;
 
-  return `<svg viewBox="0 0 900 620" preserveAspectRatio="xMidYMid slice" class="yard-svg">
-    <rect class="yard-sky" x="0" y="0" width="900" height="320" fill="#bfe3f2"/>
+  return `<svg viewBox="0 0 900 620" preserveAspectRatio="xMidYMid slice" class="yard-svg yard-stage-${milestone}" data-yard-stage="${milestone}" data-yard-era="${era}">
+    <rect class="yard-sky" x="0" y="0" width="900" height="320" fill="${skyColor}"/>
     <g class="yard-stars" fill="#fff4c7">
       <circle cx="340" cy="42" r="3"/><circle cx="392" cy="92" r="2.5"/>
       <circle cx="466" cy="38" r="3.5"/><circle cx="535" cy="116" r="2.5"/>
@@ -233,14 +377,16 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string): string {
       <ellipse cx="256" cy="100" rx="48" ry="18" fill="#ffffff" opacity="0.7"/>
       <ellipse cx="580" cy="60" rx="54" ry="19" fill="#ffffff" opacity="0.8"/>
     </g>
-    <rect x="0" y="252" width="900" height="368" fill="#79b34c"/>
-    <path d="M0 252 Q450 236 900 252 L900 268 Q450 252 0 268 Z" fill="#6cae46"/>
+    ${landscapeLayer}
+    <rect x="0" y="252" width="900" height="368" fill="${grassColor}"/>
+    <path d="M0 252 Q450 236 900 252 L900 268 Q450 252 0 268 Z" fill="${era >= 3 ? '#5e9b48' : '#6cae46'}"/>
     ${fairLayer}
     ${celebrationLayer}
     ${house}
     ${workshopLayer}
     ${trophyLayer}
     ${yard}
+    ${progressLayer}
     ${wellLayer}
     ${gardenLayer}
     ${pondLayer}

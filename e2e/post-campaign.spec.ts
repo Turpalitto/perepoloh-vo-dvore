@@ -106,10 +106,12 @@ test.describe('Post-campaign', () => {
 
     await expect(page.getByTestId('menu-elite')).toBeVisible();
     await expect(page.getByTestId('menu-endless')).toBeVisible();
+    await page.getByTestId('menu-garage').click();
     await expect(page.getByTestId('skin-9')).toBeEnabled();
     await page.getByTestId('skin-9').click();
     await expect(page.getByTestId('skin-9')).toHaveClass(/selected/);
     await page.reload();
+    await page.getByTestId('menu-garage').click();
     await expect(page.getByTestId('skin-9')).toHaveClass(/selected/);
 
     const save = await readSave(page);

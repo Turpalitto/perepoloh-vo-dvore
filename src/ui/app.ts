@@ -32,11 +32,13 @@ import {
 } from '../game/weekly';
 import { getLang, levelText, setLang, t } from '../game/i18n';
 import {
+  completedCampaignLevels,
   isLevelUnlocked,
   newlyUnlocked,
   nextLevelToPlay,
   nextUpgrade,
-  unlockedUpgrades
+  unlockedUpgrades,
+  yardMilestone
 } from '../game/progression';
 import { SaveStore, totalStars } from '../game/save';
 import {
@@ -615,6 +617,70 @@ export class App {
     });
   }
 
+  /** Пункт настроек: иконка-кнопка + короткая видимая подпись (мобильный UX без tooltip). */
+  private settingsItem(control: string, label: string): string {
+    if (!control) return '';
+    return `<div class="settings-item">${control}<span class="settings-label">${label}</span></div>`;
+  }
+
+  /** Гараж: отдельный экран выбора скинов вместо ленты на главном меню. */
+  private showGarage(): void {
+    const total = totalStars(this.store.data);
+    const campaignDone = this.store.data.campaignDone === true;
+    // Легендарный скин виден только после кампании; остальные — по звёздам.
+    const visibleSkins = TARGET_SKINS.map((skin, index) => ({ skin, index })).filter(({ skin, index }) =>
+      skin.elite ? campaignDone : index < 5 || total >= TARGET_SKINS[index - 1].unlockStars
+    );
+    const selectedIndex = this.store.data.targetSkin ?? 0;
+    const selectedSkin = TARGET_SKINS[selectedIndex] ?? TARGET_SKINS[0];
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.setAttribute('data-testid', 'garage-overlay');
+    overlay.innerHTML = `
+      <div class="dialog garage-dialog">
+        <h2>${t('garage.title')}</h2>
+        <div class="dialog-sub" data-testid="garage-selected">${t(selectedSkin.nameKey)}</div>
+        <div class="skin-row garage-grid" data-testid="skin-row">${visibleSkins
+          .map(({ skin: s, index: i }) => {
+            const unlockedSkin = s.elite ? campaignDone : total >= s.unlockStars;
+            const selected = selectedIndex === i;
+            const lockTitle = s.elite ? t('skin.legendLock') : t('skin.locked', { n: s.unlockStars });
+            return `<button class="skin-swatch${selected ? ' selected' : ''}${s.elite ? ' skin-elite' : ''}" data-skin="${i}"
+              data-testid="skin-${i}" style="--c:${s.body}" ${unlockedSkin ? '' : 'disabled'}
+              aria-label="${t(s.nameKey)}" title="${unlockedSkin ? t(s.nameKey) : lockTitle}">${
+                unlockedSkin ? '' : `<span class="skin-lock">${s.elite ? '🏅' : `★${s.unlockStars}`}</span>`
+              }</button>`;
+          })
+          .join('')}</div>
+        <div class="garage-hint">${t('garage.hint')}</div>
+        <button class="btn btn-primary btn-big" data-testid="garage-close">${t('garage.close')}</button>
+      </div>`;
+    this.q('.overlay-slot').appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('[data-testid=garage-close]')!.addEventListener('click', () => {
+      this.audio.play('click');
+      close();
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelectorAll<HTMLButtonElement>('.skin-swatch:not([disabled])').forEach((b) =>
+      b.addEventListener('click', () => {
+        const i = Number(b.dataset.skin);
+        setTargetSkin(i);
+        this.store.setTargetSkin(i);
+        this.audio.play('click');
+        // Меню перерисовывается (машинка во дворе меняет цвет), гараж остаётся открытым.
+        this.transitionScreen(() => {
+          this.showMenuInner();
+          this.showGarage();
+        });
+      })
+    );
+    if (this.platform.isTV)
+      overlay.querySelector<HTMLElement>('.skin-swatch.selected, [data-testid=garage-close]')?.focus({ preventScroll: true });
+  }
+
   // ---------- меню ----------
 
   showMenu(): void {
@@ -636,6 +702,10 @@ export class App {
     const total = totalStars(this.store.data);
     const max = LEVELS.length * 3;
     const next = nextUpgrade(total);
+    const completed = completedCampaignLevels(LEVELS, this.store.data);
+    const qaYardRaw = import.meta.env.DEV || import.meta.env.MODE === 'e2e' ? queryParam('qaYard') : null;
+    const qaYardLevel = qaYardRaw === null ? Number.NaN : Number(qaYardRaw);
+    const yardStage = yardMilestone(Number.isFinite(qaYardLevel) ? qaYardLevel : completed);
     const hasProgress = total > 0;
     const dailyKey = this.dailyKey();
     const weekDone = weeklyProgress(this.store.data.daily, new Date(`${dailyKey}T12:00:00`));
@@ -644,11 +714,13 @@ export class App {
     const giftClaimed = this.store.data.lastGift === dailyKey;
     const season = currentSeason();
     const giftAmount = 2 + (season?.giftBonus ?? 0);
+    // Единственный источник истины о завершении кампании — флаг сейва;
+    // всё меню (CTA, табы, гараж) выводится из этого одного значения.
     const campaignDone = this.store.data.campaignDone === true;
-    // Легендарный скин виден только после кампании; остальные — по звёздам.
-    const visibleSkins = TARGET_SKINS.map((skin, index) => ({ skin, index })).filter(({ skin, index }) =>
-      skin.elite ? campaignDone : index < 5 || total >= TARGET_SKINS[index - 1].unlockStars
-    );
+    const endlessOpen = this.store.starsOf(LEVELS[LEVELS.length - 1].id) > 0;
+    const unlockedSkinCount = TARGET_SKINS.filter((skin) =>
+      skin.elite ? campaignDone : total >= skin.unlockStars
+    ).length;
     const week = currentWeekKey();
     const weeklyQuests = selectWeeklyQuests(week, campaignDone).map((quest) => {
       const progress = weeklyQuestProgress(this.store.data.weekly, week, quest);
@@ -658,29 +730,33 @@ export class App {
     });
     this.root.innerHTML = `
       <div class="screen menu-screen" data-testid="screen-menu">
-        <div class="yard-bg">${yardSVG(unlockedUpgrades(total), trophies, season?.id)}</div>
+        <div class="yard-bg">${yardSVG(unlockedUpgrades(total), trophies, season?.id, yardStage)}</div>
         <div class="menu-ui">
           ${season ? `<div class="season-banner" data-testid="season-banner">${t(`season.${season.id}`)}</div>` : ''}
           <h1 class="game-title"><span>${t('game.titleTop')}</span><span>${t('game.titleBottom')}</span></h1>
           <div class="menu-buttons">
             <button class="btn btn-primary btn-big" data-testid="menu-play">${
-              hasProgress ? t('menu.continue') : t('menu.play')
+              campaignDone ? `🏅 ${t('elite.continue')}` : hasProgress ? t('menu.continue') : t('menu.play')
             }</button>
-            <button class="btn btn-big" data-testid="menu-levels">${t('menu.levels')}</button>
-            ${
-              campaignDone
-                ? `<button class="btn btn-big btn-elite" data-testid="menu-elite">🏅 ${t('elite.menu')}</button>`
-                : ''
-            }
-            ${
-              this.store.starsOf(LEVELS[LEVELS.length - 1].id) > 0
-                ? `<button class="btn btn-big btn-endless" data-testid="menu-endless">${t('menu.endless')}${
-                    (this.store.data.endlessBest ?? 0) > 0 ? ` · ${t('endless.best', { n: this.store.data.endlessBest ?? 0 })}` : ''
-                  }</button>`
-                : ''
-            }
+            <div class="mode-switch" data-testid="mode-switch" role="group" aria-label="${t('menu.events')}">
+              <button class="mode-tab${campaignDone ? '' : ' active'}" data-testid="menu-levels">${t('mode.campaign')}</button>
+              ${
+                campaignDone
+                  ? `<button class="mode-tab active mode-tab-elite" data-testid="menu-elite">🏅 ${t('mode.elite')}</button>`
+                  : ''
+              }
+              ${
+                endlessOpen
+                  ? `<button class="mode-tab" data-testid="menu-endless">🌀 ${t('mode.endless')}${
+                      (this.store.data.endlessBest ?? 0) > 0
+                        ? `<small>${t('endless.best', { n: this.store.data.endlessBest ?? 0 })}</small>`
+                        : ''
+                    }</button>`
+                  : ''
+              }
+            </div>
             <div class="menu-events" data-testid="menu-events" aria-label="${t('menu.events')}">
-              <button class="btn btn-big btn-daily" data-testid="menu-daily">🔥 ${t('daily.button')}${
+              <button class="btn btn-daily" data-testid="menu-daily">🔥 ${t('daily.button')}${
                 dailyModifier(dailyKey) !== 'none' ? ' 🎯' : ''
               }${
                 isDoneToday(this.store.data.daily, new Date(`${dailyKey}T12:00:00`))
@@ -707,44 +783,47 @@ export class App {
                 <button class="btn${weeklyQuests.some((q) => q.done && !q.claimed) ? ' has-ready' : ''}" data-testid="menu-weekly" aria-label="${t(
                   'weekly.title'
                 )}">🎯 ${weeklyQuests.filter((q) => q.claimed).length}/${weeklyQuests.length}</button>
+                <button class="btn" data-testid="menu-garage" aria-label="${t('menu.garage')}" title="${t(
+                  'menu.garage'
+                )}">🚗 ${unlockedSkinCount}/${TARGET_SKINS.length}</button>
               </div>
             </div>
           </div>
-          <div class="skin-row" data-testid="skin-row">${visibleSkins.map(({ skin: s, index: i }) => {
-            const unlockedSkin = s.elite ? campaignDone : total >= s.unlockStars;
-            const selected = this.store.data.targetSkin === i;
-            const lockTitle = s.elite ? t('skin.legendLock') : t('skin.locked', { n: s.unlockStars });
-            return `<button class="skin-swatch${selected ? ' selected' : ''}${s.elite ? ' skin-elite' : ''}" data-skin="${i}"
-              data-testid="skin-${i}" style="--c:${s.body}" ${unlockedSkin ? '' : 'disabled'}
-              aria-label="${t(s.nameKey)}" title="${unlockedSkin ? t(s.nameKey) : lockTitle}">${
-                unlockedSkin ? '' : `<span class="skin-lock">${s.elite ? '🏅' : `★${s.unlockStars}`}</span>`
-              }</button>`;
-          }).join('')}</div>
           <div class="menu-progress">
             <span class="stars-total" data-testid="stars-total">★ ${total} / ${max}</span>
             <span class="next-upgrade">${
-              next ? t('menu.nextUpgrade', { n: next.stars }) : t('menu.fullYard')
+              next ? t('menu.nextUpgrade', { n: next.stars }) : campaignDone ? t('menu.fullYard') : t('menu.allUpgrades')
             }</span>
           </div>
-          <button class="btn menu-rules-btn" data-testid="menu-rules">${t('menu.rules')}</button>
         </div>
         <div class="menu-settings">
           <button class="icon-btn settings-toggle" data-testid="menu-settings" aria-label="${t('menu.settings')}" aria-expanded="false" aria-controls="menu-settings-panel">${settingsIcon}</button>
           <div class="menu-audio" id="menu-settings-panel" data-testid="menu-settings-panel" hidden>
-            ${this.soundToggleHtml('sound-toggle')}
-            ${this.musicToggleHtml('music-toggle')}
-            ${this.vibrationToggleHtml('vibration-toggle')}
-            ${this.liveYardToggleHtml('liveyard-toggle')}
-            ${this.contrastToggleHtml('contrast-toggle')}
-            ${this.bellToggleHtml('bell-toggle')}
-            <button class="icon-btn lang-toggle" data-testid="lang-toggle" aria-label="Language">🌐<span class="lang-code">${getLang().toUpperCase()}</span></button>
+            ${this.settingsItem(this.soundToggleHtml('sound-toggle'), t('audio.sound'))}
+            ${this.settingsItem(this.musicToggleHtml('music-toggle'), t('audio.music'))}
+            ${this.settingsItem(this.vibrationToggleHtml('vibration-toggle'), t('audio.vibration'))}
+            ${this.settingsItem(this.liveYardToggleHtml('liveyard-toggle'), t('audio.liveYard'))}
+            ${this.settingsItem(this.contrastToggleHtml('contrast-toggle'), t('audio.contrast'))}
+            ${this.settingsItem(this.bellToggleHtml('bell-toggle'), t('audio.reminders'))}
+            ${this.settingsItem(
+              `<button class="icon-btn lang-toggle" data-testid="lang-toggle" aria-label="${t(
+                'settings.language'
+              )}">🌐<span class="lang-code">${getLang().toUpperCase()}</span></button>`,
+              t('settings.language')
+            )}
+            ${this.settingsItem(
+              `<button class="icon-btn" data-testid="menu-rules" aria-label="${t('rules.title')}">📖</button>`,
+              t('menu.rules')
+            )}
           </div>
         </div>
         <div class="overlay-slot"></div>
       </div>`;
     this.q('[data-testid=menu-play]').addEventListener('click', () => {
       this.audio.play('click');
-      this.startLevel(nextLevelToPlay(LEVELS, this.store.data).id);
+      // После кампании логичное «продолжить» — Высшая лига, а не повтор 100-го.
+      if (campaignDone) this.showEliteScreen();
+      else this.startLevel(nextLevelToPlay(LEVELS, this.store.data).id);
     });
     this.q('[data-testid=menu-levels]').addEventListener('click', () => {
       this.audio.play('click');
@@ -796,19 +875,9 @@ export class App {
         settingsPanel.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
       }
     });
-    this.root.querySelectorAll<HTMLButtonElement>('.skin-swatch:not([disabled])').forEach((b) =>
-      b.addEventListener('click', () => {
-        const i = Number(b.dataset.skin);
-        setTargetSkin(i);
-        this.store.setTargetSkin(i);
-        this.audio.play('click');
-        this.showMenu();
-      })
-    );
-    window.requestAnimationFrame(() => {
-      this.root
-        .querySelector<HTMLElement>('.skin-swatch.selected')
-        ?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    this.q('[data-testid=menu-garage]').addEventListener('click', () => {
+      this.audio.play('click');
+      this.showGarage();
     });
     this.wireSoundToggle(this.q('[data-testid=sound-toggle]'));
     this.wireMusicToggle(this.q('[data-testid=music-toggle]'));
@@ -1194,11 +1263,13 @@ export class App {
       const finalStars = starsFor(this.levelById(def.id), endState.moves, endState.starCollected);
       const achievementsBefore = unlockedAchievementKeys(this.store.data);
       const starsBefore = totalStars(this.store.data);
+      const yardStageBefore = yardMilestone(completedCampaignLevels(LEVELS, this.store.data));
       this.store.recordWeeklyEvent(currentWeekKey(), 'win', 1);
       if (finalStars === 3) this.store.recordWeeklyEvent(currentWeekKey(), 'perfect', 1);
       const improved = this.store.recordResult(def.id, finalStars);
       const starsAfter = totalStars(this.store.data);
       const unlocked = newlyUnlocked(starsBefore, starsAfter);
+      const yardStageAfter = yardMilestone(completedCampaignLevels(LEVELS, this.store.data));
       if (improved) {
         void this.platform.submitScore('yardstars', starsAfter);
         this.leaderboardCache.invalidate('yardstars');
@@ -1212,7 +1283,13 @@ export class App {
       // обычный уровень 100: при первом прохождении — финальная сцена вместо
       // боссовой победы; повторно — обычная боссовая победа без повторных наград.
       if (def.id === CAMPAIGN_LAST_ID && this.completeCampaignFinale()) return;
-      this.showBossVictory(def, finalStars, unlocked, newAchievements);
+      this.showBossVictory(
+        def,
+        finalStars,
+        unlocked,
+        newAchievements,
+        yardStageAfter > yardStageBefore ? yardStageAfter : 0
+      );
       return;
     }
     // Короткий переход между фазами — без перезагрузки страницы.
@@ -1268,7 +1345,8 @@ export class App {
     def: BossLevelDef,
     stars: number,
     unlocked: ReturnType<typeof newlyUnlocked>,
-    newAchievements: (typeof ACHIEVEMENTS)[number][]
+    newAchievements: (typeof ACHIEVEMENTS)[number][],
+    newYardStage: number
   ): void {
     this.audio.play('win');
     this.vibrate([28, 45, 28, 45, 70]);
@@ -1283,6 +1361,11 @@ export class App {
     const upgradeNote = unlocked
       .map((upgrade) => `<div class="win-upgrade" data-testid="win-upgrade">🎉 ${t(`upgrade.${upgrade.key}`)}</div>`)
       .join('');
+    const yardStageNote = newYardStage
+      ? `<div class="win-master yard-stage-unlocked" data-testid="win-yard-stage">${t('win.yardStage', {
+          n: newYardStage * 10
+        })}</div>`
+      : '';
     const achievementNote = newAchievements
       .map(
         (achievement) =>
@@ -1301,8 +1384,10 @@ export class App {
          <h2>${t(def.nameKey)}</h2>
          <div class="win-stars" data-testid="win-stars" data-stars="${stars}">${starIcons(stars)}</div>
          <p class="boss-victory-text" data-testid="boss-victory-text">${t(def.victoryKey)}</p>
-         ${upgradeNote}
-         ${achievementNote}
+         ${(() => {
+           const rewardNotes = [yardStageNote, upgradeNote, achievementNote].join('');
+           return rewardNotes ? `<div class="win-rewards" data-testid="win-rewards">${rewardNotes}</div>` : '';
+         })()}
         ${next ? `<button class="btn btn-primary btn-big" data-testid="btn-next">${t('win.next')}</button>` : ''}
         <button class="btn" data-testid="btn-win-menu">${t('win.menu')}</button>
       </div>`;
@@ -1861,8 +1946,10 @@ export class App {
     );
     const achievementsBefore = unlockedAchievementKeys(this.store.data);
     const before = totalStars(this.store.data);
+    const yardStageBefore = yardMilestone(completedCampaignLevels(LEVELS, this.store.data));
     let unlocked: ReturnType<typeof newlyUnlocked> = [];
     let justMastered = false;
+    let newYardStage = 0;
     let dailyStreak = 0;
     let weeklyCup = false;
     this.store.recordWeeklyEvent(currentWeekKey(), 'win', 1);
@@ -1879,6 +1966,8 @@ export class App {
       const improved = this.store.recordResult(level.id, stars);
       const after = totalStars(this.store.data);
       unlocked = newlyUnlocked(before, after);
+      const yardStageAfter = yardMilestone(completedCampaignLevels(LEVELS, this.store.data));
+      if (yardStageAfter > yardStageBefore) newYardStage = yardStageAfter;
       if (improved) {
         void this.platform.submitScore('yardstars', after);
         this.leaderboardCache.invalidate('yardstars');
@@ -1916,6 +2005,11 @@ export class App {
           .join('')
       : '';
     const masterNote = justMastered ? `<div class="win-master" data-testid="win-master">${t('win.master')}</div>` : '';
+    const yardStageNote = newYardStage
+      ? `<div class="win-master yard-stage-unlocked" data-testid="win-yard-stage">${t('win.yardStage', {
+          n: newYardStage * 10
+        })}</div>`
+      : '';
     const chapterNote =
       !daily && (level.id % 12 === 0 || level.id === CAMPAIGN_LAST_ID)
         ? `<div class="win-master chapter-complete" data-testid="win-chapter">${t('win.chapter', {
@@ -1956,13 +2050,10 @@ export class App {
         <div class="dialog-sub">${t('win.stats', { moves: endState.moves, par: level.par })}${
           endState.moves <= level.par ? t('win.perfect') : ''
         }</div>
-        ${starNote}
-        ${masterNote}
-        ${chapterNote}
-        ${eliteReplayNote}
-        ${dailyNote}
-        ${upgradeNote}
-        ${achievementNote}
+        ${(() => {
+          const rewardNotes = [starNote, masterNote, yardStageNote, chapterNote, eliteReplayNote, dailyNote, upgradeNote, achievementNote].join('');
+          return rewardNotes ? `<div class="win-rewards" data-testid="win-rewards">${rewardNotes}</div>` : '';
+        })()}
         <button class="btn share-btn" data-testid="btn-share">↗ ${t('daily.share')}</button>
         ${
           next

@@ -140,6 +140,18 @@ test.describe('Переполох во дворе', () => {
     });
   }
 
+  test('каждый десятый пройденный уровень показывает новое состояние двора', async ({ page }) => {
+    await seedCampaignBefore(page, 20);
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await page.evaluate(() =>
+      (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel()
+    );
+
+    await expect(page.getByTestId('win-yard-stage')).toContainText('уровня 20');
+  });
+
   test('счётчик ходов, отмена и перезапуск работают', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/?mock=1&lang=ru');
@@ -323,17 +335,24 @@ test.describe('Переполох во дворе', () => {
     expect(errors).toEqual([]);
   });
 
-  test('скины: заблокированные недоступны, выбор сохраняется', async ({ page }) => {
+  test('гараж: заблокированные скины недоступны, выбор сохраняется', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-garage').click();
+    await expect(page.getByTestId('garage-overlay')).toBeVisible();
     await expect(page.getByTestId('skin-0')).toBeEnabled();
     await expect(page.getByTestId('skin-1')).toBeDisabled(); // нужно ★15
     await expect(page.getByTestId('skin-0')).toHaveClass(/selected/);
+    await page.getByTestId('garage-close').click();
+    await expect(page.getByTestId('garage-overlay')).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 
-  test('выбранный дальний скин виден в мобильной палитре', async ({ page }) => {
+  test('гараж: дальний скин виден и выбирается на мобильном экране', async ({ page }) => {
     await page.addInitScript(() => {
+      // Только первый заход: перезагрузка ниже проверяет сохранение выбора.
+      if (sessionStorage.getItem('garage-seeded') === '1') return;
+      sessionStorage.setItem('garage-seeded', '1');
       const stars = Object.fromEntries(Array.from({ length: 100 }, (_, index) => [String(index + 1), 3]));
       localStorage.setItem(
         'parkovka.save.v1',
@@ -342,16 +361,17 @@ test.describe('Переполох во дворе', () => {
     });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/?mock=1&lang=ru&daytime=day');
-    const row = page.getByTestId('skin-row');
+    await page.getByTestId('menu-garage').click();
     const selected = page.getByTestId('skin-8');
     await expect(selected).toHaveClass(/selected/);
     await expect(selected).toHaveAttribute('aria-label', 'Золотой автомобиль');
-    const [rowBox, selectedBox] = await Promise.all([row.boundingBox(), selected.boundingBox()]);
-    expect(rowBox).not.toBeNull();
-    expect(selectedBox).not.toBeNull();
-    expect(selectedBox!.x).toBeGreaterThanOrEqual(rowBox!.x - 1);
-    expect(selectedBox!.x + selectedBox!.width).toBeLessThanOrEqual(rowBox!.x + rowBox!.width + 1);
-    expect(await row.evaluate((element) => getComputedStyle(element).scrollbarWidth)).toBe('none');
+    await expect(selected).toBeInViewport();
+    // выбор другого скина остаётся в гараже и сохраняется после перезагрузки
+    await page.getByTestId('skin-2').click();
+    await expect(page.getByTestId('skin-2')).toHaveClass(/selected/);
+    await page.reload();
+    await page.getByTestId('menu-garage').click();
+    await expect(page.getByTestId('skin-2')).toHaveClass(/selected/);
   });
 
   test('ежедневный подарок выдаёт две подсказки, достижения открываются отдельно', async ({ page }) => {
@@ -478,18 +498,18 @@ test.describe('Переполох во дворе', () => {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await expect(page.getByTestId('menu-play')).toBeVisible();
-    await expect(page.getByTestId('menu-rules')).toBeVisible();
-    const swatch = await page.getByTestId('skin-0').boundingBox();
-    expect(swatch).not.toBeNull();
-    expect(swatch!.width).toBeGreaterThanOrEqual(44);
-    expect(swatch!.height).toBeGreaterThanOrEqual(44);
+    await expect(page.getByTestId('menu-daily')).toBeVisible();
+    const daily = await page.getByTestId('menu-daily').boundingBox();
+    expect(daily).not.toBeNull();
+    expect(daily!.width).toBeGreaterThanOrEqual(44);
+    expect(daily!.height).toBeGreaterThanOrEqual(44);
     let title = await page.locator('.game-title').boundingBox();
     expect(title).not.toBeNull();
     expect(title!.y).toBeGreaterThanOrEqual(0);
 
     await page.setViewportSize({ width: 844, height: 390 });
     await expect(page.getByTestId('menu-play')).toBeVisible();
-    await expect(page.getByTestId('menu-rules')).toBeVisible();
+    await expect(page.getByTestId('menu-daily')).toBeVisible();
     title = await page.locator('.game-title').boundingBox();
     expect(title).not.toBeNull();
     expect(title!.x).toBeGreaterThanOrEqual(0);
@@ -522,7 +542,7 @@ test.describe('Переполох во дворе', () => {
       await page.setViewportSize(viewport);
       await page.goto('/?mock=1&lang=ru&daytime=day');
       await expect(page.getByTestId('menu-play')).toBeInViewport();
-      await expect(page.getByTestId('menu-rules')).toBeInViewport();
+      await expect(page.getByTestId('menu-daily')).toBeInViewport();
       const overflow = await page.evaluate(() => ({
         x: document.documentElement.scrollWidth - window.innerWidth,
         y: document.documentElement.scrollHeight - window.innerHeight
@@ -677,8 +697,10 @@ test.describe('Высшая лига', () => {
     await seedSave(page, { campaignDone: true, campaignDoneAt: '2026-07-22', endingSeen: true });
     await page.goto('/?mock=1&lang=ru');
     await expect(page.getByTestId('menu-elite')).toBeVisible();
-    // легендарный скин виден (10-й свотч)
+    // легендарный скин виден в гараже (10-й свотч)
+    await page.getByTestId('menu-garage').click();
     await expect(page.getByTestId('skin-9')).toBeVisible();
+    await page.getByTestId('garage-close').click();
     await page.getByTestId('menu-elite').click();
     await expect(page.getByTestId('screen-elite')).toBeVisible();
     await expect(page.getByTestId('elite-rank')).toHaveText('Новичок двора');
@@ -709,10 +731,10 @@ test.describe('Высшая лига', () => {
     await seedSave(page, { campaignDone: true, endingSeen: true });
     await page.goto('/?mock=1&tv=1&lang=ru&daytime=day');
     await expect(page.locator('#app')).toHaveClass(/tv-mode/);
-    // доходим до кнопки лиги стрелкой вниз и открываем
+    // таб «Лига» стоит слева от CTA — доходим стрелкой влево и открываем
     const elite = page.getByTestId('menu-elite');
     for (let i = 0; i < 6 && !(await elite.evaluate((el) => el === document.activeElement)); i++) {
-      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('ArrowLeft');
     }
     await expect(elite).toBeFocused();
     await page.keyboard.press('Enter');
@@ -758,6 +780,8 @@ test.describe('Живой двор и дед', () => {
     await page.goto('/?mock=1&lang=ru');
     await page.getByTestId('menu-settings').click();
     await page.getByTestId('liveyard-toggle').click();
+    // Панель настроек с подписями шире прежней и может накрывать CTA — закрываем.
+    await page.getByTestId('menu-settings').click();
     await page.getByTestId('menu-play').click();
     await expect(page.getByTestId('grandpa')).toHaveClass(/grandpa-off/);
   });
@@ -992,7 +1016,9 @@ test.describe('Боссы 25/50/75/100', () => {
     // кампания уже пройдена ранее
     await seedToBoss(page, 100, { campaignDone: true, campaignDoneAt: '2026-07-20', endingSeen: true, bossDone: [100] });
     await page.goto('/?mock=1&lang=ru');
-    await page.getByTestId('menu-play').click();
+    // После кампании CTA ведёт в Высшую лигу, поэтому повтор босса — через список уровней.
+    await page.getByTestId('menu-levels').click();
+    await page.getByTestId('level-card-100').click();
     await page.getByTestId('boss-start').click();
     await clearAllPhases(page);
     // повтор: обычная боссовая победа, финальной сцены НЕТ

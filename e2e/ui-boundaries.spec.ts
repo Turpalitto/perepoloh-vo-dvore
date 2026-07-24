@@ -68,6 +68,39 @@ test.describe('UI boundaries', () => {
     expect(headerBounds.scrollWidth).toBeLessThanOrEqual(headerBounds.clientWidth + 1);
   });
 
+  test('пауза на боссовом экране остаётся целиком в кадре', async ({ page }) => {
+    // Регрессия: .boss-game-screen > * делал .overlay-slot относительным,
+    // и диалог паузы уезжал за нижнюю границу окна.
+    await page.addInitScript(() => {
+      const stars = Object.fromEntries(Array.from({ length: 9 }, (_, index) => [String(index + 1), 3]));
+      localStorage.setItem(
+        'parkovka.save.v1',
+        JSON.stringify({ v: 1, stars, sound: false, music: false, lang: 'ru', lastLevel: 9, targetSkin: 0 })
+      );
+    });
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 320, height: 568 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/?mock=1&lang=ru&daytime=day');
+      await page.getByTestId('menu-play').click();
+      await page.getByTestId('boss-start').click();
+      await expect(page.getByTestId('board')).toBeVisible();
+      await page.getByTestId('btn-pause').click();
+      await expect(page.getByTestId('pause-overlay')).toBeVisible();
+      const dialog = await page.locator('.pause-dialog').boundingBox();
+      expect(dialog, `нет диалога паузы на ${viewport.width}x${viewport.height}`).not.toBeNull();
+      expect(dialog!.y, `пауза срезана сверху на ${viewport.width}x${viewport.height}`).toBeGreaterThanOrEqual(0);
+      expect(
+        dialog!.y + dialog!.height,
+        `пауза уезжает за низ на ${viewport.width}x${viewport.height}`
+      ).toBeLessThanOrEqual(viewport.height + 1);
+      await expect(page.getByTestId('btn-exit-menu')).toBeInViewport({ ratio: 1 });
+      await page.getByTestId('btn-resume').click();
+    }
+  });
+
   test('leaderboard replaces loading state after its shell is mounted', async ({ page }) => {
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await page.getByTestId('menu-leaderboard').click();

@@ -2292,6 +2292,13 @@ html[data-daytime='night'] .yard-lamp-light {
   position: relative;
   z-index: 1;
 }
+/* Слот оверлеев обязан оставаться absolute на весь экран: правило выше
+   (для подъёма контента над ::before/::after) иначе схлопывает его в полоску,
+   и диалоги паузы/победы у боссов уезжают за нижнюю границу. */
+.boss-game-screen > .overlay-slot {
+  position: absolute;
+  z-index: 5;
+}
 .boss-game-screen .boss-phase-chip {
   border: 1px solid rgba(255, 247, 230, 0.55);
   background: #d8ae27;

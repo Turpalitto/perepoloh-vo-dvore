@@ -1664,6 +1664,10 @@ export class App {
         this.vibrate(14);
         this.yardDirector?.react('collision');
       },
+      onIceBlocked: () => {
+        // Отдача уже отыграна в onBump; здесь только объяснение правила.
+        this.yardDirector?.react('ice');
+      },
       onGateSwitch: () => {
         this.audio.play('switch');
         this.vibrate([18, 35, 24]);

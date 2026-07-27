@@ -112,6 +112,27 @@ describe('уровни игры', () => {
     expect(intro?.pieces.length).toBeLessThanOrEqual(8);
   });
 
+  it('лёд вводится отдельной обучающей мини-главой, без других механик разом', () => {
+    // Правило льда контринтуитивно (упор в препятствие не даёт остановиться),
+    // поэтому знакомство с ним не должно конкурировать за внимание с грузовиком,
+    // трактором, ящиком, звездой или кнопкой ворот.
+    const intro = LEVELS.find((level) => level.mechanics.includes('ice'));
+    expect(intro?.id).toBe(105);
+    expect(intro?.mechanics).toEqual(['ice']);
+    expect(intro?.star).toBeUndefined();
+    expect(intro?.gateSwitch).toBeUndefined();
+
+    // Мини-глава идёт подряд и усложняется: механики только добавляются.
+    const chapter = LEVELS.filter((level) => level.mechanics.includes('ice'));
+    const positions = chapter.map((level) => LEVELS.indexOf(level));
+    for (let i = 1; i < positions.length; i++) expect(positions[i]).toBe(positions[i - 1] + 1);
+    for (let i = 1; i < chapter.length; i++) {
+      for (const mechanic of chapter[i - 1].mechanics) {
+        expect(chapter[i].mechanics, `уровень ${chapter[i].id}: механика ${mechanic} пропала`).toContain(mechanic);
+      }
+    }
+  });
+
   it('не содержит повторяющихся раскладок', () => {
     const signatures = LEVELS.map((level) =>
       JSON.stringify({
@@ -139,6 +160,7 @@ describe('уровни игры', () => {
     expect(all).toContain('crate');
     expect(all).toContain('star');
     expect(all).toContain('gate-switch');
+    expect(all).toContain('ice');
   });
 
   for (const level of LEVELS) {

@@ -3990,6 +3990,430 @@
     "hint": "Трактор деда занимает всю полосу — сдвинь его заранее"
   },
   {
+    "id": 105,
+    "name": "Первый гололёд",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 1,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "car",
+        "x": 2,
+        "y": 1,
+        "len": 2,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 3,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "C",
+        "kind": "car",
+        "x": 0,
+        "y": 3,
+        "len": 2,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 4,
+        "y": 0,
+        "len": 2,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 4,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 1,
+        "y": 0,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      }
+    ],
+    "walls": [
+      {
+        "x": 5,
+        "y": 1,
+        "kind": "log"
+      },
+      {
+        "x": 3,
+        "y": 5,
+        "kind": "hay"
+      }
+    ],
+    "ice": [
+      {
+        "x": 4,
+        "y": 4
+      }
+    ],
+    "par": 5,
+    "par2": 7,
+    "difficulty": "easy",
+    "role": "tutorial",
+    "mechanics": [
+      "ice"
+    ],
+    "hint": "На льду машина не удержится — останавливай её до наледи"
+  },
+  {
+    "id": 106,
+    "name": "Ледяная колея",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 1,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "car",
+        "x": 4,
+        "y": 0,
+        "len": 2,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 0,
+        "y": 0,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "C",
+        "kind": "car",
+        "x": 4,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 2,
+        "y": 4,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 3,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      }
+    ],
+    "walls": [
+      {
+        "x": 1,
+        "y": 4,
+        "kind": "hay"
+      },
+      {
+        "x": 2,
+        "y": 1,
+        "kind": "barrel"
+      }
+    ],
+    "ice": [
+      {
+        "x": 3,
+        "y": 0
+      },
+      {
+        "x": 2,
+        "y": 0
+      }
+    ],
+    "par": 6,
+    "par2": 8,
+    "difficulty": "medium",
+    "role": "tutorial",
+    "mechanics": [
+      "ice"
+    ],
+    "hint": "Колея длинная: проскочи её целиком, встать посередине не выйдет"
+  },
+  {
+    "id": 107,
+    "name": "Скользкий выезд",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 1,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "car",
+        "x": 0,
+        "y": 5,
+        "len": 2,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 0,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "C",
+        "kind": "car",
+        "x": 2,
+        "y": 4,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 2,
+        "y": 0,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 5,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 3,
+        "y": 0,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "G",
+        "kind": "truck",
+        "x": 3,
+        "y": 1,
+        "len": 3,
+        "dir": "h",
+        "skin": 0
+      }
+    ],
+    "walls": [
+      {
+        "x": 4,
+        "y": 3,
+        "kind": "barrel"
+      }
+    ],
+    "ice": [
+      {
+        "x": 5,
+        "y": 4
+      },
+      {
+        "x": 3,
+        "y": 2
+      }
+    ],
+    "par": 7,
+    "par2": 9,
+    "difficulty": "medium",
+    "role": "tutorial",
+    "mechanics": [
+      "truck",
+      "ice"
+    ],
+    "hint": "Короткий путь застыл — ищи, где соседям вообще можно встать"
+  },
+  {
+    "id": 108,
+    "name": "Каток у сарая",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 1,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "truck",
+        "x": 2,
+        "y": 1,
+        "len": 3,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 3,
+        "y": 5,
+        "len": 2,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "C",
+        "kind": "car",
+        "x": 2,
+        "y": 0,
+        "len": 2,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 5,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 0,
+        "y": 3,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 2,
+        "y": 4,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "G",
+        "kind": "tractor",
+        "x": 3,
+        "y": 2,
+        "len": 3,
+        "dir": "v",
+        "skin": 0
+      }
+    ],
+    "walls": [
+      {
+        "x": 5,
+        "y": 0,
+        "kind": "hay"
+      },
+      {
+        "x": 1,
+        "y": 4,
+        "kind": "barrel"
+      }
+    ],
+    "ice": [
+      {
+        "x": 5,
+        "y": 5
+      },
+      {
+        "x": 2,
+        "y": 3
+      }
+    ],
+    "star": {
+      "x": 1,
+      "y": 5
+    },
+    "par": 8,
+    "par2": 10,
+    "difficulty": "medium",
+    "role": "tutorial",
+    "mechanics": [
+      "truck",
+      "tractor",
+      "star",
+      "ice"
+    ],
+    "hint": "Лёд отнял места для стоянки — считай, куда денется каждый сосед"
+  },
+  {
     "id": 42,
     "name": "Полуденный зной",
     "width": 7,

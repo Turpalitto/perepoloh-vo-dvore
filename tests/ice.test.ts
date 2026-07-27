@@ -5,10 +5,15 @@ import type { LevelDef } from '../src/core/types';
 import { validateLevel } from '../src/core/validator';
 
 /**
- * Прототип «ледяной колеи»: остановиться на льду можно, только если дальше
- * в этом направлении ехать физически некуда. Тесты проверяют семантику
- * applyMove/maxSteps напрямую (руками просчитанные случаи), поскольку solver
- * — просто BFS поверх этих же функций: если они верны, поиск верен по построению.
+ * «Ледяная колея»: на льду нельзя остановиться вовсе — проехать насквозь
+ * можно, встать нельзя. Тесты проверяют семантику applyMove/maxSteps напрямую
+ * (руками просчитанные случаи), поскольку solver — просто BFS поверх этих же
+ * функций: если они верны, поиск верен по построению.
+ *
+ * Прежняя редакция правила разрешала вынужденную остановку, и механика была
+ * пустой: перебор всех одиночных постановок льда по уровням кампании давал
+ * дельту оптимума ноль в 111 случаях из 111. Отдельный тест ниже фиксирует
+ * главное следствие новой редакции — лёд умеет менять оптимум.
  */
 
 // 6×6, ворота справа на ряду 2, целевая машина одна на пустом поле,
@@ -28,15 +33,15 @@ const ICE_LEVEL: LevelDef = {
 };
 
 describe('ледяная колея — семантика applyMove/maxSteps', () => {
-  it('maxSteps не меняется льдом (лёд не блокирует ход, только запрещает произвольный стоп)', () => {
+  it('maxSteps не меняется льдом (лёд не блокирует проезд, только запрещает остановку)', () => {
     const s = createState(ICE_LEVEL);
     // без стен/фигур путь свободен; limit включает полный выезд (len=2 сверху).
     expect(maxSteps(ICE_LEVEL, s, 0, 1, 0)).toBe(6);
   });
 
-  it('нельзя остановиться так, что фигура окажется на льду, если дальше есть куда ехать', () => {
+  it('нельзя остановиться так, что фигура окажется на льду', () => {
     const s = createState(ICE_LEVEL);
-    // steps=2: клетки x=2,3 — x=3 это лёд; limit=6, 2<6 — есть куда ехать дальше → запрещено.
+    // steps=2: клетки x=2,3 — x=3 это лёд → запрещено.
     expect(applyMove(ICE_LEVEL, s, 0, 1, 0, 2)).toBeNull();
     // steps=3: клетки x=3,4 — тоже задевает лёд (x=3) → запрещено.
     expect(applyMove(ICE_LEVEL, s, 0, 1, 0, 3)).toBeNull();
@@ -54,7 +59,7 @@ describe('ледяная колея — семантика applyMove/maxSteps', 
     expect(r4!.state.pieces[0]).toMatchObject({ x: 4, y: 2 });
   });
 
-  it('полный выезд (steps === limit) разрешён независимо от льда на линии', () => {
+  it('полный выезд разрешён: фигура покидает поле и ни на чём не останавливается', () => {
     const s = createState(ICE_LEVEL);
     const r = applyMove(ICE_LEVEL, s, 0, 1, 0, 6);
     expect(r).not.toBeNull();
@@ -67,13 +72,13 @@ describe('ледяная колея — семантика applyMove/maxSteps', 
     expect(applyMove(ICE_LEVEL, s, 0, 1, 0, 5)).toBeNull();
   });
 
-  it('уровень с ice валиден и решатель находит оптимум за один ход (выезд игнорирует внутренний лёд)', () => {
+  it('уровень с ice валиден и решатель находит оптимум за один ход', () => {
     expect(validateLevel(ICE_LEVEL, { withSolver: true })).toEqual([]);
     const res = solve(ICE_LEVEL);
     expect(res).toMatchObject({ solvable: true, optimal: 1, exhausted: false });
   });
 
-  it('без поля ice поведение идентично прежнему (нулевая регрессия для 100 уровней кампании)', () => {
+  it('без поля ice поведение идентично прежнему (нулевая регрессия для уровней кампании)', () => {
     const noIce: LevelDef = { ...ICE_LEVEL, ice: undefined };
     const s = createState(noIce);
     // steps=2 и steps=3 теперь разрешены — лёд не мешает, потому что его нет.
@@ -82,15 +87,14 @@ describe('ледяная колея — семантика applyMove/maxSteps', 
     expect(maxSteps(noIce, s, 0, 1, 0)).toBe(6);
   });
 
-  it('лёд, блокирующий обходной манёвр, меняет доступные точки остановки другой фигуры', () => {
-    // Блокер стоит поперёк поля вертикально; лёд лежит на клетке, где он мог бы
-    // «удобно» встать сразу под целевой линией. Ход по-прежнему стоит 1 (цена
-    // хода не зависит от пройденных клеток), но конкретная итоговая позиция
-    // блокера меняется — доказывает, что solver реально учитывает лёд при
-    // выборе состояний, а не игнорирует его.
+  it('вынужденная остановка на льду тоже запрещена — упор в препятствие не оправдание', () => {
+    // Блокер A может съехать вниз ровно до упора в нижний край, и обе конечные
+    // клетки этого съезда — лёд. Прежняя редакция правила такой ход разрешала
+    // («ехать дальше некуда»), новая — нет: полоса вниз для A закрыта, и
+    // единственный способ освободить ряд ворот — увести A вверх.
     const level: LevelDef = {
       id: 0,
-      name: 'ice-detour',
+      name: 'ice-forced',
       width: 6,
       height: 6,
       exit: { side: 'right', index: 2 },
@@ -98,23 +102,56 @@ describe('ледяная колея — семантика applyMove/maxSteps', 
         { id: 'T', kind: 'target', x: 0, y: 2, len: 2, dir: 'h' },
         { id: 'A', kind: 'car', x: 2, y: 2, len: 2, dir: 'v' }
       ],
-      ice: [{ x: 2, y: 4 }],
-      par: 1,
-      par2: 1,
+      ice: [
+        { x: 2, y: 4 },
+        { x: 2, y: 5 }
+      ],
+      par: 2,
+      par2: 2,
       difficulty: 'easy',
       mechanics: ['ice']
     };
-    expect(validateLevel(level, { withSolver: true })).toEqual([]);
     const s = createState(level);
-    // A вниз на 1 клетку: клетки (2,3),(2,4) — (2,4) это лёд, а дальше (down max = 2) есть куда ехать → запрещено.
+    // A вниз на 1: клетки (2,3),(2,4) — (2,4) лёд → запрещено.
     expect(applyMove(level, s, 1, 0, 1, 1)).toBeNull();
-    // A вниз на 2 (до упора) — разрешено (вынужденная остановка), хоть и тоже задевает лёд.
-    const forced = applyMove(level, s, 1, 0, 1, 2);
-    expect(forced).not.toBeNull();
-    expect(forced!.state.pieces[1]).toMatchObject({ x: 2, y: 4 });
-    // A вверх на 2 (до упора) — не касается льда вовсе, тоже разрешено.
-    const alt = applyMove(level, s, 1, 0, -1, 2);
-    expect(alt).not.toBeNull();
-    expect(alt!.state.pieces[1]).toMatchObject({ x: 2, y: 0 });
+    // A вниз на 2 (до упора в край): клетки (2,4),(2,5) — обе лёд → запрещено.
+    expect(applyMove(level, s, 1, 0, 1, 2)).toBeNull();
+    // Вверх лёд не мешает: (2,0),(2,1) чисты.
+    const up = applyMove(level, s, 1, 0, -1, 2);
+    expect(up).not.toBeNull();
+    expect(up!.state.pieces[1]).toMatchObject({ x: 2, y: 0 });
+  });
+
+  it('лёд меняет оптимум: он отнимает позицию покоя, а не только вариант хода', () => {
+    // Ряд ворот перекрыт машиной A. Вниз ей ехать дёшево: один ход — и выезд
+    // свободен, оптимум 2 хода. Вверх мешает B, которую сперва надо увести.
+    // Лёд лежит внизу так, что ни одна из тамошних позиций покоя A не годится
+    // (ни промежуточная, ни до упора в край), — дешёвый путь закрыт целиком, и
+    // остаётся длинный: сначала B, потом A. Оптимум растёт.
+    const base: LevelDef = {
+      id: 0,
+      name: 'ice-depth',
+      width: 6,
+      height: 6,
+      exit: { side: 'right', index: 2 },
+      pieces: [
+        { id: 'T', kind: 'target', x: 0, y: 2, len: 2, dir: 'h' },
+        { id: 'A', kind: 'car', x: 3, y: 2, len: 2, dir: 'v' },
+        { id: 'B', kind: 'car', x: 3, y: 0, len: 2, dir: 'h' }
+      ],
+      par: 2,
+      par2: 2,
+      difficulty: 'easy',
+      mechanics: ['ice']
+    };
+    const iced: LevelDef = { ...base, ice: [{ x: 3, y: 4 }] };
+
+    expect(validateLevel(base, { withSolver: true })).toEqual([]);
+    expect(validateLevel(iced, { withSolver: true })).toEqual([]);
+
+    const plain = solve(base);
+    const withIce = solve(iced);
+    expect(plain.solvable && withIce.solvable).toBe(true);
+    expect(withIce.optimal).toBeGreaterThan(plain.optimal);
   });
 });

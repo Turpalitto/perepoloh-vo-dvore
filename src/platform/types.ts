@@ -1,3 +1,4 @@
+import type { AnalyticsTracker } from '../game/analytics';
 import type { SaveData } from '../game/save';
 
 /** Колбэки на время показа рекламы: пауза/мьют и восстановление. */
@@ -76,6 +77,12 @@ export interface Platform {
   showInterstitial(h: AdHandlers): Promise<void>;
   /** Rewarded-видео; true — награда заслужена. */
   showRewarded(h: AdHandlers): Promise<boolean>;
+  /**
+   * Трекер воронки этой платформы. Игра не знает, куда именно уходят события:
+   * на Яндексе — счётчик Метрики (только если он настроен), локально — консоль.
+   * Реализация обязана быть «мягкой»: сбой аналитики не ломает игру.
+   */
+  createAnalyticsTracker(): AnalyticsTracker;
   /**
    * Sticky-баннер в свободных полях по краям широкого экрана (десктоп/TV).
    * Платформа сама решает, показывать ли его и где — мы только просим.

@@ -1,5 +1,6 @@
 import levelsJson from '../levels/levels.json';
 import type { Platform } from '../platform/types';
+import { noopTracker } from './analytics';
 import { getLang } from './i18n';
 import type { SaveData } from './save';
 import { withQueryParam } from '../query';
@@ -23,6 +24,8 @@ export function createQaPlatform(platform: Platform): Platform {
     ...platform,
     saveData: async () => {},
     submitScore: async () => {},
+    // QA-сеанс не должен попадать в продуктовую воронку.
+    createAnalyticsTracker: () => noopTracker,
     requestReview: async () => false,
     showInterstitial: async () => {},
     showRewarded: async () => true

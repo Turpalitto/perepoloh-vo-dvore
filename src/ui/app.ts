@@ -6,6 +6,7 @@ import levelsJson from '../levels/levels.json';
 import type { LevelDef } from '../core/types';
 import { GameState, createState, starsFor } from '../core/game';
 import { track } from '../game/analytics';
+import type { RewardedContext } from '../game/analytics';
 import { hint, solve } from '../core/solver';
 import { ACHIEVEMENTS, achievementProgress, unlockedAchievementKeys } from '../game/achievements';
 import type { GameAudio } from '../game/audio';
@@ -22,6 +23,7 @@ import {
 import { DailyLevelService } from '../game/daily-client';
 import { generateEndless } from '../game/endless';
 import { requestReminderPermission } from '../game/reminder';
+import { SessionStats } from '../game/session-stats';
 import { currentSeason } from '../game/season';
 import {
   WEEKLY_QUEST_REWARD_HINTS,
@@ -135,6 +137,8 @@ export class App {
   private screenTransitionActive = false;
   /** Рестарты за сессию по уровням — после 3 предлагаем пропуск за рекламу. */
   private restartCounts = new Map<number, number>();
+  /** Счётчики воронки за сессию (номер уровня и попытки) — см. session-stats.ts. */
+  private readonly sessionStats = new SessionStats();
   /** Один запрос на таблицу лидерборда за раз (TTL 45с) — см. leaderboard-cache.ts. */
   private readonly leaderboardCache: LeaderboardCache;
 
@@ -507,6 +511,25 @@ export class App {
         extraResume?.();
       }
     };
+  }
+
+  /**
+   * Единственная точка показа rewarded: одно предложение — ровно одно
+   * завершающее событие (completed при выданной награде, closed иначе).
+   * Расставлять эти три события по местам вызова нельзя: воронка разъезжается
+   * при первом же новом стоке.
+   */
+  private async showRewardedFor(context: RewardedContext, levelId: number): Promise<boolean> {
+    track({ type: 'rewarded_offer_shown', context, levelId });
+    const ok = await this.platform.showRewarded(this.adHandlers());
+    track({ type: ok ? 'rewarded_completed' : 'rewarded_closed', context, levelId });
+    return ok;
+  }
+
+  /** Interstitial всегда через эту обёртку — иначе показ не попадёт в воронку. */
+  private async showInterstitialTracked(levelId: number): Promise<void> {
+    track({ type: 'interstitial_shown', levelId });
+    await this.platform.showInterstitial(this.adHandlers());
   }
 
   private dailyKey(): string {
@@ -1215,6 +1238,13 @@ export class App {
    */
   private completeCampaignFinale(): boolean {
     const firstEver = this.store.markCampaignDone(this.dailyKey());
+    // markCampaignDone идемпотентен: события уходят ровно один раз за игрока.
+    // Бесконечный двор сегодня открывается ровно этим же событием (условие —
+    // пройденный уровень 100); при смене правила доступа перенести сюда же.
+    if (firstEver) {
+      track({ type: 'campaign_completed', stars: totalStars(this.store.data) });
+      track({ type: 'endless_unlocked' });
+    }
     if (firstEver && !this.store.data.endingSeen) {
       this.store.markEndingSeen();
       this.showCampaignEnding();
@@ -1277,6 +1307,7 @@ export class App {
       const improved = this.store.recordResult(def.id, finalStars);
       const starsAfter = totalStars(this.store.data);
       const unlocked = newlyUnlocked(starsBefore, starsAfter);
+      for (const upgrade of unlocked) track({ type: 'upgrade_unlocked', key: upgrade.key, stars: starsAfter });
       const yardStageAfter = yardMilestone(completedCampaignLevels(LEVELS, this.store.data));
       if (improved) {
         void this.platform.submitScore('yardstars', starsAfter);
@@ -1428,6 +1459,12 @@ export class App {
     }
     try {
       const level = await this.dailyLevels.get(key);
+      // Событие — после успешной загрузки: неудачная попытка не считается стартом.
+      track({
+        type: 'daily_started',
+        modifier: level.modifier,
+        streak: currentStreak(this.store.data.daily)
+      });
       this.runLevel(level, true, key, false, level.modifier);
     } catch (error) {
       console.error('Уровень дня не загрузился:', error);
@@ -1443,6 +1480,7 @@ export class App {
   /** «Бесконечный двор»: доступен после первого прохождения уровня 100. */
   startEndless(): void {
     this.endlessStreak = 0;
+    track({ type: 'endless_started', best: this.store.data.endlessBest ?? 0 });
     void this.playNextEndless();
   }
 
@@ -1482,7 +1520,15 @@ export class App {
     const attempt: AttemptResult = { moves: 0, starCollected: false, usedHint: false, usedUndo: false, usedRestart: false };
     const levelStartedAt = performance.now();
     let firstMoveTracked = false;
-    track({ type: 'level_start', levelId: level.id });
+    // Номер попытки живёт в SessionStats, а не в DOM: рестарт увеличивает его
+    // без нового входа на экран, повторный рендер HUD не плодит событий.
+    const entry = this.sessionStats.levelStarted(level.id);
+    track({
+      type: 'level_start',
+      levelId: level.id,
+      sessionLevelNumber: entry.sessionLevelNumber,
+      attemptNumber: entry.attemptNumber
+    });
     if (boss && boss.run.phaseIndex === 0) track({ type: 'boss_start', levelId: boss.def.id });
     this.audio.setMood(endless || boss !== undefined || level.difficulty === 'hard');
     const isBoss = level.width > 6;
@@ -1647,12 +1693,16 @@ export class App {
         this.finishEliteChallenge(challenge, { ...attempt, moves: cur.moves, starCollected: cur.starCollected });
       } else {
         finished = true;
+        const elapsedMs = Math.round(performance.now() - levelStartedAt);
         track({
           type: 'level_complete',
           levelId: level.id,
           moves: cur.moves,
           stars: starsFor(level, cur.moves, cur.starCollected),
-          timeMs: Math.round(performance.now() - levelStartedAt)
+          timeMs: elapsedMs,
+          attemptNumber: this.sessionStats.attemptOf(level.id),
+          durationSeconds: Math.round(elapsedMs / 1000),
+          hintUsed: attempt.usedHint
         });
         this.finishLevel(level, cur, daily, dailyDate, endless);
       }
@@ -1727,6 +1777,7 @@ export class App {
       if (finished || cur.won) return;
       attempt.usedRestart = true;
       track({ type: 'level_restart', levelId: level.id, moves: cur.moves });
+      this.sessionStats.levelRestarted(level.id);
       undoStack.length = 0;
       redoStack.length = 0;
       cur = createState(level);
@@ -1747,7 +1798,7 @@ export class App {
       skipBtn.disabled = true;
       bv.interactive = false;
       try {
-        const ok = await this.platform.showRewarded(this.adHandlers());
+        const ok = await this.showRewardedFor('skip', level.id);
         if (ok) {
           finished = true;
           this.restartCounts.delete(level.id);
@@ -1798,7 +1849,7 @@ export class App {
           hintBtn.textContent = t('btn.hintAd');
         } else {
           hintSource = 'rewarded';
-          ok = await this.platform.showRewarded(this.adHandlers());
+          ok = await this.showRewardedFor('hint', level.id);
         }
         if (ok) {
           attempt.usedHint = true;
@@ -1986,12 +2037,17 @@ export class App {
       this.store.setDaily(newDaily);
       dailyStreak = newDaily.streak;
       weeklyCup = weeklyTrophies(newDaily) > previousTrophies;
+      // Стрик берём уже посчитанный платформой прогресса, а не «+1» на глазок.
+      track({ type: 'daily_completed', modifier: dailyModifier(dailyDate ?? this.dailyKey()), streak: dailyStreak, stars });
       void this.platform.submitScore('dailystreak', newDaily.streak);
       this.leaderboardCache.invalidate('dailystreak');
     } else {
       const improved = this.store.recordResult(level.id, stars);
       const after = totalStars(this.store.data);
       unlocked = newlyUnlocked(before, after);
+      // Пороги считаются по звёздам «до/после», поэтому повторное прохождение
+      // уже открытого улучшения событие не повторяет.
+      for (const upgrade of unlocked) track({ type: 'upgrade_unlocked', key: upgrade.key, stars: after });
       const yardStageAfter = yardMilestone(completedCampaignLevels(LEVELS, this.store.data));
       if (yardStageAfter > yardStageBefore) newYardStage = yardStageAfter;
       if (improved) {
@@ -2112,7 +2168,7 @@ export class App {
         performance.now() - this.sessionStartedAt >= adConfig.interstitialMinSessionMs;
       if (canShowAd && this.winsSinceAd >= adConfig.interstitialEvery) {
         this.winsSinceAd = 0;
-        await this.platform.showInterstitial(this.adHandlers());
+        await this.showInterstitialTracked(level.id);
       }
       if (next) this.startLevel(next.id);
       else button.disabled = false;
@@ -2161,6 +2217,7 @@ export class App {
     const stars = starsFor(level, endState.moves, endState.starCollected);
     const achievementsBefore = unlockedAchievementKeys(this.store.data);
     const isNewBest = this.store.recordEndless(this.endlessStreak);
+    track({ type: 'endless_finished', streak: this.endlessStreak, best: this.store.data.endlessBest ?? this.endlessStreak });
     const newAchievements = ACHIEVEMENTS.filter(
       (achievement) =>
         !achievementsBefore.has(achievement.key) && unlockedAchievementKeys(this.store.data).has(achievement.key)
@@ -2217,7 +2274,7 @@ export class App {
         performance.now() - this.sessionStartedAt >= adConfig.interstitialMinSessionMs;
       if (canShowAd && this.winsSinceAd >= adConfig.interstitialEvery) {
         this.winsSinceAd = 0;
-        await this.platform.showInterstitial(this.adHandlers());
+        await this.showInterstitialTracked(level.id);
       }
       void this.playNextEndless();
     });

@@ -3,12 +3,100 @@
  * Единственный модуль, знающий о YaGames. Все вызовы «мягкие»:
  * без авторизации и при сбоях SDK игра продолжает работать на localStorage.
  */
+import type { AnalyticsTracker, GameAnalyticsEvent } from '../game/analytics';
+import { noopTracker } from '../game/analytics';
 import type { SaveData } from '../game/save';
 import { mergeSave, sanitizeSave } from '../game/save';
 import { DEFAULT_PLATFORM_CONFIG } from './types';
 import type { AdHandlers, LeaderboardSnapshot, Platform, PlatformConfig } from './types';
 
 const STORAGE_KEY = 'parkovka.save.v1';
+
+/**
+ * Счётчик Яндекс Метрики — единственный поддерживаемый приёмник воронки на
+ * Яндекс Играх (в SDK своего метода аналитики нет, консольные метрики платформы
+ * считаются автоматически). ID счётчика задаётся сборкой: `VITE_YM_COUNTER_ID`.
+ *
+ * Без ID адаптер выключен целиком: ветка вырезается сборщиком, домен Метрики
+ * в бандл не попадает, ни одного внешнего запроса не уходит. Это осознанный
+ * default — игра публикуется без аналитики, пока владелец не заведёт счётчик.
+ *
+ * Приватность (см. заголовок analytics.ts): включается только пересылка фактов
+ * воронки. Явно выключены все дополнительные сборы Метрики — вебвизор (запись
+ * действий), карта кликов, отслеживание ссылок и hash-переходов, точный отказ,
+ * e-commerce. Идентификаторы игрока, ID платформы и любые PII не передаются.
+ */
+const METRICA_COUNTER_ID = import.meta.env.VITE_YM_COUNTER_ID as string | undefined;
+const METRICA_TAG_URL = 'https://mc.yandex.ru/metrika/tag.js';
+
+type YmFunction = ((counterId: string, action: string, ...args: unknown[]) => void) & { a?: unknown[]; l?: number };
+
+function metricaQueue(): YmFunction | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as Window & { ym?: YmFunction };
+  if (!w.ym) {
+    // Очередь-заглушка (официальный сниппет Метрики): вызовы, сделанные до
+    // загрузки tag.js, не теряются, а проигрываются после инициализации.
+    const queued: YmFunction = ((...args: unknown[]) => {
+      (queued.a = queued.a ?? []).push(args);
+    }) as YmFunction;
+    queued.l = Date.now();
+    w.ym = queued;
+  }
+  return w.ym;
+}
+
+function loadMetricaTag(): void {
+  if (typeof document === 'undefined') return;
+  if (document.querySelector(`script[src="${METRICA_TAG_URL}"]`)) return;
+  const script = document.createElement('script');
+  script.src = METRICA_TAG_URL;
+  script.async = true;
+  // Оффлайн/блокировщик/модерация: неудачная загрузка счётчика не должна
+  // всплывать ошибкой в игру — события просто останутся в очереди и умрут.
+  script.addEventListener('error', () => console.warn('[analytics] счётчик Метрики недоступен'));
+  document.head.appendChild(script);
+}
+
+/** Плоские параметры цели: только числа/строки/булевы из самого события. */
+function goalParams(event: GameAnalyticsEvent): Record<string, string | number | boolean> {
+  const params: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(event)) {
+    if (key === 'type') continue;
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') params[key] = value;
+  }
+  return params;
+}
+
+export function createMetricaTracker(counterId = METRICA_COUNTER_ID): AnalyticsTracker {
+  if (!counterId) return noopTracker;
+  const ym = metricaQueue();
+  if (!ym) return noopTracker;
+  try {
+    ym(counterId, 'init', {
+      defer: true,
+      clickmap: false,
+      trackLinks: false,
+      accurateTrackBounce: false,
+      webvisor: false,
+      trackHash: false,
+      ecommerce: false
+    });
+    loadMetricaTag();
+  } catch (e) {
+    console.warn('[analytics] инициализация Метрики не удалась:', e);
+    return noopTracker;
+  }
+  return {
+    track(event) {
+      try {
+        ym(counterId, 'reachGoal', event.type, goalParams(event));
+      } catch {
+        // Аналитика никогда не ломает игру: событие теряется молча.
+      }
+    }
+  };
+}
 
 /**
  * Предохранитель на «немой» SDK: если реклама открылась, но соответствующий
@@ -383,6 +471,8 @@ export function createYandexPlatform(): Platform {
         }
       });
     },
+
+    createAnalyticsTracker: () => createMetricaTracker(),
 
     showRewarded(h: AdHandlers): Promise<boolean> {
       return new Promise((resolve) => {

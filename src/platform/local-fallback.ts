@@ -1,3 +1,4 @@
+import { createDebugTracker } from '../game/analytics';
 import type { SaveData } from '../game/save';
 import { sanitizeSave } from '../game/save';
 import { DEFAULT_PLATFORM_CONFIG } from './types';
@@ -79,6 +80,8 @@ export function createLocalFallbackPlatform(): Platform {
     async showRewarded(): Promise<boolean> {
       return false;
     },
+    // Без платформы отправлять воронку некуда — только консоль для отладки.
+    createAnalyticsTracker: () => createDebugTracker(),
     async showBanner(): Promise<void> {
       // Баннер недоступен без платформы.
     }

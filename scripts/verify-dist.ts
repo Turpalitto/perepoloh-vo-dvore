@@ -21,7 +21,11 @@ const forbidden = [
 // «хосты» без точки (a, b, x, xn--e1aybc) — артефакты извлечения URL из
 // минифицированного кода, а не домены; они отсекаются требованием точки ниже,
 // а не занесением в whitelist (иначе whitelist глушил бы саму проверку).
-const allowedStaticDomains = new Set(['www.w3.org', 'github.com']);
+// mc.yandex.ru — официальный счётчик Яндекс Метрики, рекомендованный самой
+// площадкой для аналитики игр. Скрипт грузится ТОЛЬКО в сборке с заданным
+// VITE_YM_COUNTER_ID (см. src/platform/yandex.ts); без переменной строка домена
+// остаётся в бандле мёртвой, ни одного запроса наружу не уходит.
+const allowedStaticDomains = new Set(['www.w3.org', 'github.com', 'mc.yandex.ru']);
 
 interface PngExpectation {
   path: string;

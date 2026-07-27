@@ -25,12 +25,10 @@ function showFallbackNotice(): void {
 async function boot(): Promise<void> {
   const qaTools = (import.meta.env.DEV || import.meta.env.MODE === 'e2e') && queryParam('qaTools') === '1';
   const qaMode = qaTools && queryParam('qa') === '1';
-  // Только dev/e2e + явный query-параметр: no-op трекер остаётся в production
-  // независимо от строки запроса, и никогда не отправляет данные наружу.
-  if ((import.meta.env.DEV || import.meta.env.MODE === 'e2e') && queryParam('analyticsDebug') === '1') {
-    setAnalyticsTracker(createDebugTracker());
-  }
-  track({ type: 'game_start' });
+  // Только dev/e2e + явный query-параметр: debug-трекер печатает воронку в
+  // консоль и перекрывает трекер платформы (см. ниже), в production недоступен.
+  const analyticsDebug =
+    (import.meta.env.DEV || import.meta.env.MODE === 'e2e') && queryParam('analyticsDebug') === '1';
   applyDaytime();
   applySeason();
   let platform = await createPlatform();
@@ -51,6 +49,11 @@ async function boot(): Promise<void> {
     save = qaToolsModule.createQaSave(save);
     platform = qaToolsModule.createQaPlatform(platform);
   }
+  // Приёмник воронки выбирает платформа (Метрика на Яндексе, консоль локально).
+  // Ставим его после QA-обёртки, иначе game_start ушёл бы из тестового сеанса,
+  // и отправляем первое событие уже настоящим трекером, а не в no-op.
+  setAnalyticsTracker(analyticsDebug ? createDebugTracker() : platform.createAnalyticsTracker());
+  track({ type: 'game_start' });
   // Первый запуск следует языку платформы; ручной выбор хранится в сейве.
   // ?lang= остаётся QA-переопределением и обрабатывается внутри initI18n.
   save.lang = initI18n(hadSave && save.langChosen ? save.lang : platform.getLang());

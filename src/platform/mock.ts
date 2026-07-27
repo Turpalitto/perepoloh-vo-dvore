@@ -1,4 +1,5 @@
 import './mock.css';
+import { createDebugTracker } from '../game/analytics';
 import type { SaveData } from '../game/save';
 import { sanitizeSave } from '../game/save';
 import { queryParam } from '../query';
@@ -133,6 +134,8 @@ export function createMockPlatform(): Platform {
     showRewarded(h: AdHandlers): Promise<boolean> {
       return fakeAd('rewarded', h);
     },
+    // Локально события никуда не уходят — их видно в консоли (см. analytics.ts).
+    createAnalyticsTracker: () => createDebugTracker(),
     async showBanner(): Promise<void> {
       showMockBanner();
     }

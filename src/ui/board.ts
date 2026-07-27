@@ -772,6 +772,8 @@ export class BoardView {
     let steps = Math.abs(move.offset);
     // как и при перетаскивании: лёд может запретить именно эту точку остановки —
     // доводим до ближайшей легальной клетки в ту же сторону вместо отмены хода.
+    // Легальной точки может не оказаться ни одной (на льду нельзя встать даже
+    // упершись в препятствие) — тогда ход невозможен и ниже сработает отдача.
     const hardLimit = exit ? steps : sign > 0 ? move.inPos[move.axis] : move.inNeg[move.axis];
     let result = applyMove(this.level, this.state, move.idx, dx, dy, steps);
     while (!result && !exit && steps < hardLimit) {
@@ -1017,9 +1019,14 @@ export class BoardView {
       const dx = axis === 'x' ? Math.sign(steps) : 0;
       const dy = axis === 'y' ? Math.sign(steps) : 0;
       let magnitude = Math.abs(steps);
-      // Ледяная колея запрещает часть промежуточных стопов (applyMove вернёт null).
+      // Ледяная колея запрещает часть точек остановки (applyMove вернёт null).
       // Вместо снапа в начало «доводим» жест вперёд до ближайшей легальной точки
       // в ту же сторону — так отпускание на льду не выглядит как баг.
+      //
+      // Важно: упор в препятствие больше НЕ гарантирует легальную остановку —
+      // по новой редакции правила на льду нельзя встать и вынужденно. Полоса
+      // может не иметь ни одной легальной точки вперёд, тогда цикл упирается в
+      // hardLimit без результата: ход невозможен, отвечаем отдачей.
       const hardLimit = exit ? magnitude : steps > 0 ? maxIn : -minIn;
       let res = applyMove(this.level, this.state, d.idx, dx, dy, magnitude);
       while (!res && !exit && magnitude < hardLimit) {
@@ -1030,6 +1037,9 @@ export class BoardView {
         this.commit(res, d.idx, exit, dx, dy, magnitude);
         return;
       }
+      // легальной остановки в эту сторону нет вовсе — отдача, как при упоре
+      this.bumpPiece(d.idx, axis);
+      this.events.onBump();
     }
     // снап назад
     el.style.transform = this.pieceTransform(d.idx);

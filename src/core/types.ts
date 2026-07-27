@@ -55,6 +55,15 @@ export interface IceDef {
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
+/**
+ * Роль уровня в кривой сложности кампании. Обычные уровни роль не задают —
+ * им запрещено быть легче предыдущего. Помеченные роли — единственное
+ * исключение, разрешённое тестом `levels.test.ts`:
+ * `tutorial` — знакомство с новой механикой (осознанно проще соседей),
+ * `breather` — передышка после тяжёлого кластера.
+ */
+export type LevelRole = 'tutorial' | 'breather';
+
 export interface LevelDef {
   id: number;
   name: string;
@@ -71,6 +80,8 @@ export interface LevelDef {
   /** Порог двух звёзд: ходов <= par2. */
   par2: number;
   difficulty: Difficulty;
+  /** Роль в кривой сложности; задаётся только уровням, которым разрешено быть легче предыдущего. */
+  role?: LevelRole;
   mechanics: string[];
   /** Однострочная подсказка-обучение (показывается в начале уровня). */
   hint?: string;

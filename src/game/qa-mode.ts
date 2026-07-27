@@ -9,7 +9,7 @@ export function createQaSave(base: SaveData): SaveData {
   return {
     ...base,
     stars: Object.fromEntries(levelsJson.map((level) => [String(level.id), 3])),
-    lastLevel: 100,
+    lastLevel: levelsJson[levelsJson.length - 1].id,
     campaignDone: true,
     endingSeen: true,
     eliteMedals: {},

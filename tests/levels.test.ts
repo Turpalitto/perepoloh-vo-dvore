@@ -3,18 +3,80 @@ import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import { validateLevel } from '../src/core/validator';
 import { BOSSES } from '../src/game/boss';
+import { SOLVER_SHARDS } from './solver-shards';
 
 const LEVELS = levelsJson as LevelDef[];
 
 describe('уровни игры', () => {
-  it('ровно 100 уровней с уникальными id по порядку', () => {
-    expect(LEVELS).toHaveLength(100);
-    expect(LEVELS.map((l) => l.id)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+  it('id уникальны, положительны и стабильны как ключ сейва', () => {
+    // Порядок в массиве задаёт кампанию, id — ключ звёзд и ссылок (боссы,
+    // мастер-испытания). Поэтому id НЕ обязаны идти подряд: уровни, вставленные
+    // в середину кампании после релиза, получают свободные id, чтобы не сдвинуть
+    // звёзды живых игроков.
+    expect(LEVELS.length).toBeGreaterThanOrEqual(100);
+    expect(new Set(LEVELS.map((l) => l.id)).size).toBe(LEVELS.length);
+    for (const level of LEVELS) expect(Number.isInteger(level.id) && level.id >= 1).toBe(true);
+    expect(LEVELS[0].id).toBe(1);
   });
 
-  it('сложность кампании нигде не падает: каждый уровень не легче предыдущего', () => {
+  it('сложность кампании падает только на помеченных уровнях, и кривая возвращается', () => {
+    // Инвариант заменяет прежнюю строгую монотонность par: она запрещала и
+    // обучающие мини-главы, и передышки после пиков. Теперь просадка разрешена
+    // только помеченному уровню и только под гарантию возврата к кривой.
+    let i = 1;
+    while (i < LEVELS.length) {
+      const level = LEVELS[i];
+      const before = LEVELS[i - 1].par;
+      if (level.par >= before) {
+        i++;
+        continue;
+      }
+      expect(level.role, `уровень ${level.id} легче предыдущего без роли`).toBeDefined();
+
+      if (level.role === 'breather') {
+        // Отдых после пика: один уровень, не глубже двух ходов, не подряд.
+        expect(before - level.par, `уровень ${level.id}: передышка глубже двух ходов`).toBeLessThanOrEqual(2);
+        expect(LEVELS[i + 1]?.role, `уровень ${level.id}: две передышки подряд`).not.toBe('breather');
+        i++;
+        continue;
+      }
+
+      // Обучающая мини-глава: может начаться заметно легче, но обязана расти
+      // внутри себя и вернуть кампанию на прежний уровень сложности сразу после.
+      let end = i;
+      while (end + 1 < LEVELS.length && LEVELS[end + 1].role === 'tutorial') end++;
+      for (let k = i; k < end; k++) {
+        expect(LEVELS[k + 1].par, `уровень ${LEVELS[k + 1].id}: мини-глава не растёт`).toBeGreaterThanOrEqual(
+          LEVELS[k].par
+        );
+      }
+      const after = LEVELS[end + 1];
+      expect(after?.par ?? before, `после мини-главы (${level.id}…) кампания не вернулась к сложности`).toBeGreaterThanOrEqual(
+        before
+      );
+      i = end + 1;
+    }
+  });
+
+  it('каждый уровень покрыт ровно одним шардом решателя', () => {
+    // Правило проекта: par обязан совпадать с оптимумом решателя. Доказывают это
+    // шард-файлы, поэтому уровень вне всех диапазонов остался бы недоказанным.
+    for (const level of LEVELS) {
+      const hits = SOLVER_SHARDS.filter((shard) => shard.match(level.id));
+      expect(hits.length, `уровень ${level.id}: шардов решателя ${hits.length}, нужен ровно 1`).toBe(1);
+    }
+  });
+
+  it('роль не навешивается на уровень, который не облегчает кривую', () => {
+    expect(LEVELS[0].role).toBeUndefined();
     for (let i = 1; i < LEVELS.length; i++) {
-      expect(LEVELS[i].par).toBeGreaterThanOrEqual(LEVELS[i - 1].par);
+      const level = LEVELS[i];
+      if (level.role === undefined) continue;
+      // Либо уровень действительно легче предыдущего, либо он — продолжение
+      // мини-главы той же роли (внутри неё сложность уже растёт).
+      const startsRelief = level.par < LEVELS[i - 1].par;
+      const continuesChain = LEVELS[i - 1].role === level.role;
+      expect(startsRelief || continuesChain, `уровень ${level.id}: роль без причины`).toBe(true);
     }
   });
 
@@ -92,6 +154,7 @@ describe('уровни игры', () => {
         }
         expect(level.mechanics.includes('star')).toBe(level.star !== undefined);
         expect(level.mechanics.includes('gate-switch')).toBe(level.gateSwitch !== undefined);
+        expect(level.mechanics.includes('ice')).toBe((level.ice?.length ?? 0) > 0);
       });
     });
   }

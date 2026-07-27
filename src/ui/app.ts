@@ -34,6 +34,7 @@ import {
 } from '../game/weekly';
 import { getLang, levelText, setLang, t } from '../game/i18n';
 import {
+  campaignNumber,
   completedCampaignLevels,
   isLevelUnlocked,
   newlyUnlocked,
@@ -1028,7 +1029,7 @@ export class App {
           return `<article class="achievement-card${done ? ' done' : ''}" data-testid="achievement-${achievement.key}">
             <div class="achievement-icon">${achievement.icon}</div>
             <div class="achievement-copy"><strong>${t(`achievement.${achievement.key}.title`)}</strong>
-              <span>${t(`achievement.${achievement.key}.desc`)}</span>
+              <span>${t(`achievement.${achievement.key}.desc`, { n: achievement.goal })}</span>
               <div class="achievement-track"><i style="width:${Math.round((progress / achievement.goal) * 100)}%"></i></div>
               <small>${done ? `✓ ${t('achievements.done')}` : `${progress} / ${achievement.goal}`}</small>
             </div>
@@ -1146,9 +1147,11 @@ export class App {
     this.setGameplay(false);
     const parts: string[] = [];
     const currentId = nextLevelToPlay(LEVELS, this.store.data).id;
-    LEVELS.forEach((l) => {
-      if ((l.id - 1) % 12 === 0) {
-        const chapter = Math.floor((l.id - 1) / 12) + 1;
+    // Главы режутся по позиции в кампании, а не по id: вставленные уровни
+    // получают id 101+, и деление по id развалило бы и заголовки, и подсчёт звёзд.
+    LEVELS.forEach((l, index) => {
+      if (index % 12 === 0) {
+        const chapter = Math.floor(index / 12) + 1;
         const chapterLevels = LEVELS.slice((chapter - 1) * 12, chapter * 12);
         const chapterStars = chapterLevels.reduce((sum, chapterLevel) => sum + this.store.starsOf(chapterLevel.id), 0);
         parts.push(
@@ -1162,7 +1165,7 @@ export class App {
           unlocked ? '' : 'disabled'
         }>
           ${unlocked ? levelThumbnail(l) : ''}
-          <span class="level-num">${l.width > 6 ? '👑 ' : ''}${l.id}</span>
+          <span class="level-num">${l.width > 6 ? '👑 ' : ''}${index + 1}</span>
           <span class="level-stars">${
             unlocked
               ? starIcons(stars)
@@ -1543,7 +1546,7 @@ export class App {
           ? `🔥 ${t('daily.title')}`
           : endless
             ? `🌀 ${t('endless.title')} · ${level.name}`
-            : `${isBoss ? '👑 ' : ''}${level.id}. ${levelText('name', level.name)}`;
+            : `${isBoss ? '👑 ' : ''}${campaignNumber(LEVELS, level.id) || level.id}. ${levelText('name', level.name)}`;
     const starHud = level.star ? `<span class="hud-star" data-testid="hud-star">★</span>` : '';
     this.root.innerHTML = `
       <div class="screen game-screen${boss ? ` boss-game-screen ${bossWorldClass}` : ''}" data-testid="screen-game"${
@@ -2092,10 +2095,13 @@ export class App {
           n: newYardStage * 10
         })}</div>`
       : '';
+    // Глава закрывается по позиции в кампании: у вставленных уровней id 101+,
+    // и счёт по id объявлял бы «главу пройдена» в произвольных местах.
+    const campaignPos = campaignNumber(LEVELS, level.id);
     const chapterNote =
-      !daily && (level.id % 12 === 0 || level.id === CAMPAIGN_LAST_ID)
+      !daily && campaignPos > 0 && (campaignPos % 12 === 0 || level.id === CAMPAIGN_LAST_ID)
         ? `<div class="win-master chapter-complete" data-testid="win-chapter">${t('win.chapter', {
-            n: Math.ceil(level.id / 12)
+            n: Math.ceil(campaignPos / 12)
           })}</div>`
         : '';
     const eliteReplayNote =
@@ -2163,8 +2169,10 @@ export class App {
       this.audio.play('click');
       this.winsSinceAd++;
       const adConfig = this.platform.config;
+      // Порог «не раньше N-го уровня» считается по позиции в кампании: у
+      // вставленных уровней id 101+, и сравнение по id обошло бы защиту новичка.
       const canShowAd =
-        level.id >= adConfig.interstitialMinLevel &&
+        (campaignPos || level.id) >= adConfig.interstitialMinLevel &&
         performance.now() - this.sessionStartedAt >= adConfig.interstitialMinSessionMs;
       if (canShowAd && this.winsSinceAd >= adConfig.interstitialEvery) {
         this.winsSinceAd = 0;

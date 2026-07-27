@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import { solve } from '../src/core/solver';
+import { SOLVER_SHARDS } from './solver-shards';
 
-const LEVELS = (levelsJson as LevelDef[]).filter((l) => l.id >= 82 && l.id <= 92);
+const SHARD = SOLVER_SHARDS[2];
+const LEVELS = (levelsJson as LevelDef[]).filter((l) => SHARD.match(l.id));
 
-describe('решатель уровней 82–92', () => {
+describe(`решатель ${SHARD.title}`, () => {
   for (const level of LEVELS) {
     const timeout = level.par >= 15 || level.pieces.length >= 13 ? 60_000 : 20_000;
     it(`уровень ${level.id}: оптимум и 3 звезды достижимы`, { timeout }, () => {

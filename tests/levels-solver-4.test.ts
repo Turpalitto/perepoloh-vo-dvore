@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import { solve } from '../src/core/solver';
+import { SOLVER_SHARDS } from './solver-shards';
 
 // Уровень 93 — самый тяжёлый для решателя в диапазоне 51–99, живёт в своём
 // файле, чтобы не складываться с соседями и не подводить vitest-worker RPC.
-const LEVELS = (levelsJson as LevelDef[]).filter((l) => l.id === 93);
+const SHARD = SOLVER_SHARDS[3];
+const LEVELS = (levelsJson as LevelDef[]).filter((l) => SHARD.match(l.id));
 
-describe('решатель уровня 93', () => {
+describe(`решатель ${SHARD.title}`, () => {
   for (const level of LEVELS) {
     it(`уровень ${level.id}: оптимум и 3 звезды достижимы`, { timeout: 60_000 }, () => {
       const result = solve(level);

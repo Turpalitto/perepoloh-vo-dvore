@@ -1,4 +1,5 @@
 import { Page, expect, test } from '@playwright/test';
+import { CAMPAIGN_LEVEL_IDS } from './campaign-levels';
 
 /**
  * Регрессия дизайн-аудита: посткампанийное главное меню на маленьких телефонах.
@@ -15,8 +16,10 @@ const VIEWPORTS = [
 ] as const;
 
 async function seedCampaignDone(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const stars = Object.fromEntries(Array.from({ length: 100 }, (_, index) => [String(index + 1), 3]));
+  // Id берём из данных кампании, а не из диапазона 1..100: вставленные уровни
+  // получают id 101+, и «пройдено всё» по счётчику разошлось бы с реальностью.
+  await page.addInitScript((levelIds: number[]) => {
+    const stars = Object.fromEntries(levelIds.map((id) => [String(id), 3]));
     localStorage.setItem(
       'parkovka.save.v1',
       JSON.stringify({
@@ -25,7 +28,7 @@ async function seedCampaignDone(page: Page): Promise<void> {
         sound: false,
         music: false,
         lang: 'ru',
-        lastLevel: 100,
+        lastLevel: levelIds[levelIds.length - 1],
         targetSkin: 0,
         campaignDone: true,
         campaignDoneAt: '2026-07-20',
@@ -33,7 +36,7 @@ async function seedCampaignDone(page: Page): Promise<void> {
         endlessBest: 3
       })
     );
-  });
+  }, CAMPAIGN_LEVEL_IDS);
 }
 
 async function seedMidCampaign(page: Page): Promise<void> {

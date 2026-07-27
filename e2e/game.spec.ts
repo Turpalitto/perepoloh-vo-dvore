@@ -1,4 +1,5 @@
 import { Page, expect, test } from '@playwright/test';
+import { CAMPAIGN_LEVEL_IDS } from './campaign-levels';
 
 /** Собираем ошибки страницы; в конце каждого теста их не должно быть. */
 function trackErrors(page: Page): string[] {
@@ -379,16 +380,16 @@ test.describe('Переполох во дворе', () => {
   });
 
   test('гараж: дальний скин виден и выбирается на мобильном экране', async ({ page }) => {
-    await page.addInitScript(() => {
+    await page.addInitScript((levelIds: number[]) => {
       // Только первый заход: перезагрузка ниже проверяет сохранение выбора.
       if (sessionStorage.getItem('garage-seeded') === '1') return;
       sessionStorage.setItem('garage-seeded', '1');
-      const stars = Object.fromEntries(Array.from({ length: 100 }, (_, index) => [String(index + 1), 3]));
+      const stars = Object.fromEntries(levelIds.map((id) => [String(id), 3]));
       localStorage.setItem(
         'parkovka.save.v1',
         JSON.stringify({ v: 1, stars, sound: true, music: true, lang: 'ru', lastLevel: 1, targetSkin: 8 })
       );
-    });
+    }, CAMPAIGN_LEVEL_IDS);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await page.getByTestId('menu-garage').click();

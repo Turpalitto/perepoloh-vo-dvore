@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest';
 import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import { solve } from '../src/core/solver';
+import { SOLVER_SHARDS } from './solver-shards';
 
 // Уровни разбиты на несколько файлов не только по номерам, но и так, чтобы
 // суммарное время синхронного решателя внутри одного файла не подводило
 // vitest-worker RPC к таймауту (решатель блокирует event loop без await).
-const LEVELS = (levelsJson as LevelDef[]).filter((l) => l.id >= 51 && l.id <= 81);
+const SHARD = SOLVER_SHARDS[1];
+const LEVELS = (levelsJson as LevelDef[]).filter((l) => SHARD.match(l.id));
 
-describe('решатель уровней 51–81', () => {
+describe(`решатель ${SHARD.title}`, () => {
   for (const level of LEVELS) {
     const timeout = level.par >= 15 || level.pieces.length >= 13 ? 60_000 : 20_000;
     it(`уровень ${level.id}: оптимум и 3 звезды достижимы`, { timeout }, () => {

@@ -5500,6 +5500,121 @@
     "hint": "Свинарник у самого выезда — обходи через ящики"
   },
   {
+    "id": 101,
+    "name": "Полдник во дворе",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 0,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "tractor",
+        "x": 1,
+        "y": 4,
+        "len": 3,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 4,
+        "y": 4,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "C",
+        "kind": "tractor",
+        "x": 5,
+        "y": 1,
+        "len": 3,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 0,
+        "y": 3,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "E",
+        "kind": "tractor",
+        "x": 1,
+        "y": 1,
+        "len": 3,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 2,
+        "y": 5,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "G",
+        "kind": "car",
+        "x": 3,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "H",
+        "kind": "truck",
+        "x": 3,
+        "y": 0,
+        "len": 3,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "I",
+        "kind": "car",
+        "x": 2,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      }
+    ],
+    "walls": [],
+    "star": {
+      "x": 1,
+      "y": 0
+    },
+    "par": 8,
+    "par2": 10,
+    "difficulty": "medium",
+    "role": "breather",
+    "mechanics": [
+      "truck",
+      "tractor",
+      "star"
+    ]
+  },
+  {
     "id": 55,
     "name": "Великая уборка",
     "width": 6,
@@ -7255,6 +7370,113 @@
     "hint": "Жёрнов тяжёлый — грузовики вокруг него двигай по очереди"
   },
   {
+    "id": 102,
+    "name": "Тихий час",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 0,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "truck",
+        "x": 4,
+        "y": 0,
+        "len": 3,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 4,
+        "y": 3,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "C",
+        "kind": "car",
+        "x": 5,
+        "y": 4,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 3,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "E",
+        "kind": "tractor",
+        "x": 2,
+        "y": 4,
+        "len": 3,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "F",
+        "kind": "tractor",
+        "x": 1,
+        "y": 0,
+        "len": 3,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "G",
+        "kind": "crate",
+        "x": 3,
+        "y": 1,
+        "len": 1,
+        "dir": "any",
+        "maxMoves": 2
+      },
+      {
+        "id": "H",
+        "kind": "truck",
+        "x": 1,
+        "y": 3,
+        "len": 3,
+        "dir": "v",
+        "skin": 1
+      }
+    ],
+    "walls": [],
+    "star": {
+      "x": 2,
+      "y": 1
+    },
+    "par": 9,
+    "par2": 11,
+    "difficulty": "medium",
+    "role": "breather",
+    "mechanics": [
+      "truck",
+      "tractor",
+      "crate",
+      "star"
+    ]
+  },
+  {
     "id": 71,
     "name": "Босс: Тракторный слёт",
     "width": 7,
@@ -8667,6 +8889,101 @@
       "star"
     ],
     "hint": "Сад зарос — сначала расчисти ближние ряды"
+  },
+  {
+    "id": 103,
+    "name": "Передышка у сарая",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 0,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "tractor",
+        "x": 2,
+        "y": 3,
+        "len": 3,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "B",
+        "kind": "truck",
+        "x": 2,
+        "y": 0,
+        "len": 3,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "C",
+        "kind": "tractor",
+        "x": 0,
+        "y": 5,
+        "len": 3,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "D",
+        "kind": "crate",
+        "x": 0,
+        "y": 0,
+        "len": 1,
+        "dir": "any",
+        "maxMoves": 1
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 3,
+        "y": 1,
+        "len": 2,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 4,
+        "y": 4,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      }
+    ],
+    "walls": [
+      {
+        "x": 0,
+        "y": 3,
+        "kind": "hay"
+      }
+    ],
+    "star": {
+      "x": 5,
+      "y": 5
+    },
+    "par": 10,
+    "par2": 12,
+    "difficulty": "medium",
+    "role": "breather",
+    "mechanics": [
+      "truck",
+      "tractor",
+      "crate",
+      "star"
+    ]
   },
   {
     "id": 83,
@@ -10099,6 +10416,127 @@
       "star"
     ],
     "hint": "Каретный двор тесный — здесь пригодится каждая машина"
+  },
+  {
+    "id": 104,
+    "name": "Чай на крыльце",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 1,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "car",
+        "x": 2,
+        "y": 4,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 3,
+        "y": 5,
+        "len": 2,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "C",
+        "kind": "car",
+        "x": 4,
+        "y": 0,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "D",
+        "kind": "truck",
+        "x": 5,
+        "y": 3,
+        "len": 3,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 3,
+        "y": 3,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 1,
+        "y": 0,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "G",
+        "kind": "truck",
+        "x": 4,
+        "y": 2,
+        "len": 3,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "H",
+        "kind": "crate",
+        "x": 0,
+        "y": 2,
+        "len": 1,
+        "dir": "any",
+        "maxMoves": 2
+      },
+      {
+        "id": "I",
+        "kind": "truck",
+        "x": 0,
+        "y": 3,
+        "len": 3,
+        "dir": "h",
+        "skin": 0
+      }
+    ],
+    "walls": [
+      {
+        "x": 0,
+        "y": 0,
+        "kind": "barrel"
+      }
+    ],
+    "star": {
+      "x": 3,
+      "y": 0
+    },
+    "par": 13,
+    "par2": 15,
+    "difficulty": "hard",
+    "role": "breather",
+    "mechanics": [
+      "truck",
+      "crate",
+      "star"
+    ]
   },
   {
     "id": 95,

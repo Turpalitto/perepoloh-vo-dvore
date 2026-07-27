@@ -1,4 +1,5 @@
 import { Page, expect, test } from '@playwright/test';
+import { CAMPAIGN_LEVEL_IDS, LAST_CAMPAIGN_LEVEL_ID } from './campaign-levels';
 
 type SaveData = {
   campaignDone?: boolean;
@@ -19,11 +20,11 @@ async function seedSave(page: Page, overrides: SaveData = {}): Promise<void> {
     sessionStorage.setItem('post-campaign-seeded', '1');
   }, {
     v: 1,
-    stars: { '100': 3 },
+    stars: { [String(LAST_CAMPAIGN_LEVEL_ID)]: 3 },
     sound: true,
     music: true,
     lang: 'ru',
-    lastLevel: 100,
+    lastLevel: LAST_CAMPAIGN_LEVEL_ID,
     targetSkin: 0,
     campaignDone: true,
     endingSeen: true,
@@ -32,10 +33,14 @@ async function seedSave(page: Page, overrides: SaveData = {}): Promise<void> {
 }
 
 async function seedBeforeFinalBoss(page: Page): Promise<void> {
-  const stars = Object.fromEntries(Array.from({ length: 99 }, (_, index) => [String(index + 1), 3]));
+  // «Пройдено всё, кроме финала» — по позиции в кампании: уровни, вставленные
+  // после релиза, имеют id вне 1..99, и диапазон оставил бы их непройденными,
+  // отправив «Продолжить» не на финального босса.
+  const beforeFinal = CAMPAIGN_LEVEL_IDS.slice(0, -1);
+  const stars = Object.fromEntries(beforeFinal.map((id) => [String(id), 3]));
   await seedSave(page, {
     stars,
-    lastLevel: 99,
+    lastLevel: beforeFinal[beforeFinal.length - 1],
     campaignDone: undefined,
     endingSeen: undefined
   });
@@ -256,23 +261,25 @@ test.describe('Post-campaign', () => {
     ).toBe(0);
 
     await page.getByTestId('btn-back').click();
-    const stars = Object.fromEntries(
-      Array.from({ length: 99 }, (_, index) => [String(index + 1), 3])
+    const beforeFinal = CAMPAIGN_LEVEL_IDS.slice(0, -1);
+    const stars = Object.fromEntries(beforeFinal.map((id) => [String(id), 3]));
+    await page.evaluate(
+      ({ stars, lastLevel }) => {
+        localStorage.setItem(
+          'parkovka.save.v1',
+          JSON.stringify({
+            v: 1,
+            stars,
+            sound: false,
+            music: false,
+            lang: 'ru',
+            lastLevel,
+            targetSkin: 0
+          })
+        );
+      },
+      { stars, lastLevel: beforeFinal[beforeFinal.length - 1] }
     );
-    await page.evaluate((stars) => {
-      localStorage.setItem(
-        'parkovka.save.v1',
-        JSON.stringify({
-          v: 1,
-          stars,
-          sound: false,
-          music: false,
-          lang: 'ru',
-          lastLevel: 99,
-          targetSkin: 0
-        })
-      );
-    }, stars);
     await page.reload();
     await completeFinalBoss(page);
     await expect(page.getByTestId('ending-reward')).toBeVisible({ timeout: 7000 });

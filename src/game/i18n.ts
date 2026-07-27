@@ -1014,7 +1014,12 @@ const EN_NAMES: Dict = {
   'Сеновал под крышей': 'Hayloft Under the Roof',
   'Каретный двор': 'The Carriage Yard',
   Кузница: 'The Forge',
-  'Босс: Хозяин усадьбы': 'Boss: Master of the Estate'
+  'Босс: Хозяин усадьбы': 'Boss: Master of the Estate',
+  // Уровни-передышки, добавленные после релиза.
+  'Полдник во дворе': 'Afternoon Snack',
+  'Тихий час': 'Quiet Hour',
+  'Передышка у сарая': 'Breather by the Barn',
+  'Чай на крыльце': 'Tea on the Porch'
 };
 
 const EN_HINTS: Dict = {
@@ -1023,7 +1028,9 @@ const EN_HINTS: Dict = {
   'Грузовик длинный — освободи ему место': 'The truck is long — clear some room',
   'Иногда сперва нужно подвинуть соседа': 'Sometimes move a neighbour first',
   'Проедь по канистре — получишь звезду!': 'Drive over the can to grab a star!',
+  'Сначала освободи место для машины у канистры': 'First clear room for the car by the can',
   'Ящик тяжёлый: его можно сдвинуть только 1 раз': 'The crate is heavy: it moves only once',
+  'Подготовь место: ящик можно передвинуть только один раз': 'Make room first: the crate moves only once',
   'Проедь по красной кнопке любой машиной — замок на воротах откроется!': 'Drive any vehicle over the red plate to unlock the gate!',
   'Расчисти простой путь к воротам': 'Clear a simple path to the gate',
   'Сдвинь ближайшую машину — путь откроется': 'Move the nearest car — the path opens',
@@ -1158,7 +1165,12 @@ const TR_NAMES: Dict = {
   'Сеновал под крышей': 'Çatı Altı Samanlık',
   'Каретный двор': 'Fayton Avlusu',
   Кузница: 'Demirci Dükkanı',
-  'Босс: Хозяин усадьбы': 'Boss: Çiftliğin Sahibi'
+  'Босс: Хозяин усадьбы': 'Boss: Çiftliğin Sahibi',
+  // Уровни-передышки, добавленные после релиза.
+  'Полдник во дворе': 'İkindi Molası',
+  'Тихий час': 'Sessiz Saat',
+  'Передышка у сарая': 'Ahırda Mola',
+  'Чай на крыльце': 'Verandada Çay'
 };
 
 const TR_HINTS: Dict = {
@@ -1167,7 +1179,9 @@ const TR_HINTS: Dict = {
   'Грузовик длинный — освободи ему место': 'Kamyon uzun — yer aç',
   'Иногда сперва нужно подвинуть соседа': 'Bazen önce komşuyu kaydır',
   'Проедь по канистре — получишь звезду!': 'Güğümün üstünden geç, yıldızı al!',
+  'Сначала освободи место для машины у канистры': 'Önce güğümün yanındaki arabaya yer aç',
   'Ящик тяжёлый: его можно сдвинуть только 1 раз': 'Sandık ağır: sadece bir kez taşınır',
+  'Подготовь место: ящик можно передвинуть только один раз': 'Önce yer aç: sandık yalnızca bir kez taşınır',
   'Проедь по красной кнопке любой машиной — замок на воротах откроется!': 'Kapıyı açmak için herhangi bir araçla kırmızı düğmenin üzerinden geç!',
   'Расчисти простой путь к воротам': 'Kapıya giden basit yolu aç',
   'Сдвинь ближайшую машину — путь откроется': 'En yakın arabayı kaydır — yol açılır',

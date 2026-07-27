@@ -1,5 +1,5 @@
 import { Page, expect, test } from '@playwright/test';
-import { CAMPAIGN_LEVEL_IDS } from './campaign-levels';
+import { CAMPAIGN_LEVEL_IDS, CAMPAIGN_MAX_STARS } from './campaign-levels';
 
 /** Собираем ошибки страницы; в конце каждого теста их не должно быть. */
 function trackErrors(page: Page): string[] {
@@ -87,7 +87,7 @@ test.describe('Переполох во дворе', () => {
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await expect(page.getByTestId('menu-play')).toBeVisible();
     await expect(page.getByTestId('screen-menu')).toContainText('Переполох');
-    await expect(page.getByTestId('stars-total')).toContainText('★ 0 / 300');
+    await expect(page.getByTestId('stars-total')).toContainText(`★ 0 / ${CAMPAIGN_MAX_STARS}`);
     expect(errors).toEqual([]);
   });
 
@@ -245,10 +245,10 @@ test.describe('Переполох во дворе', () => {
     await dragPiece(page, 'T', 5.7, 0);
     await expect(page.getByTestId('win-overlay')).toBeVisible();
     await page.getByTestId('btn-win-menu').click();
-    await expect(page.getByTestId('stars-total')).toContainText('★ 3 / 300');
+    await expect(page.getByTestId('stars-total')).toContainText(`★ 3 / ${CAMPAIGN_MAX_STARS}`);
     await page.reload();
     await expect(page.getByTestId('menu-play')).toHaveText('Продолжить');
-    await expect(page.getByTestId('stars-total')).toContainText('★ 3 / 300');
+    await expect(page.getByTestId('stars-total')).toContainText(`★ 3 / ${CAMPAIGN_MAX_STARS}`);
     await page.getByTestId('menu-levels').click();
     await expect(page.getByTestId('level-card-1')).toContainText('★★★');
     await expect(page.getByTestId('level-card-2')).toBeEnabled();
@@ -910,16 +910,21 @@ test.describe('Боссы 25/50/75/100', () => {
 
   /** Прогресс до слота босса (уровни 1..slot-1 пройдены на 3 звезды). */
   async function seedToBoss(page: Page, slot: number, extra: Record<string, unknown> = {}): Promise<void> {
+    // «Пройдено до босса» — это позиция в кампании, а не диапазон id: уровни,
+    // вставленные между слотами боссов, имеют id вне 1..slot, и без них
+    // «Продолжить» уводило бы не на босса, а на первый непройденный новый уровень.
+    const slotIndex = CAMPAIGN_LEVEL_IDS.indexOf(slot);
     const stars: Record<string, number> = {};
-    for (let i = 1; i < slot; i++) stars[String(i)] = 3;
+    for (const id of CAMPAIGN_LEVEL_IDS.slice(0, slotIndex)) stars[String(id)] = 3;
+    const previousId = CAMPAIGN_LEVEL_IDS[slotIndex - 1] ?? slot;
     await page.addInitScript(
-      ({ stars, slot, extra }) => {
+      ({ stars, previousId, extra }) => {
         localStorage.setItem(
           'parkovka.save.v1',
-          JSON.stringify({ v: 1, stars, sound: true, music: true, lang: 'ru', lastLevel: slot - 1, targetSkin: 0, ...extra })
+          JSON.stringify({ v: 1, stars, sound: true, music: true, lang: 'ru', lastLevel: previousId, targetSkin: 0, ...extra })
         );
       },
-      { stars, slot, extra }
+      { stars, previousId, extra }
     );
   }
 

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { CAMPAIGN_LEVEL_IDS, CAMPAIGN_MAX_STARS } from './campaign-levels';
 
 test('QA button unlocks everything without changing real progress', async ({ page }) => {
   await page.addInitScript(() => {
@@ -19,18 +20,18 @@ test('QA button unlocks everything without changing real progress', async ({ pag
   });
 
   await page.goto('/?mock=1&qaTools=1&lang=ru&daytime=day');
-  await expect(page.getByTestId('stars-total')).toHaveText('★ 1 / 300');
+  await expect(page.getByTestId('stars-total')).toHaveText(`★ 1 / ${CAMPAIGN_MAX_STARS}`);
   await page.getByTestId('menu-settings').click();
   await page.getByTestId('qa-toggle').click();
 
   await expect(page).toHaveURL(/qa=1/);
   await expect(page.getByTestId('qa-mode-notice')).toBeVisible();
-  await expect(page.getByTestId('stars-total')).toHaveText('★ 300 / 300');
+  await expect(page.getByTestId('stars-total')).toHaveText(`★ ${CAMPAIGN_MAX_STARS} / ${CAMPAIGN_MAX_STARS}`);
   await expect(page.getByTestId('menu-elite')).toBeVisible();
   await expect(page.getByTestId('menu-endless')).toBeVisible();
 
   await page.getByTestId('menu-levels').click();
-  await expect(page.locator('.level-card')).toHaveCount(100);
+  await expect(page.locator('.level-card')).toHaveCount(CAMPAIGN_LEVEL_IDS.length);
   await expect(page.locator('.level-card.locked')).toHaveCount(0);
   await page.getByTestId('btn-back').click();
 
@@ -38,7 +39,7 @@ test('QA button unlocks everything without changing real progress', async ({ pag
   await page.getByTestId('qa-toggle').click();
   await expect(page).not.toHaveURL(/(?:\?|&)qa=1/);
   await expect(page.getByTestId('qa-mode-notice')).toHaveCount(0);
-  await expect(page.getByTestId('stars-total')).toHaveText('★ 1 / 300');
+  await expect(page.getByTestId('stars-total')).toHaveText(`★ 1 / ${CAMPAIGN_MAX_STARS}`);
 });
 
 test('QA-редактор уровней: проверка, решение и тестовый запуск черновика', async ({ page }) => {
@@ -96,5 +97,5 @@ test('QA yard preview selects a campaign milestone without changing unlocked con
   await expect(yard).toHaveAttribute('data-yard-era', '2');
   await expect(page.locator('[data-yard-detail=birdhouse]')).toBeVisible();
   await expect(page.locator('[data-yard-detail=champion-arch]')).toHaveCount(0);
-  await expect(page.getByTestId('stars-total')).toHaveText('★ 300 / 300');
+  await expect(page.getByTestId('stars-total')).toHaveText(`★ ${CAMPAIGN_MAX_STARS} / ${CAMPAIGN_MAX_STARS}`);
 });

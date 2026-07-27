@@ -20,3 +20,6 @@ export const CAMPAIGN_LEVEL_IDS: number[] = levels.map((level) => level.id);
 
 /** Последний уровень кампании — финал, он же слот финального босса. */
 export const LAST_CAMPAIGN_LEVEL_ID = CAMPAIGN_LEVEL_IDS[CAMPAIGN_LEVEL_IDS.length - 1];
+
+/** Потолок счётчика звёзд в меню: три звезды за уровень. */
+export const CAMPAIGN_MAX_STARS = CAMPAIGN_LEVEL_IDS.length * 3;

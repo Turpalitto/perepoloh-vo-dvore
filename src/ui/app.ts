@@ -34,8 +34,10 @@ import {
 } from '../game/weekly';
 import { getLang, levelText, setLang, t } from '../game/i18n';
 import {
+  ENDLESS_UNLOCK_AT,
   campaignNumber,
   completedCampaignLevels,
+  endlessAccess,
   isLevelUnlocked,
   newlyUnlocked,
   nextLevelToPlay,
@@ -741,12 +743,15 @@ export class App {
     // Единственный источник истины о завершении кампании — флаг сейва;
     // всё меню (CTA, табы, гараж) выводится из этого одного значения.
     const campaignDone = this.store.data.campaignDone === true;
-    const endlessOpen = this.store.starsOf(LEVELS[LEVELS.length - 1].id) > 0;
+    const endless = endlessAccess(LEVELS, this.store.data);
     const unlockedSkinCount = TARGET_SKINS.filter((skin) =>
       skin.elite ? campaignDone : total >= skin.unlockStars
     ).length;
     const week = currentWeekKey();
-    const weeklyQuests = selectWeeklyQuests(week, campaignDone).map((quest) => {
+    // Недельные цели по «Бесконечному двору» выдаются только тем, кому режим
+    // уже доступен: иначе игрок получает заведомо невыполнимую цель и теряет
+    // недельную награду. Тизер доступом не считается.
+    const weeklyQuests = selectWeeklyQuests(week, endless === 'open').map((quest) => {
       const progress = weeklyQuestProgress(this.store.data.weekly, week, quest);
       const done = progress >= quest.goal;
       const claimed = isWeeklyQuestClaimed(this.store.data.weekly, week, quest.key);
@@ -770,13 +775,17 @@ export class App {
                   : ''
               }
               ${
-                endlessOpen
+                endless === 'open'
                   ? `<button class="mode-tab" data-testid="menu-endless">🌀 ${t('mode.endless')}${
                       (this.store.data.endlessBest ?? 0) > 0
                         ? `<small>${t('endless.best', { n: this.store.data.endlessBest ?? 0 })}</small>`
                         : ''
                     }</button>`
-                  : ''
+                  : endless === 'teaser'
+                    ? `<button class="mode-tab mode-tab-locked" data-testid="menu-endless-locked" disabled aria-disabled="true">🔒 ${t(
+                        'mode.endless'
+                      )}<small>${t('endless.teaser', { n: ENDLESS_UNLOCK_AT })}</small></button>`
+                    : ''
               }
             </div>
             <div class="menu-events" data-testid="menu-events" aria-label="${t('menu.events')}">
@@ -1241,13 +1250,10 @@ export class App {
    */
   private completeCampaignFinale(): boolean {
     const firstEver = this.store.markCampaignDone(this.dailyKey());
-    // markCampaignDone идемпотентен: события уходят ровно один раз за игрока.
-    // Бесконечный двор сегодня открывается ровно этим же событием (условие —
-    // пройденный уровень 100); при смене правила доступа перенести сюда же.
-    if (firstEver) {
-      track({ type: 'campaign_completed', stars: totalStars(this.store.data) });
-      track({ type: 'endless_unlocked' });
-    }
+    // markCampaignDone идемпотентен: событие уходит ровно один раз за игрока.
+    // «Бесконечный двор» больше не привязан к финалу — он открывается в
+    // середине кампании, и его событие живёт в finishLevel рядом с условием.
+    if (firstEver) track({ type: 'campaign_completed', stars: totalStars(this.store.data) });
     if (firstEver && !this.store.data.endingSeen) {
       this.store.markEndingSeen();
       this.showCampaignEnding();
@@ -1548,6 +1554,22 @@ export class App {
             ? `🌀 ${t('endless.title')} · ${level.name}`
             : `${isBoss ? '👑 ' : ''}${campaignNumber(LEVELS, level.id) || level.id}. ${levelText('name', level.name)}`;
     const starHud = level.star ? `<span class="hud-star" data-testid="hud-star">★</span>` : '';
+
+    // Условие третьей звезды показываем явно: раньше в HUD висел только мягкий
+    // лимит par2, и игрок не знал, чем ★★★ отличается от ★★ — на уровнях со
+    // звездой это сбор канистры, на остальных более жёсткий лимит ходов.
+    // В мастер-испытании тиры звёзд не действуют (там медали), поэтому у него
+    // остаётся прежняя одиночная цель.
+    const goalText = challenge
+      ? t('hud.goal', { n: level.par2 })
+      : `${t('hud.goal2', { n: level.par2 })} · ${
+          level.star ? t('hud.goal3star') : t('hud.goal3moves', { n: level.par })
+        }`;
+    const goalAria = challenge
+      ? t('hud.goal', { n: level.par2 })
+      : level.star
+        ? t('hud.goalAriaStar', { n: level.par2 })
+        : t('hud.goalAriaMoves', { n: level.par2, m: level.par });
     this.root.innerHTML = `
       <div class="screen game-screen${boss ? ` boss-game-screen ${bossWorldClass}` : ''}" data-testid="screen-game"${
         boss ? ` data-boss-id="${boss.def.id}" data-boss-phase="${boss.run.phaseIndex + 1}"` : ''
@@ -1559,7 +1581,7 @@ export class App {
           }</div>
           <div class="hud-right">
             ${starHud}
-            <div class="hud-moves">${t('hud.moves')} <b data-testid="hud-moves">0</b><span class="hud-par">${t('hud.goal', { n: level.par2 })}</span></div>
+            <div class="hud-moves">${t('hud.moves')} <b data-testid="hud-moves">0</b><span class="hud-par" data-testid="hud-goal" title="${escapeHTML(goalAria)}" aria-label="${escapeHTML(goalAria)}">${goalText}</span></div>
           </div>
         </div>
         <div class="board-host" data-testid="board-host"></div>
@@ -1741,7 +1763,14 @@ export class App {
     const hasOnboardingToast = !!levelText('hint', level.hint);
     window.setTimeout(
       () => {
-        if (!finished) this.yardDirector?.react(level.id === 1 ? 'level-start' : (level.id - 1) % 12 === 0 ? 'chapter-start' : 'level-start');
+        // «Начало главы» определяется позицией в кампании: главы режутся по
+        // порядку уровней, а не по id, и после вставки новых уровней счёт по id
+        // отмечал бы главу не на той карточке.
+        if (!finished) {
+          const position = campaignNumber(LEVELS, level.id);
+          const chapterOpener = position > 1 && (position - 1) % 12 === 0;
+          this.yardDirector?.react(chapterOpener ? 'chapter-start' : 'level-start');
+        }
       },
       hasOnboardingToast ? 5000 : 650
     );
@@ -2026,6 +2055,7 @@ export class App {
     );
     const achievementsBefore = unlockedAchievementKeys(this.store.data);
     const before = totalStars(this.store.data);
+    const endlessBefore = endlessAccess(LEVELS, this.store.data);
     const yardStageBefore = yardMilestone(completedCampaignLevels(LEVELS, this.store.data));
     let unlocked: ReturnType<typeof newlyUnlocked> = [];
     let justMastered = false;
@@ -2047,6 +2077,12 @@ export class App {
     } else {
       const improved = this.store.recordResult(level.id, stars);
       const after = totalStars(this.store.data);
+      // Открытие «Бесконечного двора» — переход доступа, а не побочный эффект
+      // финала кампании: событие уходит ровно один раз, на том уровне, который
+      // режим и открывает. Повторное прохождение перехода не даёт.
+      if (endlessBefore !== 'open' && endlessAccess(LEVELS, this.store.data) === 'open') {
+        track({ type: 'endless_unlocked' });
+      }
       unlocked = newlyUnlocked(before, after);
       // Пороги считаются по звёздам «до/после», поэтому повторное прохождение
       // уже открытого улучшения событие не повторяет.

@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import {
+  ENDLESS_TEASER_AT,
+  ENDLESS_UNLOCK_AT,
   campaignNumber,
   completedCampaignLevels,
+  endlessAccess,
   isLevelUnlocked,
   nextLevelToPlay,
   unlockedUpgrades,
@@ -44,6 +47,47 @@ describe('прогрессия двора', () => {
   it('не меняет существующие награды за звёзды', () => {
     expect(unlockedUpgrades(20)).toEqual(new Set(['fence', 'flowers', 'gate']));
     expect(unlockedUpgrades(250).has('celebration')).toBe(true);
+  });
+});
+
+describe('доступ к «Бесконечному двору»', () => {
+  /** Сейв, в котором пройдены первые `count` уровней кампании по порядку. */
+  const clearedUpTo = (count: number) => ({
+    ...defaultSave(),
+    stars: Object.fromEntries(levels.slice(0, count).map((level) => [String(level.id), 3]))
+  });
+
+  it('скрыт до первого порога', () => {
+    expect(endlessAccess(levels, defaultSave())).toBe('hidden');
+    expect(endlessAccess(levels, clearedUpTo(ENDLESS_TEASER_AT - 1))).toBe('hidden');
+  });
+
+  it('показывает тизер с порога и до открытия', () => {
+    expect(endlessAccess(levels, clearedUpTo(ENDLESS_TEASER_AT))).toBe('teaser');
+    expect(endlessAccess(levels, clearedUpTo(ENDLESS_UNLOCK_AT - 1))).toBe('teaser');
+  });
+
+  it('открывается на своём пороге и уже не закрывается', () => {
+    expect(endlessAccess(levels, clearedUpTo(ENDLESS_UNLOCK_AT))).toBe('open');
+    expect(endlessAccess(levels, clearedUpTo(levels.length))).toBe('open');
+  });
+
+  it('пройденная кампания открывает режим даже при разреженном сейве', () => {
+    // Сейв игрока, закончившего кампанию по старым правилам: флаг стоит, а
+    // звёзды могли не сохраниться по всем уровням. Режим отнимать нельзя.
+    const veteran = { ...defaultSave(), stars: { [String(levels[levels.length - 1].id)]: 3 }, campaignDone: true };
+    expect(endlessAccess(levels, veteran)).toBe('open');
+  });
+
+  it('пороги считаются по позиции, а не по id — вставка уровней их не сдвигает', () => {
+    // Уровень, вставленный до порога, отодвигает открытие ровно на себя:
+    // игрок всё так же проходит ENDLESS_UNLOCK_AT уровней, а не больше.
+    const withInsert = [...levels.slice(0, 5), { ...levels[0], id: 9001 }, ...levels.slice(5)];
+    const save = {
+      ...defaultSave(),
+      stars: Object.fromEntries(withInsert.slice(0, ENDLESS_UNLOCK_AT).map((l) => [String(l.id), 3]))
+    };
+    expect(endlessAccess(withInsert, save)).toBe('open');
   });
 });
 

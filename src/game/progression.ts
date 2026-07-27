@@ -80,6 +80,38 @@ export function campaignNumber(levels: LevelDef[], levelId: number): number {
   return levels.findIndex((l) => l.id === levelId) + 1;
 }
 
+/**
+ * Доступ к «Бесконечному двору». Раньше режим открывался только вместе с
+ * Высшей лигой — после всех уровней кампании, то есть подавляющее большинство
+ * игроков не узнавало о его существовании вовсе. Теперь он показывается
+ * заблокированной карточкой в середине кампании и открывается задолго до
+ * финала; Высшая лига остаётся исключительно наградой за пройденную кампанию.
+ *
+ * Пороги заданы позицией в кампании, а не id: вставка уровней не должна
+ * сдвигать момент открытия режима.
+ */
+export const ENDLESS_TEASER_AT = 20;
+export const ENDLESS_UNLOCK_AT = 35;
+
+export type EndlessAccess = 'hidden' | 'teaser' | 'open';
+
+/** Пройден ли уровень, стоящий на позиции `position` (1-based) в кампании. */
+function isPositionCleared(levels: LevelDef[], save: SaveData, position: number): boolean {
+  const level = levels[position - 1];
+  return level !== undefined && (save.stars[String(level.id)] ?? 0) > 0;
+}
+
+export function endlessAccess(levels: LevelDef[], save: SaveData): EndlessAccess {
+  // Пройденная кампания открывает режим безусловно. Порог по позиции — это
+  // способ открыть его РАНЬШЕ, а не новое условие: сейв игрока, добравшегося до
+  // финала ещё по старым правилам, не обязан содержать звёзды всех уровней, и
+  // отнимать у него уже доступный режим нельзя.
+  if (save.campaignDone === true) return 'open';
+  if (isPositionCleared(levels, save, ENDLESS_UNLOCK_AT)) return 'open';
+  if (isPositionCleared(levels, save, ENDLESS_TEASER_AT)) return 'teaser';
+  return 'hidden';
+}
+
 /** Следующий незавершённый уровень для кнопки «Играть». */
 export function nextLevelToPlay(levels: LevelDef[], save: SaveData): LevelDef {
   for (const l of levels) {

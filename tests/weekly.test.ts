@@ -20,6 +20,20 @@ describe('недельные цели', () => {
     expect(selectWeeklyQuests('2026-07-27')).not.toEqual(quests);
   });
 
+  it('раннее открытие Endless не раздувает недельную экономику наград', () => {
+    // «Бесконечный двор» открывается в середине кампании, поэтому игроков с
+    // Endless-целью стало кратно больше. Цель при этом ЗАМЕНЯЕТ кампанийную, а
+    // не добавляется к ней: недельный потолок подсказок остаётся прежним, и
+    // приток игроков середины кампании не увеличивает выдачу.
+    for (const week of ['2026-07-20', '2026-07-27', '2026-08-03', '2026-08-10']) {
+      const locked = selectWeeklyQuests(week, false);
+      const open = selectWeeklyQuests(week, true);
+      expect(open).toHaveLength(locked.length);
+      expect(open.length * WEEKLY_QUEST_REWARD_HINTS).toBe(locked.length * WEEKLY_QUEST_REWARD_HINTS);
+      expect(open.filter((quest) => quest.kind === 'endless')).toHaveLength(1);
+    }
+  });
+
   it('до открытия Endless выбирает три достижимые кампанийные цели', () => {
     const quests = selectWeeklyQuests('2026-07-20', false);
     expect(quests).toHaveLength(3);

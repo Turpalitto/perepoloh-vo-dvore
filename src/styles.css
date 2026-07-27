@@ -505,6 +505,11 @@ html.high-contrast .levels-grid {
 .mode-tab.mode-tab-elite.active {
   background: linear-gradient(135deg, #f0d287, #d8ae27);
 }
+/* Тизер режима: карточка видна, но выключена — обещание, а не кнопка. */
+.mode-tab-locked {
+  opacity: 0.55;
+  cursor: default;
+}
 
 /* ---------- гараж ---------- */
 

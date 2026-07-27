@@ -789,6 +789,24 @@ test.describe('Живой двор и дед', () => {
     expect(errors).toEqual([]);
   });
 
+  test('уровень 2: дед здоровается в первые секунды, а не только на первом уровне', async ({ page }) => {
+    // Продуктовый аудит требовал убедиться, что «живой двор» реально работает
+    // на старте кампании, а не срабатывает один раз на уровне 1: приветствие
+    // отложено до конца обучающего toast'а, и легко было отложить его навсегда.
+    const errors = trackErrors(page);
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'parkovka.save.v1',
+        JSON.stringify({ v: 1, stars: { '1': 3 }, sound: true, music: true, lang: 'ru', lastLevel: 1, targetSkin: 0 })
+      );
+    });
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('grandpa-portrait')).toBeVisible();
+    await expect(page.getByTestId('grandpa-bubble')).not.toBeEmpty({ timeout: 10_000 });
+    expect(errors).toEqual([]);
+  });
+
   test('частые движения не спамят репликами (глобальный кулдаун)', async ({ page }) => {
     await page.goto('/?mock=1&lang=ru');
     await page.getByTestId('menu-play').click();

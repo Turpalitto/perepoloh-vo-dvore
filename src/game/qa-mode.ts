@@ -27,7 +27,7 @@ export function createQaPlatform(platform: Platform): Platform {
     // QA-сеанс не должен попадать в продуктовую воронку.
     createAnalyticsTracker: () => noopTracker,
     requestReview: async () => false,
-    showInterstitial: async () => {},
+    showInterstitial: async () => false,
     showRewarded: async () => true
   };
 }

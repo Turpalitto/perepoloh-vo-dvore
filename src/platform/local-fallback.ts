@@ -74,8 +74,9 @@ export function createLocalFallbackPlatform(): Platform {
         // localStorage недоступен (приватный режим/квота) — прогресс не персистится в этой сессии.
       }
     },
-    async showInterstitial(): Promise<void> {
-      // Реклама недоступна без платформы.
+    async showInterstitial(): Promise<boolean> {
+      // Реклама недоступна без платформы — показа не было.
+      return false;
     },
     async showRewarded(): Promise<boolean> {
       return false;

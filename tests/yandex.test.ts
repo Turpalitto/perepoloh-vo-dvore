@@ -164,6 +164,35 @@ describe('адаптер Яндекс Игр', () => {
     }
   });
 
+  it('interstitial различает показ и отказ по wasShown из onClose', async () => {
+    // Яндекс вызывает onClose и когда ролик не показан (например, слишком
+    // частые вызовы), сообщая это аргументом wasShown. Без него любая попытка
+    // выглядела бы показом, и воронка завышала бы количество interstitial.
+    const run = async (wasShown: boolean): Promise<boolean> => {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: {
+          YaGames: {
+            init: async () => ({
+              adv: {
+                showFullscreenAdv: ({ callbacks }: { callbacks: Record<string, (arg?: unknown) => void> }) => {
+                  callbacks.onOpen?.();
+                  callbacks.onClose?.(wasShown);
+                }
+              }
+            })
+          }
+        }
+      });
+      const platform = createYandexPlatform();
+      await platform.init();
+      return platform.showInterstitial({ onPause: vi.fn(), onResume: vi.fn() });
+    };
+
+    await expect(run(true)).resolves.toBe(true);
+    await expect(run(false)).resolves.toBe(false);
+  });
+
   it('interstitial, зависший без onClose, разблокируется по таймауту', async () => {
     vi.useFakeTimers();
     try {
@@ -187,7 +216,8 @@ describe('адаптер Яндекс Игр', () => {
       const resume = vi.fn();
       const promise = platform.showInterstitial({ onPause: pause, onResume: resume });
       await vi.advanceTimersByTimeAsync(30_000);
-      await expect(promise).resolves.toBeUndefined();
+      // Молчащий SDK не даёт повода считать показ состоявшимся.
+      await expect(promise).resolves.toBe(false);
       expect(pause).toHaveBeenCalledOnce();
       expect(resume).toHaveBeenCalledOnce();
     } finally {
@@ -238,7 +268,7 @@ describe('адаптер Яндекс Игр', () => {
     });
     const platform = createYandexPlatform();
     await platform.init();
-    await expect(platform.showInterstitial({ onPause: vi.fn(), onResume: vi.fn() })).resolves.toBeUndefined();
+    await expect(platform.showInterstitial({ onPause: vi.fn(), onResume: vi.fn() })).resolves.toBe(false);
     expect(warn).toHaveBeenCalledWith('[platform] interstitial:', expect.any(Error));
     warn.mockRestore();
   });

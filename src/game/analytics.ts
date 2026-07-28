@@ -39,7 +39,12 @@ export type GameAnalyticsEvent =
   | { type: 'rewarded_offer_shown'; context: RewardedContext; levelId: number }
   | { type: 'rewarded_completed'; context: RewardedContext; levelId: number }
   | { type: 'rewarded_closed'; context: RewardedContext; levelId: number }
+  // Interstitial: вызов и результат — разные события. Платформа выполняет
+  // onClose и когда ролик не показан (частые вызовы, offline, нет SDK), и
+  // сообщает это в wasShown; без разделения воронка завышала показы.
+  | { type: 'interstitial_requested'; levelId: number }
   | { type: 'interstitial_shown'; levelId: number }
+  | { type: 'interstitial_not_shown'; levelId: number }
   // Ежедневный уровень
   | { type: 'daily_started'; modifier: string; streak: number }
   | { type: 'daily_completed'; modifier: string; streak: number; stars: number }
@@ -50,7 +55,9 @@ export type GameAnalyticsEvent =
   | { type: 'endless_unlocked' }
   | { type: 'endless_started'; best: number }
   | { type: 'endless_finished'; streak: number; best: number }
-  | { type: 'session_exit'; screen: string };
+  // Возврат в меню — именно возврат, а не конец сессии: так же выглядит
+  // штатный выход после победы, из рейтинга или настроек.
+  | { type: 'returned_to_menu'; screen: string };
 
 export interface AnalyticsTracker {
   track(event: GameAnalyticsEvent): void;

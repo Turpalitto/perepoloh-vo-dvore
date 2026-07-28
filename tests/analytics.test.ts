@@ -48,7 +48,7 @@ describe('аналитика — типизированный интерфейс
       { type: 'daily_started', modifier: 'none', streak: 3 },
       { type: 'upgrade_unlocked', key: 'fence', stars: 2 },
       { type: 'endless_finished', streak: 4, best: 7 },
-      { type: 'session_exit', screen: 'screen-menu' }
+      { type: 'returned_to_menu', screen: 'screen-menu' }
     ];
     for (const e of events) {
       const keys = Object.keys(e);

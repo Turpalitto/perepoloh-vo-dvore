@@ -533,10 +533,16 @@ export class App {
     return ok;
   }
 
-  /** Interstitial всегда через эту обёртку — иначе показ не попадёт в воронку. */
+  /**
+   * Interstitial всегда через эту обёртку — иначе показ не попадёт в воронку.
+   * Событие показа отправляется ПОСЛЕ платформы и по её ответу: Яндекс закрывает
+   * рекламу и когда она не показана (слишком частые вызовы, offline, нет SDK),
+   * поэтому «вызвали» и «показали» разведены.
+   */
   private async showInterstitialTracked(levelId: number): Promise<void> {
-    track({ type: 'interstitial_shown', levelId });
-    await this.platform.showInterstitial(this.adHandlers());
+    track({ type: 'interstitial_requested', levelId });
+    const shown = await this.platform.showInterstitial(this.adHandlers());
+    track({ type: shown ? 'interstitial_shown' : 'interstitial_not_shown', levelId });
   }
 
   private dailyKey(): string {
@@ -718,7 +724,7 @@ export class App {
     // Читаем testid текущего экрана ДО его замены, не разбрасывая track() по
     // каждому «Меню»/«Назад»-обработчику (их десятки по всему App).
     const fromScreen = this.root.querySelector<HTMLElement>('.screen[data-testid]')?.dataset.testid;
-    if (fromScreen && fromScreen !== 'screen-menu') track({ type: 'session_exit', screen: fromScreen });
+    if (fromScreen && fromScreen !== 'screen-menu') track({ type: 'returned_to_menu', screen: fromScreen });
     this.transitionScreen(() => this.showMenuInner());
   }
 

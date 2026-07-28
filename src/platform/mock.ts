@@ -59,9 +59,15 @@ function showMockBanner(): void {
 }
 
 export function createMockPlatform(): Platform {
+  // `?adNow=1` снимает пороги показа interstitial (частота, минимальный уровень,
+  // прогрев сессии). Иначе рекламный путь недостижим в тестах: штатно он ждёт
+  // шестой победы, десятой позиции кампании и четырёх минут сессии.
+  const adNow = queryParam('adNow') === '1';
   return {
     name: 'mock',
-    config: { ...DEFAULT_PLATFORM_CONFIG },
+    config: adNow
+      ? { ...DEFAULT_PLATFORM_CONFIG, interstitialEvery: 1, interstitialMinLevel: 1, interstitialMinSessionMs: 0 }
+      : { ...DEFAULT_PLATFORM_CONFIG },
     isTV: queryParam('tv') === '1',
     async init(): Promise<void> {
       console.info('[platform] mock-режим (без Яндекс SDK)');
@@ -128,8 +134,12 @@ export function createMockPlatform(): Platform {
     async saveData(data: SaveData): Promise<void> {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     },
-    showInterstitial(h: AdHandlers): Promise<void> {
-      return fakeAd('interstitial', h).then(() => undefined);
+    showInterstitial(h: AdHandlers): Promise<boolean> {
+      // `?adSkip=1` эмулирует отказ платформы: у Яндекса interstitial штатно не
+      // показывается при слишком частых вызовах и offline, и этот путь нужно
+      // уметь проверять — иначе воронка «вызвали/показали» тестами не покрыта.
+      if (queryParam('adSkip') === '1') return Promise.resolve(false);
+      return fakeAd('interstitial', h);
     },
     showRewarded(h: AdHandlers): Promise<boolean> {
       return fakeAd('rewarded', h);

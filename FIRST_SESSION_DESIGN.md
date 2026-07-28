@@ -40,7 +40,7 @@
 `interstitialMinLevel=10`, `interstitialMinSessionMs=240000` (4 мин), `interstitialEvery=6` побед — реклама физически не может показаться раньше уровня 10 и раньше 4 минут сессии. Между фазами босса и после победной сцены (обычной или боссовой) реклама не вызывается — подтверждено чтением кода (`showInterstitial` только в 2 местах: обычный/endless `btn-next`) и e2e (уровни 1-5 без единого `mock-ad`).
 
 ## Аналитика (privacy-safe, no-op по умолчанию)
-`game_start`, `level_start`, `first_move`, `level_restart`, `hint_used`, `level_complete`, `boss_start`, `boss_phase_complete`, `boss_complete`, `session_exit`. Без персональных данных, без покоординатного трекинга. Debug: `?analyticsDebug=1` (dev/e2e) — вывод в консоль.
+`game_start`, `level_start`, `first_move`, `level_restart`, `hint_used`, `level_complete`, `boss_start`, `boss_phase_complete`, `boss_complete`, `returned_to_menu`. Без персональных данных, без покоординатного трекинга. Debug: `?analyticsDebug=1` (dev/e2e) — вывод в консоль.
 
 ## UX-риски
 - Уровни 7-9 без `hint`-текста — единственная опора игрока: солвер-подтверждённая проходимость + дед (но дед не гарантирует подсказку хода). Риск застревания реальный, но в рамках дизайна (обучение постепенно снимает подпорки).

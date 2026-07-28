@@ -3,6 +3,8 @@ import { applyMove, createState, maxSteps } from '../src/core/game';
 import { solve } from '../src/core/solver';
 import type { LevelDef } from '../src/core/types';
 import { validateLevel } from '../src/core/validator';
+import { analyzeIceImpact } from '../src/core/ice-impact';
+import { LEVELS } from '../src/game/campaign';
 
 /**
  * «Ледяная колея»: на льду нельзя остановиться вовсе — проехать насквозь
@@ -122,6 +124,21 @@ describe('ледяная колея — семантика applyMove/maxSteps', 
     expect(up!.state.pieces[1]).toMatchObject({ x: 2, y: 0 });
   });
 
+  it('валидатор ловит дубли ледяных клеток и лёд на кнопке ворот', () => {
+    // Генератор так не ошибается, но QA-редактор и рукописный JSON — запросто,
+    // а дублированная клетка ещё и обманывает проверку значимости: удаление
+    // одной копии ничего не меняет, потому что вторая остаётся на месте.
+    const doubled: LevelDef = { ...ICE_LEVEL, ice: [{ x: 3, y: 2 }, { x: 3, y: 2 }] };
+    expect(validateLevel(doubled).join()).toContain('пересекается');
+
+    const onSwitch: LevelDef = {
+      ...ICE_LEVEL,
+      gateSwitch: { x: 3, y: 2 },
+      ice: [{ x: 3, y: 2 }]
+    };
+    expect(validateLevel(onSwitch).join()).toContain('пересекается');
+  });
+
   it('лёд меняет оптимум: он отнимает позицию покоя, а не только вариант хода', () => {
     // Ряд ворот перекрыт машиной A. Вниз ей ехать дёшево: один ход — и выезд
     // свободен, оптимум 2 хода. Вверх мешает B, которую сперва надо увести.
@@ -154,4 +171,36 @@ describe('ледяная колея — семантика applyMove/maxSteps', 
     expect(plain.solvable && withIce.solvable).toBe(true);
     expect(withIce.optimal).toBeGreaterThan(plain.optimal);
   });
+});
+
+describe('лёд в кампании — постфактум-абляция каждой клетки', () => {
+  // `npm run verify:ice` печатает подробный отчёт, но это отдельная команда.
+  // Гарантия обязана жить и в обычном прогоне тестов: жадная расстановка в
+  // генераторе доказывает вклад клетки только в момент постановки, а поздняя
+  // клетка способна сделать раннюю избыточной. Разбор общий с отчётом —
+  // analyzeIceImpact, иначе проверка и отчёт со временем разъедутся.
+  const iceLevels = LEVELS.filter((level) => (level.ice?.length ?? 0) > 0);
+
+  it('в кампании есть уровни со льдом', () => {
+    expect(iceLevels.length).toBeGreaterThan(0);
+  });
+
+  for (const level of iceLevels) {
+    it(`уровень ${level.id} «${level.name}»: каждая клетка несёт вес и имеет роль`, () => {
+      const impact = analyzeIceImpact(level);
+      expect(impact.solvable && !impact.exhausted).toBe(true);
+      expect(impact.fullOptimal).toBe(level.par);
+      // Подсказка берёт первый ход оптимального решения: если бы оно вставало
+      // на лёд, игра предлагала бы невозможный ход.
+      expect(impact.landsOnIce).toBe(false);
+
+      for (const cell of impact.cells) {
+        const where = `(${cell.cell.x},${cell.cell.y})`;
+        expect(
+          cell.required,
+          `клетка ${where}: роль «${cell.role}», без неё оптимум ${cell.optimalWithout} против ${impact.fullOptimal}`
+        ).toBe(true);
+      }
+    });
+  }
 });

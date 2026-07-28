@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { ACHIEVEMENTS } from '../src/game/achievements';
 import { CAMPAIGN_MAX_STARS, CHAPTERS, LEVELS } from '../src/game/campaign';
-import { ELITE_CHALLENGES } from '../src/levels/elite-challenges';
+import { DIVISIONS, DIVISION_SIZE, DIVISION_UNLOCK_MEDALS, ELITE_CHALLENGES, originLevel, sourceLevel } from '../src/levels/elite-challenges';
 import { ENDLESS_TEASER_AT, ENDLESS_UNLOCK_AT } from '../src/game/progression';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -28,6 +28,10 @@ const DOCS = ['README.md', 'PRODUCT_SPEC.md', 'IMPLEMENTATION_PLAN.md', 'TECHNIC
 const SNAPSHOT = 'GENERATED_PROJECT_STATS.md';
 
 const iceLevels = LEVELS.filter((level) => (level.ice?.length ?? 0) > 0);
+const remixes = ELITE_CHALLENGES.filter((c) => c.remixed);
+// Отражение сохраняет оптимум, поэтому «изменённые правила» считаем по нему:
+// добавленная бочка, ледяная клетка или сдвиг старта par всегда сдвигают.
+const ruleChangingRemixes = remixes.filter((c) => sourceLevel(c).par !== originLevel(c).par).length;
 
 function snapshot(): string {
   return [
@@ -41,7 +45,8 @@ function snapshot(): string {
     `- Глав: ${CHAPTERS.length} (размеры: ${CHAPTERS.map((c) => c.size).join(', ')})`,
     `- Уровней со льдом: ${iceLevels.length} (id ${iceLevels.map((l) => l.id).join(', ')})`,
     `- Достижений: ${ACHIEVEMENTS.length}`,
-    `- Испытаний Высшей лиги: ${ELITE_CHALLENGES.length}`,
+    `- Испытаний Высшей лиги: ${ELITE_CHALLENGES.length} (дивизионов ${DIVISIONS.length} по ${DIVISION_SIZE}, порог продвижения ${DIVISION_UNLOCK_MEDALS} медали)`,
+    `- Ремиксов в лиге: ${remixes.length} (из них с изменёнными правилами ${ruleChangingRemixes})`,
     `- Endless: тизер с позиции ${ENDLESS_TEASER_AT}, открытие с позиции ${ENDLESS_UNLOCK_AT}`,
     ''
   ].join('\n');

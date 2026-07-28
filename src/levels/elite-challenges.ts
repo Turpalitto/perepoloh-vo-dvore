@@ -52,9 +52,11 @@ const REMIX_ID_BASE = 900;
 /**
  * Кураторский список: уровень-источник + модификатор-«вкус».
  *
- * Порядок — по возрастанию нагрузки, а не по id: сначала знакомство с лигой на
- * коротких уровнях без ограничений, дальше снимаются страховки, в конце —
- * самые длинные уровни кампании с обеими снятыми.
+ * Порядок — не по id. Внутри дивизиона `par` не убывает (проверяется тестом),
+ * и каждый следующий дивизион начинается не легче, чем начинался предыдущий.
+ * Через границу блока `par` намеренно падает: дивизион открывается ледяным
+ * уровнем, а лёд короткий по ходам и сложный по правилам — сортировать его по
+ * `par` значило бы утопить единственную новую механику в первом дивизионе.
  *
  * Ледяные уровни (105–108) включены намеренно: лёд — самая новая механика
  * проекта, и до этого она в пост-кампании не встречалась вообще. Ледяных
@@ -78,21 +80,22 @@ const REMIX_ID_BASE = 900;
 const CURATED: Array<{ source: number; modifier: EliteModifier; remix?: Omit<RemixSpec, 'source'> }> = [
   // Дивизион 1 — знакомство: короткие уровни, ограничения ещё мягкие.
   { source: 8, modifier: 'none' },
+  { source: 15, modifier: 'noUndo' },
   {
     source: 12,
     modifier: 'none',
     remix: { flip: 'x', walls: [{ x: 1, y: 3, kind: 'barrel' }], name: 'Сено и бочка', par: 8, par2: 10 }
   },
-  { source: 15, modifier: 'noUndo' },
   { source: 18, modifier: 'none' },
   { source: 22, modifier: 'noUndo' },
-  // Дивизион 2 — снимаются страховки, появляется лёд.
-  { source: 25, modifier: 'noHints', remix: { flip: 'x', name: 'Погреб наоборот', par: 8, par2: 10 } },
-  { source: 28, modifier: 'noUndo' },
+  // Дивизион 2 — вход через лёд, дальше снимаются страховки.
   { source: 105, modifier: 'none' },
   { source: 106, modifier: 'noUndo' },
+  { source: 25, modifier: 'noHints', remix: { flip: 'x', name: 'Погреб наоборот', par: 8, par2: 10 } },
+  { source: 28, modifier: 'noUndo' },
   { source: 31, modifier: 'noUndo' },
   // Дивизион 3 — плотнее всего ремиксов: двор знаком, решение уже нет.
+  { source: 107, modifier: 'noUndoNoHints' },
   {
     source: 35,
     modifier: 'noHints',
@@ -103,30 +106,29 @@ const CURATED: Array<{ source: number; modifier: EliteModifier; remix?: Omit<Rem
     modifier: 'noUndo',
     remix: { flip: 'x', ice: [{ x: 2, y: 4 }], name: 'Улей во льду', par: 10, par2: 12 }
   },
-  { source: 107, modifier: 'noUndoNoHints' },
+  { source: 45, modifier: 'noHints', remix: { flip: 'x', name: 'Круговорот наоборот', par: 10, par2: 12 } },
   {
     source: 42,
     modifier: 'noUndo',
     remix: { flip: 'x', ice: [{ x: 2, y: 3 }], name: 'Зной во льду', par: 12, par2: 14 }
   },
-  { source: 45, modifier: 'noHints', remix: { flip: 'x', name: 'Круговорот наоборот', par: 10, par2: 12 } },
   // Дивизион 4 — лёд со звездой и длинные уровни.
-  { source: 50, modifier: 'noUndoNoHints', remix: { flip: 'x', name: 'Закуток наоборот', par: 10, par2: 12 } },
   { source: 108, modifier: 'noUndoNoHints' },
+  { source: 50, modifier: 'noUndoNoHints', remix: { flip: 'x', name: 'Закуток наоборот', par: 10, par2: 12 } },
   { source: 55, modifier: 'noUndo' },
   { source: 64, modifier: 'noHints' },
   { source: 72, modifier: 'noUndoNoHints', remix: { flip: 'y', name: 'Задний двор наоборот', par: 12, par2: 14 } },
   // Дивизион 5 — самые длинные оптимумы кампании.
-  {
-    source: 88,
-    modifier: 'noUndoNoHints',
-    remix: { flip: 'x', ice: [{ x: 3, y: 4 }], name: 'Дым во льду', par: 18, par2: 20 }
-  },
   { source: 92, modifier: 'noHints', remix: { flip: 'y', name: 'Сеновал наоборот', par: 14, par2: 16 } },
   {
     source: 95,
     modifier: 'noUndo',
     remix: { flip: 'x', ice: [{ x: 0, y: 3 }], name: 'Капкан во льду', par: 17, par2: 19 }
+  },
+  {
+    source: 88,
+    modifier: 'noUndoNoHints',
+    remix: { flip: 'x', ice: [{ x: 3, y: 4 }], name: 'Дым во льду', par: 18, par2: 20 }
   },
   { source: 98, modifier: 'noUndoNoHints' },
   { source: 100, modifier: 'none' }

@@ -1,6 +1,8 @@
 import type { LeaderboardSnapshot } from '../platform/types';
 
-type Board = 'yardstars' | 'dailystreak';
+import type { LeaderboardName } from '../platform/types';
+
+type Board = LeaderboardName;
 
 interface CacheEntry {
   snapshot: LeaderboardSnapshot;

@@ -1,5 +1,11 @@
 /**
- * Level Intelligence: отчёт по сложности и дубликатам всей кампании.
+ * Level Intelligence: отчёт по сложности и дубликатам всей кампании И ремиксов
+ * Высшей лиги.
+ *
+ * Ремиксы включены намеренно: это полноценные раскладки, просто собранные из
+ * конфигурации, а не записанные в levels.json. Именно поэтому дубликат в них
+ * заметить труднее всего — глазами их никто не листает.
+ *
  * Запуск: npm run analyze [-- --json out.json]
  * Выход 1 только при реальных дефектах: невалидный уровень или точный дубликат.
  * Находки кривой сложности — рекомендации, уровни не переставляются.
@@ -11,9 +17,12 @@ import type { LevelDef } from '../src/core/types';
 import { analyzeDifficulty, DifficultyResult } from '../src/core/difficulty';
 import { findSimilarLevels } from '../src/core/canonical';
 import { validateLevel } from '../src/core/validator';
+import { ELITE_CHALLENGES, sourceLevel } from '../src/levels/elite-challenges';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const levels = JSON.parse(readFileSync(join(root, 'src/levels/levels.json'), 'utf8')) as LevelDef[];
+const campaign = JSON.parse(readFileSync(join(root, 'src/levels/levels.json'), 'utf8')) as LevelDef[];
+const remixes = ELITE_CHALLENGES.filter((c) => c.remixed).map(sourceLevel);
+const levels = [...campaign, ...remixes];
 
 const jsonArgIndex = process.argv.indexOf('--json');
 const jsonPath = jsonArgIndex >= 0 ? process.argv[jsonArgIndex + 1] : null;
@@ -74,11 +83,27 @@ for (const r of rows) {
   for (const e of r.errors) findings.push(`ДЕФЕКТ уровня ${r.id}: ${e}`);
 }
 
+/**
+ * Ремикс-отражение обязано совпадать со своим источником с точностью до
+ * симметрии — это и есть определение отражения. Такая пара не дефект, а
+ * доказательство, что преобразование сработало; дефектом было бы её
+ * отсутствие. Любое другое стопроцентное совпадение остаётся дефектом.
+ */
+const allowedIdenticalPairs = new Set(
+  ELITE_CHALLENGES.filter((c) => c.remixed).map((c) => {
+    const level = sourceLevel(c);
+    return [level.id, c.sourceLevelId].sort((a, b) => a - b).join('↔');
+  })
+);
+
 // Дубликаты
 const similar = findSimilarLevels(levels, 0.9);
 for (const p of similar) {
   const line = `сходство ${p.a} ↔ ${p.b}: ${(p.similarity * 100).toFixed(0)}% — ${p.reason}`;
-  if (p.similarity === 1) {
+  const pairKey = [p.a, p.b].sort((a, b) => a - b).join('↔');
+  if (p.similarity === 1 && allowedIdenticalPairs.has(pairKey)) {
+    findings.push(`${line} (ремикс-отражение своего источника — так и задумано)`);
+  } else if (p.similarity === 1) {
     defects++;
     findings.push(`ДЕФЕКТ: ${line}`);
   } else {

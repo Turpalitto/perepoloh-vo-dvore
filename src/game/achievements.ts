@@ -1,5 +1,7 @@
 import type { SaveData } from './save';
 import { CAMPAIGN_LEVEL_IDS, CAMPAIGN_MAX_STARS, LEVELS, campaignCleared, campaignStars } from './campaign';
+import { goldCount, medaledCount } from './elite';
+import { ELITE_CHALLENGES } from '../levels/elite-challenges';
 
 /** Цели «пройти всё» деривируются из данных кампании — иначе вставка уровней делает их ложью. */
 const CAMPAIGN_LEVELS = LEVELS.length;
@@ -19,6 +21,11 @@ const perfect = (save: SaveData): number =>
 const streak = (save: SaveData): number => save.daily?.streak ?? 0;
 const trophies = (save: SaveData): number => save.daily?.trophies ?? 0;
 const endless = (save: SaveData): number => save.endlessBest ?? 0;
+// Медали лиги считаем по сейву, а не по списку испытаний: ключи испытаний,
+// которых уже нет в конфигурации, не должны завышать прогресс — та же причина,
+// по которой звёзды фильтруются по CAMPAIGN_LEVEL_IDS.
+const eliteMedals = (save: SaveData): number => medaledCount(save);
+const eliteGolds = (save: SaveData): number => goldCount(save);
 
 export const ACHIEVEMENTS: Achievement[] = [
   { key: 'firstRide', icon: '🚗', goal: 1, progress: completed },
@@ -34,7 +41,13 @@ export const ACHIEVEMENTS: Achievement[] = [
   { key: 'weeklyCup', icon: '🏅', goal: 1, progress: trophies },
   { key: 'cupShelf', icon: '🎖️', goal: 4, progress: trophies },
   { key: 'endlessRunner', icon: '🌀', goal: 5, progress: endless },
-  { key: 'endlessLegend', icon: '🐐', goal: 15, progress: endless }
+  { key: 'endlessLegend', icon: '🐐', goal: 15, progress: endless },
+  // Высшая лига. Цели деривируются из числа испытаний, иначе правка
+  // кураторского списка молча превратит их в недостижимые или бесплатные.
+  { key: 'leagueEntry', icon: '🥉', goal: 5, progress: eliteMedals },
+  { key: 'leagueFull', icon: '🎖️', goal: ELITE_CHALLENGES.length, progress: eliteMedals },
+  { key: 'leagueGold', icon: '🥇', goal: 5, progress: eliteGolds },
+  { key: 'leagueLegend', icon: '👑', goal: ELITE_CHALLENGES.length, progress: eliteGolds }
 ];
 
 export function achievementProgress(save: SaveData, achievement: Achievement): number {

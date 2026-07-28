@@ -31,6 +31,11 @@ import type { Platform } from '../src/platform/types';
 import { createState, starsFor } from '../src/core/game';
 import { solve } from '../src/core/solver';
 import { validateLevel } from '../src/core/validator';
+import { canonicalKey, exactKey } from '../src/core/canonical';
+import levelsJson from '../src/levels/levels.json';
+import type { LevelDef } from '../src/core/types';
+
+const LEVELS = levelsJson as LevelDef[];
 
 const attempt = (over: Partial<AttemptResult> = {}): AttemptResult => ({
   moves: 0,
@@ -326,6 +331,48 @@ describe('Высшая лига — дивизионы', () => {
 
 describe('Высшая лига — ремиксы', () => {
   const remixes = ELITE_CHALLENGES.filter((c) => c.remixed);
+
+  it('ремикс отличается от источника картинкой на экране', () => {
+    // canonicalKey инвариантен к отражениям, поэтому «ремикс» симметричного
+    // двора мог бы выглядеть один в один как оригинал и пройти незамеченным.
+    for (const c of remixes) {
+      expect(exactKey(sourceLevel(c))).not.toBe(exactKey(originLevel(c)));
+    }
+  });
+
+  it('ремикс не дублирует другой уровень кампании', () => {
+    const campaign = new Map(LEVELS.map((l) => [canonicalKey(l), l.id]));
+    for (const c of remixes) {
+      const level = sourceLevel(c);
+      const hit = campaign.get(canonicalKey(level));
+      const pureFlip = (level.ice?.length ?? 0) === (originLevel(c).ice?.length ?? 0)
+        && (level.walls?.length ?? 0) === (originLevel(c).walls?.length ?? 0);
+      // Отражение с точностью до симметрии — тот же уровень, и совпасть оно
+      // может только со своим источником. Ремикс с новым препятствием не имеет
+      // права совпасть ни с чем.
+      expect(hit).toBe(pureFlip ? c.sourceLevelId : undefined);
+    }
+  });
+
+  it('внутри дивизиона нагрузка не убывает, а дивизионы не начинаются легче предыдущего', () => {
+    let previousStart = 0;
+    for (const division of DIVISIONS) {
+      const block = ELITE_CHALLENGES.filter((c) => divisionOf(c.id) === division.index).map(sourceLevel);
+      for (let i = 1; i < block.length; i++) {
+        expect(block[i].par).toBeGreaterThanOrEqual(block[i - 1].par);
+      }
+      expect(block[0].par).toBeGreaterThanOrEqual(previousStart);
+      previousStart = block[0].par;
+    }
+  });
+
+  it('difficulty ремикса пересчитан по его par, а не унаследован', () => {
+    for (const c of remixes) {
+      const level = sourceLevel(c);
+      const expected = level.par <= 5 ? 'easy' : level.par <= 10 ? 'medium' : 'hard';
+      expect(level.difficulty).toBe(expected);
+    }
+  });
 
   it('ремиксов достаточно, чтобы лига не была одним повтором кампании', () => {
     expect(remixes.length).toBeGreaterThanOrEqual(10);

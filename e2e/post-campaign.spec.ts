@@ -13,8 +13,8 @@ type SaveData = {
 // Испытания, где кнопка скрыта. Комбинированный модификатор noUndoNoHints
 // попадает в оба набора — именно он раньше молча ломал проверки на равенство
 // строке 'noUndo' / 'noHints'.
-const NO_UNDO = new Set([3, 5, 7, 9, 10, 12, 13, 14, 16, 17, 18, 20, 21, 23, 24]);
-const NO_HINTS = new Set([6, 11, 13, 15, 16, 17, 19, 20, 21, 22, 24]);
+const NO_UNDO = new Set([2, 5, 7, 9, 10, 11, 13, 15, 16, 17, 18, 20, 22, 23, 24]);
+const NO_HINTS = new Set([8, 11, 12, 14, 16, 17, 19, 20, 21, 23, 24]);
 
 async function seedSave(page: Page, overrides: SaveData = {}): Promise<void> {
   await page.addInitScript((data) => {
@@ -178,7 +178,8 @@ test.describe('Post-campaign', () => {
   });
 
   test('divisions gate the league and open on the third medal of the previous block', async ({ page }) => {
-    await seedSave(page, { eliteMedals: { '1': 1, '2': 1 } });
+    // stars пустые: перенесённые из кампании медали открыли бы блок сами.
+    await seedSave(page, { stars: {}, eliteMedals: { '1': 1, '2': 1 } });
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await openElite(page);
     await expect(page.getByTestId('elite-division-1')).toContainText('Дворовый претендент');
@@ -199,6 +200,35 @@ test.describe('Post-campaign', () => {
     await expect(page.getByTestId('elite-division-2')).not.toContainText('🔒');
     // Третий блок остаётся закрытым: его правило считает медали второго.
     await expect(page.getByTestId('elite-card-11')).toBeDisabled();
+  });
+
+  test('a remix challenge really plays a rebuilt yard, not the campaign level', async ({ page }) => {
+    // Испытание 3 — ремикс уровня 12: отражение плюс добавленная бочка.
+    // Проверяем именно то, ради чего ремиксы делались: на экране другой двор.
+    // Звёзды по всей кампании нужны, чтобы уровень 12 открывался для сравнения.
+    await seedSave(page, {
+      stars: Object.fromEntries(CAMPAIGN_LEVEL_IDS.map((id) => [String(id), 3]))
+    });
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await openElite(page);
+    const card = page.getByTestId('elite-card-3');
+    await expect(card).toContainText('Сено и бочка');
+    await expect(card).toContainText('Ремикс');
+    await expect(card).toHaveAttribute('title', /перестроенный двор «Свежее сено»/);
+
+    await card.click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('screen-game')).toContainText('Испытание 3');
+    const remixWalls = await page.locator('.layer-walls > g').count();
+
+    // Тот же двор в кампании: у него на одну бочку меньше и другая раскладка.
+    await page.getByTestId('btn-pause').click();
+    await page.getByTestId('btn-exit-menu').click();
+    await page.getByTestId('menu-levels').click();
+    await page.getByTestId('level-card-12').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    const originWalls = await page.locator('.layer-walls > g').count();
+    expect(remixWalls).toBe(originWalls + 1);
   });
 
   test('Elite medals improve once, rank up, retry, next and persist', async ({ page }) => {

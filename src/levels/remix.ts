@@ -35,12 +35,35 @@ export interface RemixSpec {
   ice?: IceDef[];
   /** Препятствия поверх уровня — в координатах ПОСЛЕ отражения. */
   walls?: WallDef[];
+  /**
+   * Сдвиг стартовой позиции фигур (по id, ПОСЛЕ отражения).
+   *
+   * Самый дешёвый способ сломать заученное решение, не трогая состав двора:
+   * машины те же, узор тот же, а порядок разъезда другой. Проверка на выход за
+   * поле и наложения — на валидаторе, отдельного контроля здесь нет намеренно:
+   * дублировать правила размещения значит однажды их разойти.
+   */
+  shift?: Array<{ piece: string; dx: number; dy: number }>;
   /** Название ремикса (русское; переводы — через тот же словарь имён уровней). */
   name: string;
   /** Оптимум решателя. Сверяется тестом, как `par` уровня кампании. */
   par: number;
   /** Порог двух звёзд. */
   par2: number;
+}
+
+/**
+ * Категория сложности по оптимуму. Полосы взяты из самой кампании (easy ≤ 5,
+ * medium 6–10, hard ≥ 11) — там они распределены именно так.
+ *
+ * Наследовать `difficulty` источника нельзя: добавленная бочка или ледяная
+ * клетка сдвигает оптимум на несколько ходов, и унаследованное значение
+ * начинает врать. Поле сейчас не читается игровым кодом, но данные, которые
+ * врут, в этом проекте уже один раз обошлись дорого.
+ */
+function difficultyForPar(par: number): LevelDef['difficulty'] {
+  if (par <= 5) return 'easy';
+  return par <= 10 ? 'medium' : 'hard';
 }
 
 /** Клетки, занятые фигурой (ящик — одна). */
@@ -87,6 +110,7 @@ export function buildRemix(source: LevelDef, spec: RemixSpec, id: number): Level
     name: spec.name,
     par: spec.par,
     par2: spec.par2,
+    difficulty: difficultyForPar(spec.par),
     // Обучающая подсказка привязана к раскладу источника и после
     // преобразования врёт — у ремикса её нет.
     hint: undefined,
@@ -104,6 +128,13 @@ export function buildRemix(source: LevelDef, spec: RemixSpec, id: number): Level
     mechanics: [...source.mechanics]
   };
 
+  if (spec.shift?.length) {
+    const byId = new Map(spec.shift.map((s) => [s.piece, s]));
+    level.pieces = level.pieces.map((p) => {
+      const s = byId.get(p.id);
+      return s ? { ...p, x: p.x + s.dx, y: p.y + s.dy } : p;
+    });
+  }
   if (spec.walls?.length) level.walls = [...(level.walls ?? []), ...spec.walls.map((w) => ({ ...w }))];
   if (spec.ice?.length) {
     level.ice = [...(level.ice ?? []), ...spec.ice.map((c) => ({ ...c }))];
@@ -116,5 +147,5 @@ export function buildRemix(source: LevelDef, spec: RemixSpec, id: number): Level
 
 /** Ремикс меняет задачу, а не только систему координат. */
 export function remixChangesRules(spec: RemixSpec): boolean {
-  return Boolean(spec.ice?.length || spec.walls?.length);
+  return Boolean(spec.ice?.length || spec.walls?.length || spec.shift?.length);
 }

@@ -1028,9 +1028,13 @@ export class App {
   }
 
   private async loadLeaderboardContent(): Promise<void> {
-    const [starsSnap, streakSnap] = await Promise.all([
+    // Доска лиги грузится только тем, кто в лигу вошёл: остальным она пуста и
+    // лишь занимает экран, а запрос всё равно стоит квоты SDK.
+    const leagueOpen = this.store.data.campaignDone === true;
+    const [starsSnap, streakSnap, leagueSnap] = await Promise.all([
       this.leaderboardCache.get('yardstars'),
-      this.leaderboardCache.get('dailystreak')
+      this.leaderboardCache.get('dailystreak'),
+      leagueOpen ? this.leaderboardCache.get('eliteleague') : Promise.resolve(null)
     ]);
     const stars = starsSnap.entries;
     const streak = streakSnap.entries;
@@ -1056,7 +1060,8 @@ export class App {
     };
     content.innerHTML =
       board(t('leaderboard.stars'), stars, myStars, ' ★') +
-      board(t('leaderboard.streak'), streak, myStreak, ` ${t('leaderboard.days')}`);
+      board(t('leaderboard.streak'), streak, myStreak, ` ${t('leaderboard.days')}`) +
+      (leagueSnap ? board(t('leaderboard.league'), leagueSnap.entries, leagueSnap.me, ' 🏅') : '');
   }
 
   private async inviteNeighbor(button: HTMLButtonElement): Promise<void> {
@@ -2433,6 +2438,10 @@ export class App {
     this.store.grantEliteMedals(campaignImpliedMedals(this.store.data.stars));
     const points = elitePoints(this.store.data);
     const rank = rankFor(points);
+    track({ type: 'elite_opened', points, rank: rank.key, medals: medaledCount(this.store.data) });
+    // Медали за кампанию засчитываются здесь же, поэтому счёт на доске мог
+    // измениться без единой сыгранной попытки.
+    if (points > 0) void this.platform.submitScore('eliteleague', points);
     const nx = nextRank(points);
     const done = medaledCount(this.store.data);
     const golds = goldCount(this.store.data);
@@ -2556,6 +2565,13 @@ export class App {
       this.showEliteScreen();
       return;
     }
+    track({
+      type: 'elite_challenge_started',
+      challengeId: challenge.id,
+      division: divisionOf(challenge.id),
+      modifier: challenge.modifier,
+      remixed: challenge.remixed
+    });
     this.runLevel(sourceLevel(challenge), false, undefined, false, challenge.modifier, challenge);
   }
 
@@ -2564,11 +2580,44 @@ export class App {
     this.audio.engineStop();
     const earned = medalForAttempt(challenge, attempt);
     const rankBefore = rankFor(elitePoints(this.store.data));
+    const achievementsBefore = unlockedAchievementKeys(this.store.data);
+    const medalsBefore = this.store.data.eliteMedals ?? {};
+    const divisionsBefore = DIVISIONS.filter((d) => divisionUnlocked(medalsBefore, d.index)).length;
     const { previous, next } = this.store.recordEliteMedal(challenge.id, earned);
     const improved = next > previous;
     const points = elitePoints(this.store.data);
     const rank = rankFor(points);
     const rankUp = rank.key !== rankBefore.key;
+    track({
+      type: 'elite_challenge_finished',
+      challengeId: challenge.id,
+      division: divisionOf(challenge.id),
+      modifier: challenge.modifier,
+      remixed: challenge.remixed,
+      medal: earned,
+      previousMedal: previous,
+      moves: attempt.moves
+    });
+    // Открытие дивизиона — ключевая точка воронки: именно здесь режим либо
+    // ведёт игрока дальше, либо упирается в гейт.
+    const medalsAfter = this.store.data.eliteMedals ?? {};
+    for (const division of DIVISIONS) {
+      if (division.index > divisionsBefore && divisionUnlocked(medalsAfter, division.index)) {
+        track({ type: 'elite_division_unlocked', division: division.index });
+      }
+    }
+    if (rankUp) track({ type: 'elite_rank_up', rank: rank.key, points });
+    if (improved) {
+      void this.platform.submitScore('eliteleague', points);
+      this.leaderboardCache.invalidate('eliteleague');
+    }
+    // Достижения лиги выдаются здесь: путь кампании сюда не заходит, и без
+    // этого блока они молча ждали бы следующего уровня кампании.
+    const newAchievements = ACHIEVEMENTS.filter(
+      (achievement) =>
+        !achievementsBefore.has(achievement.key) && unlockedAchievementKeys(this.store.data).has(achievement.key)
+    );
+    this.store.rememberAchievements(unlockedAchievementKeys(this.store.data));
     this.audio.play(earned === 3 ? 'win' : earned > 0 ? 'star' : 'thud');
     this.vibrate(earned > 0 ? [28, 45, 28] : 14);
 
@@ -2591,6 +2640,14 @@ export class App {
         ${improved ? `<div class="win-upgrade">${t('elite.result.improved')}</div>` : ''}
         <div class="win-note">🏅 ${t('elite.points')}: ${points}</div>
         ${rankUp ? `<div class="win-master" data-testid="elite-rankup">${t('elite.result.rankUp', { rank: t(`rank.${rank.key}`) })}</div>` : ''}
+        ${newAchievements
+          .map(
+            (achievement) =>
+              `<div class="win-note ok" data-testid="elite-achievement">${achievement.icon} ${t(
+                'achievements.unlocked'
+              )}: ${t(`achievement.${achievement.key}.title`)}</div>`
+          )
+          .join('')}
         <div class="elite-goals" data-testid="elite-goals">${eliteGoalRows(challenge)
           .map((r) => `<div class="elite-goal${medalNow >= r.medal ? ' done' : ''}">${r.text}</div>`)
           .join('')}</div>

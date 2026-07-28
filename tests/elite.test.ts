@@ -14,7 +14,9 @@ import {
   rankFor
 } from '../src/game/elite';
 import type { AttemptResult } from '../src/game/elite';
-import { ELITE_CHALLENGES, eliteChallenge, sourceLevel } from '../src/levels/elite-challenges';
+import { ELITE_CHALLENGES, campaignImpliedMedals, eliteChallenge, sourceLevel } from '../src/levels/elite-challenges';
+import { SaveStore } from '../src/game/save';
+import type { Platform } from '../src/platform/types';
 import { createState, starsFor } from '../src/core/game';
 import { solve } from '../src/core/solver';
 
@@ -158,11 +160,110 @@ describe('Высшая лига — 25 мастер-испытаний вали�
     120_000
   );
 
+  it('лестница порогов выведена из уровня: par2+2 / par2 / par', () => {
+    for (const c of ELITE_CHALLENGES) {
+      const level = sourceLevel(c);
+      expect(c.bronze.maxMoves).toBe(level.par2 + 2);
+      expect(c.silver.maxMoves).toBe(level.par2);
+      expect(c.gold.maxMoves).toBe(level.par);
+      // Звезда требуется ровно там, где она есть на уровне.
+      expect(c.silver.requireStar ?? false).toBe(level.star !== undefined);
+      // Золото всегда без подсказки — иначе кампания «доказывала» бы его.
+      expect(c.gold.noHint).toBe(true);
+    }
+  });
+
+  it('серебро не слабее трёх звёзд кампании (регрессия прежних порогов)', () => {
+    // Прежде silver был par2+2 со звездой, то есть МЯГЧЕ условия трёх звёзд
+    // (par2 со звездой): игрок получал медаль за результат хуже уже показанного.
+    for (const c of ELITE_CHALLENGES) {
+      const level = sourceLevel(c);
+      expect(c.silver.maxMoves).toBeLessThanOrEqual(level.par2);
+      // и бронза больше не «пройти как угодно»: запас ровно два хода
+      expect(c.bronze.maxMoves - c.silver.maxMoves).toBe(2);
+    }
+  });
+
+  it('ледяные уровни представлены, а испытаний без модификатора меньшинство', () => {
+    const sources = ELITE_CHALLENGES.map((c) => c.sourceLevelId);
+    // все четыре ледяных уровня кампании (у 101–104 льда нет — это обычные вставки)
+    for (const ice of [105, 106, 107, 108]) expect(sources).toContain(ice);
+    const byModifier = (m: string): number => ELITE_CHALLENGES.filter((c) => c.modifier === m).length;
+    expect(byModifier('none')).toBe(5);
+    expect(byModifier('noUndo')).toBe(9);
+    expect(byModifier('noHints')).toBe(5);
+    expect(byModifier('noUndoNoHints')).toBe(6);
+    expect(byModifier('none')).toBeLessThan(ELITE_CHALLENGES.length / 2);
+    // источники не повторяются: 25 разных уровней
+    expect(new Set(sources).size).toBe(ELITE_CHALLENGES.length);
+  });
+
   it('золотой результат честно даёт 3 звезды исходного уровня (согласованность)', () => {
     const c = eliteChallenge(1)!;
     const level = sourceLevel(c);
     const res = solve(level);
     createState(level); // расклад стартового состояния существует
     expect(starsFor(level, res.optimal, false)).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('Высшая лига — медали, заслуженные в кампании', () => {
+  const noneChallenge = ELITE_CHALLENGES.find((c) => c.modifier === 'none')!;
+  const moddedChallenge = ELITE_CHALLENGES.find((c) => c.modifier !== 'none')!;
+  const starsFor3 = (challenge: typeof noneChallenge): Record<string, number> => ({
+    [String(challenge.sourceLevelId)]: 3
+  });
+
+  it('три звезды на испытании без модификатора дают серебро', () => {
+    const granted = campaignImpliedMedals(starsFor3(noneChallenge));
+    expect(granted[String(noneChallenge.id)]).toBe(2);
+  });
+
+  it('две звезды дают бронзу, одна — ничего', () => {
+    const level = sourceLevel(noneChallenge);
+    expect(campaignImpliedMedals({ [String(level.id)]: 2 })[String(noneChallenge.id)]).toBe(1);
+    expect(campaignImpliedMedals({ [String(level.id)]: 1 })[String(noneChallenge.id)]).toBeUndefined();
+    expect(campaignImpliedMedals({})[String(noneChallenge.id)]).toBeUndefined();
+  });
+
+  it('испытание с модификатором не переносится: кампания его не доказывает', () => {
+    const granted = campaignImpliedMedals(starsFor3(moddedChallenge));
+    expect(granted[String(moddedChallenge.id)]).toBeUndefined();
+  });
+
+  it('золото не выдаётся никогда — оно требует прохождения без подсказки', () => {
+    const allThree: Record<string, number> = {};
+    for (const c of ELITE_CHALLENGES) allThree[String(c.sourceLevelId)] = 3;
+    const granted = campaignImpliedMedals(allThree);
+    expect(Object.values(granted).every((m) => m <= 2)).toBe(true);
+    // и переносятся ровно испытания без модификатора
+    expect(Object.keys(granted).length).toBe(ELITE_CHALLENGES.filter((c) => c.modifier === 'none').length);
+  });
+
+  it('полная кампания на три звезды не выносит игрока выше серебряного ранга', () => {
+    const allThree: Record<string, number> = {};
+    for (const c of ELITE_CHALLENGES) allThree[String(c.sourceLevelId)] = 3;
+    const save: SaveData = { ...defaultSave(), eliteMedals: campaignImpliedMedals(allThree) };
+    // все 25 серебром — потолок «переноса» — тоже ниже золотого ранга
+    const allSilver: SaveData = {
+      ...defaultSave(),
+      eliteMedals: Object.fromEntries(ELITE_CHALLENGES.map((c) => [String(c.id), 2]))
+    };
+    expect(rankFor(elitePoints(save)).points).toBeLessThan(RANKS.find((r) => r.key === 'gold')!.points);
+    expect(rankFor(elitePoints(allSilver)).key).toBe('silver');
+  });
+
+  it('выдача идемпотентна и не понижает уже заработанное', () => {
+    const platform = { saveData: async () => undefined } as unknown as Platform;
+    const store = new SaveStore(platform, { ...defaultSave(), eliteMedals: { [String(noneChallenge.id)]: 3 } });
+    const implied = campaignImpliedMedals(starsFor3(noneChallenge));
+    // золото не понижается до серебра
+    expect(store.grantEliteMedals(implied)).toBe(0);
+    expect(store.data.eliteMedals![String(noneChallenge.id)]).toBe(3);
+
+    const fresh = new SaveStore(platform, defaultSave());
+    expect(fresh.grantEliteMedals(implied)).toBe(1);
+    // повторный вызов ничего не выдаёт
+    expect(fresh.grantEliteMedals(implied)).toBe(0);
   });
 });

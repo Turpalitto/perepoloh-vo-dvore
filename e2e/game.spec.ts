@@ -742,11 +742,15 @@ test.describe('Высшая лига', () => {
     await page.getByTestId('menu-elite').click();
     await expect(page.getByTestId('screen-elite')).toBeVisible();
     await expect(page.getByTestId('elite-rank')).toHaveText('Новичок двора');
-    await expect(page.getByTestId('elite-points')).toContainText('0');
+    // В сейве три звезды за уровень 100 — источник испытания 25 без модификатора.
+    // Серебро по нему засчитывается сразу: переигрывать доказанное не нужно.
+    await expect(page.getByTestId('elite-points')).toContainText('25');
+    await expect(page.getByTestId('elite-medals')).toContainText('1/25 · 🥇 0');
     // закрываем интро и проверяем 25 карточек
     await page.getByTestId('elite-intro-close').click();
     await expect(page.getByTestId('elite-card-1')).toBeVisible();
     await expect(page.getByTestId('elite-card-25')).toBeVisible();
+    await expect(page.getByTestId('elite-card-25')).toContainText('🥈');
     // перезагрузка — лига остаётся открытой
     await page.reload();
     await expect(page.getByTestId('menu-elite')).toBeVisible();

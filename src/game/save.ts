@@ -43,6 +43,14 @@ export interface SaveData {
   /** Финальная сцена кампании показана (однократно). */
   endingSeen?: boolean;
   /**
+   * Вступление в Высшую лигу показано (однократно).
+   *
+   * Раньше признаком «первый заход» служило отсутствие медалей. Это перестало
+   * работать, когда медали начали засчитываться по результату кампании: игрок
+   * заходит в лигу уже с серебром и объяснения правил не видит вообще.
+   */
+  eliteIntroSeen?: boolean;
+  /**
    * Лучшая медаль по каждому мастер-испытанию Высшей лиги: id -> 1|2|3
    * (бронза/серебро/золото). Очки лиги ДЕРИВИРУЮТСЯ из этих медалей — отдельного
    * счётчика очков нет, поэтому награда не может быть выдана повторно: merge
@@ -133,6 +141,7 @@ export function sanitizeSave(raw: unknown): SaveData | null {
     campaignDone: r.campaignDone === true ? true : undefined,
     campaignDoneAt: typeof r.campaignDoneAt === 'string' ? r.campaignDoneAt : undefined,
     endingSeen: r.endingSeen === true ? true : undefined,
+    eliteIntroSeen: r.eliteIntroSeen === true ? true : undefined,
     eliteMedals: sanitizeMedals(r.eliteMedals),
     grandpaSeen: Array.isArray(r.grandpaSeen)
       ? (() => {
@@ -234,6 +243,7 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
           ? a.campaignDoneAt
           : b.campaignDoneAt,
     endingSeen: a.endingSeen || b.endingSeen || undefined,
+    eliteIntroSeen: a.eliteIntroSeen || b.eliteIntroSeen || undefined,
     eliteMedals: mergeMedals(a.eliteMedals, b.eliteMedals),
     grandpaSeen: mergeSeen(a.grandpaSeen, b.grandpaSeen),
     liveYard: a.liveYard === false || b.liveYard === false ? false : undefined,
@@ -421,6 +431,14 @@ export class SaveStore {
     this.persist();
   }
 
+  /** Первый заход в лигу: возвращает true один раз за игрока. */
+  markEliteIntroSeen(): boolean {
+    if (this.data.eliteIntroSeen) return false;
+    this.data.eliteIntroSeen = true;
+    this.persist();
+    return true;
+  }
+
   /**
    * Записывает результат мастер-испытания: медаль по id хранится как максимум.
    * Возвращает предыдущую и новую медаль (для показа «улучшение»/«без изменений»).
@@ -435,6 +453,29 @@ export class SaveStore {
       this.persist();
     }
     return { previous, next };
+  }
+
+  /**
+   * Массовая выдача медалей по максимуму — для медалей, заслуженных в кампании.
+   * Идемпотентно (max), поэтому повторные вызовы при каждом заходе в лигу
+   * ничего не меняют и не пишут сейв. Возвращает число реально выданных.
+   */
+  grantEliteMedals(medals: Record<string, number>): number {
+    const current = this.data.eliteMedals ?? {};
+    const next = { ...current };
+    let granted = 0;
+    for (const [key, medal] of Object.entries(medals)) {
+      const best = Math.max(current[key] ?? 0, medal);
+      if (best !== (current[key] ?? 0)) {
+        next[key] = best;
+        granted++;
+      }
+    }
+    if (granted > 0) {
+      this.data.eliteMedals = next;
+      this.persist();
+    }
+    return granted;
   }
 
   liveYardEnabled(): boolean {

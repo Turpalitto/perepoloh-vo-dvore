@@ -17,7 +17,6 @@ import type { RewardedContext } from '../game/analytics';
 import { hint, solve } from '../core/solver';
 import { ACHIEVEMENTS, achievementProgress, unlockedAchievementKeys } from '../game/achievements';
 import type { GameAudio } from '../game/audio';
-import type { DailyModifier } from '../game/daily';
 import {
   advanceStreak,
   currentStreak,
@@ -57,13 +56,15 @@ import {
   type AttemptResult,
   type Medal,
   elitePoints,
+  goldCount,
   medalForAttempt,
   medalOf,
   medaledCount,
   nextRank,
   rankFor
 } from '../game/elite';
-import { ELITE_CHALLENGES, type EliteChallenge, sourceLevel } from '../levels/elite-challenges';
+import { ELITE_CHALLENGES, type EliteChallenge, campaignImpliedMedals, sourceLevel } from '../levels/elite-challenges';
+import { type RuleModifier, blocksHints, blocksUndo } from '../game/modifiers';
 import {
   type BossLevelDef,
   type BossPhase,
@@ -87,6 +88,30 @@ import { yardSVG } from './yard';
 
 const MEDAL_ICON: Record<Medal, string> = { 0: '', 1: '🥉', 2: '🥈', 3: '🥇' };
 const MEDAL_KEY: Record<Medal, string> = { 0: 'medal.none', 1: 'medal.bronze', 2: 'medal.silver', 3: 'medal.gold' };
+
+/**
+ * Три порога испытания текстом. Ключи для них лежали в словаре, но нигде не
+ * выводились: игрок видел медаль и не видел, чего не хватило до следующей.
+ * Формулировка зависит от данных уровня — звезда требуется не везде, запрет
+ * отмены есть не у всех золот.
+ */
+function eliteGoalRows(challenge: EliteChallenge): Array<{ medal: Medal; text: string }> {
+  return [
+    {
+      medal: 3,
+      text: challenge.gold.noUndo
+        ? t('elite.goalGoldNoUndo', { n: challenge.gold.maxMoves })
+        : t('elite.goalGold', { n: challenge.gold.maxMoves })
+    },
+    {
+      medal: 2,
+      text: challenge.silver.requireStar
+        ? t('elite.goalSilver', { n: challenge.silver.maxMoves })
+        : t('elite.goalSilverPlain', { n: challenge.silver.maxMoves })
+    },
+    { medal: 1, text: t('elite.goalBronze', { n: challenge.bronze.maxMoves }) }
+  ];
+}
 
 const soundOnIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 9 h4 l5 -4 v14 l-5 -4 H4 Z" fill="currentColor"/><path d="M16 8 q3 4 0 8 M18.5 5.5 q5 6.5 0 13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
 const soundOffIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 9 h4 l5 -4 v14 l-5 -4 H4 Z" fill="currentColor"/><path d="M16 9 l6 6 M22 9 l-6 6" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>`;
@@ -1529,7 +1554,7 @@ export class App {
     daily: boolean,
     dailyDate?: string,
     endless = false,
-    modifier: DailyModifier = 'none',
+    modifier: RuleModifier = 'none',
     challenge?: EliteChallenge,
     boss?: { def: BossLevelDef; run: BossRun }
   ): void {
@@ -1599,10 +1624,10 @@ export class App {
         </div>
         <div class="board-host" data-testid="board-host"></div>
         <div class="hud hud-bottom">
-          <button class="btn" data-testid="btn-undo" disabled ${modifier === 'noUndo' ? 'hidden' : ''}>${t('btn.undo')}</button>
-          <button class="btn btn-redo" data-testid="btn-redo" disabled ${modifier === 'noUndo' ? 'hidden' : ''} aria-label="${t('btn.redo')}" title="${t('btn.redo')}">↪</button>
+          <button class="btn" data-testid="btn-undo" disabled ${blocksUndo(modifier) ? 'hidden' : ''}>${t('btn.undo')}</button>
+          <button class="btn btn-redo" data-testid="btn-redo" disabled ${blocksUndo(modifier) ? 'hidden' : ''} aria-label="${t('btn.redo')}" title="${t('btn.redo')}">↪</button>
           <button class="btn" data-testid="btn-restart">${t('btn.restart')}</button>
-          <button class="btn" data-testid="btn-hint" ${modifier === 'noHints' ? 'hidden' : ''}>${
+          <button class="btn" data-testid="btn-hint" ${blocksHints(modifier) ? 'hidden' : ''}>${
             !daily && !challenge && level.id >= 1 && level.id <= 3
               ? t('btn.hintFree')
               : (this.store.data.hintTokens ?? 0) > 0
@@ -1922,11 +1947,13 @@ export class App {
       window.setTimeout(() => controls.remove(), 7400);
     }
 
-    if (daily && modifier !== 'none') {
+    // Мастер-испытание навязывает модификатор молча: до этого игрок узнавал о
+    // запрете только по пропавшей кнопке. Баннер тот же, что у ежедневного.
+    if ((daily || challenge) && modifier !== 'none') {
       const banner = document.createElement('div');
       banner.className = 'hint-toast modifier-toast';
       banner.setAttribute('data-testid', 'modifier-toast');
-      banner.textContent = `🎯 ${t(`daily.modifier.${modifier}`)}`;
+      banner.textContent = `🎯 ${t(challenge ? `elite.mod.${modifier}` : `daily.modifier.${modifier}`)}`;
       this.q('.overlay-slot').appendChild(banner);
       window.setTimeout(() => banner.classList.add('gone'), 5200);
       window.setTimeout(() => banner.remove(), 5800);
@@ -2389,16 +2416,24 @@ export class App {
   private showEliteInner(): void {
     this.disposeActiveBoard();
     this.setGameplay(false);
+    // Медали, уже заслуженные в кампании, выдаются при входе: идемпотентно,
+    // поэтому повторные заходы ничего не меняют и сейв не переписывают.
+    this.store.grantEliteMedals(campaignImpliedMedals(this.store.data.stars));
     const points = elitePoints(this.store.data);
     const rank = rankFor(points);
     const nx = nextRank(points);
     const done = medaledCount(this.store.data);
+    const golds = goldCount(this.store.data);
     const cards = ELITE_CHALLENGES.map((c) => {
       const medal = medalOf(this.store.data, c.id);
       const level = sourceLevel(c);
       const mod = c.modifier !== 'none' ? `<span class="elite-mod">${t(`elite.mod.${c.modifier}`)}</span>` : '';
       return `
-        <button class="elite-card${medal ? ' medaled' : ''}" data-testid="elite-card-${c.id}" data-challenge="${c.id}">
+        <button class="elite-card${medal ? ' medaled' : ''}" data-testid="elite-card-${c.id}" data-challenge="${c.id}" title="${escapeHTML(
+          eliteGoalRows(c)
+            .map((r) => r.text)
+            .join(' · ')
+        )}">
           <span class="elite-card-medal">${MEDAL_ICON[medal] || '·'}</span>
           <span class="elite-card-num">${t('elite.challenge')} ${c.id}</span>
           <span class="elite-card-src">${escapeHTML(levelText('name', level.name) ?? level.name)}</span>
@@ -2419,7 +2454,7 @@ export class App {
             }</span></div>
           <div class="elite-figures">
             <span data-testid="elite-points">🏅 ${t('elite.points')}: ${points}</span>
-            <span>🎖️ ${t('elite.medals')}: ${done}/${ELITE_CHALLENGES.length}</span>
+            <span data-testid="elite-medals">🎖️ ${t('elite.medals')}: ${done}/${ELITE_CHALLENGES.length} · 🥇 ${golds}</span>
             ${(this.store.data.endlessBest ?? 0) > 0 ? `<span>🌀 ${t('elite.bestEndless', { n: this.store.data.endlessBest ?? 0 })}</span>` : ''}
           </div>
         </div>
@@ -2436,8 +2471,9 @@ export class App {
         this.startEliteChallenge(Number(b.dataset.challenge));
       })
     );
-    // Короткое объяснение при первом заходе (пока нет ни одной медали).
-    if (done === 0) this.showEliteIntro();
+    // Короткое объяснение при первом заходе. Признак — флаг сейва, а не «нет
+    // медалей»: медали теперь могут быть засчитаны по кампании ещё до входа.
+    if (this.store.markEliteIntroSeen()) this.showEliteIntro();
     if (this.platform.isTV) this.q<HTMLElement>('[data-testid=btn-back]').focus({ preventScroll: true });
   }
 
@@ -2452,6 +2488,7 @@ export class App {
           <li>${t('elite.intro.1')}</li>
           <li>${t('elite.intro.2')}</li>
           <li>${t('elite.intro.3')}</li>
+          <li>${t('elite.fromCampaign')}</li>
         </ul>
         <button class="btn btn-primary btn-big" data-testid="elite-intro-close">${t('rules.close')}</button>
       </div>`;
@@ -2502,6 +2539,9 @@ export class App {
         ${improved ? `<div class="win-upgrade">${t('elite.result.improved')}</div>` : ''}
         <div class="win-note">🏅 ${t('elite.points')}: ${points}</div>
         ${rankUp ? `<div class="win-master" data-testid="elite-rankup">${t('elite.result.rankUp', { rank: t(`rank.${rank.key}`) })}</div>` : ''}
+        <div class="elite-goals" data-testid="elite-goals">${eliteGoalRows(challenge)
+          .map((r) => `<div class="elite-goal${medalNow >= r.medal ? ' done' : ''}">${r.text}</div>`)
+          .join('')}</div>
         <button class="btn btn-primary btn-big" data-testid="elite-retry">${t('win.again')}</button>
         <div class="dialog-row">
           ${nextCh ? `<button class="btn" data-testid="elite-next">${t('win.next')}</button>` : ''}

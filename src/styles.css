@@ -2119,6 +2119,21 @@ html[data-daytime='night'] .yard-lamp-light {
   font-size: 64px;
   text-align: center;
 }
+.elite-goals {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 8px 0 2px;
+  text-align: left;
+}
+.elite-goal {
+  font-size: 12px;
+  opacity: 0.45;
+}
+.elite-goal.done {
+  opacity: 1;
+  font-weight: 600;
+}
 .elite-intro-dialog .rules-list {
   text-align: left;
 }

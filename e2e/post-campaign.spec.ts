@@ -10,8 +10,11 @@ type SaveData = {
   [key: string]: unknown;
 };
 
-const NO_UNDO = new Set([2, 6, 10, 14, 18, 22]);
-const NO_HINTS = new Set([4, 8, 12, 16, 20, 24]);
+// Испытания, где кнопка скрыта. Комбинированный модификатор noUndoNoHints
+// попадает в оба набора — именно он раньше молча ломал проверки на равенство
+// строке 'noUndo' / 'noHints'.
+const NO_UNDO = new Set([3, 5, 7, 9, 10, 12, 13, 14, 16, 17, 18, 20, 21, 23, 24]);
+const NO_HINTS = new Set([6, 11, 13, 15, 16, 17, 19, 20, 21, 22, 24]);
 
 async function seedSave(page: Page, overrides: SaveData = {}): Promise<void> {
   await page.addInitScript((data) => {
@@ -88,6 +91,14 @@ async function openElite(page: Page): Promise<void> {
   await expect(page.getByTestId('screen-elite')).toBeVisible();
   const intro = page.getByTestId('elite-intro-close');
   if (await intro.isVisible().catch(() => false)) await intro.click();
+  // Экран въезжает анимацией screen-in и до её конца смещён на 12px вниз.
+  // Раньше эти миллисекунды съедало закрытие интро; теперь интро показывается
+  // один раз за игрока, и измерения геометрии стали читать промежуточный кадр.
+  await page
+    .getByTestId('screen-elite')
+    .evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((a) => a.finished.catch(() => undefined)));
+    });
 }
 
 test.describe('Post-campaign', () => {
@@ -161,16 +172,19 @@ test.describe('Post-campaign', () => {
   });
 
   test('Elite medals improve once, rank up, retry, next and persist', async ({ page }) => {
-    const firstEightGold = Object.fromEntries(
-      Array.from({ length: 8 }, (_, index) => [String(index + 1), 3])
+    // 14 золотых = 700 очков, плюс 25 за серебро, засчитанное по трём звёздам
+    // финального уровня кампании (испытание 25 — без модификатора) = 725.
+    // Это ещё серебряный ранг; золото за испытание 15 переводит через порог 750.
+    const firstFourteenGold = Object.fromEntries(
+      Array.from({ length: 14 }, (_, index) => [String(index + 1), 3])
     );
-    await seedSave(page, { eliteMedals: firstEightGold });
+    await seedSave(page, { eliteMedals: firstFourteenGold });
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await openElite(page);
     await expect(page.getByTestId('elite-rank')).toHaveText('Серебряный мастер');
-    await expect(page.getByTestId('elite-points')).toContainText('400');
+    await expect(page.getByTestId('elite-points')).toContainText('725');
 
-    await page.getByTestId('elite-card-9').click();
+    await page.getByTestId('elite-card-15').click();
     await page.evaluate(() =>
       (window as unknown as { __e2eWinLevel: (opts: { starCollected: boolean }) => void }).__e2eWinLevel({
         starCollected: true
@@ -189,7 +203,7 @@ test.describe('Post-campaign', () => {
     await expect(page.getByTestId('elite-rankup')).toHaveCount(0);
 
     await page.getByTestId('elite-next').click();
-    await expect(page.getByTestId('screen-game')).toContainText('Испытание 10');
+    await expect(page.getByTestId('screen-game')).toContainText('Испытание 16');
     await page.evaluate(() =>
       (window as unknown as { __e2eWinLevel: (opts: { starCollected: boolean }) => void }).__e2eWinLevel({
         starCollected: true
@@ -197,14 +211,16 @@ test.describe('Post-campaign', () => {
     );
     await page.getByTestId('elite-back').click();
     await expect(page.getByTestId('elite-rank')).toHaveText('Золотой мастер');
-    await expect(page.getByTestId('elite-points')).toContainText('500');
+    await expect(page.getByTestId('elite-points')).toContainText('825');
 
     await page.reload();
     await openElite(page);
     await expect(page.getByTestId('elite-rank')).toHaveText('Золотой мастер');
     const save = await readSave(page);
-    expect(save.eliteMedals?.['9']).toBe(3);
-    expect(save.eliteMedals?.['10']).toBe(3);
+    expect(save.eliteMedals?.['15']).toBe(3);
+    expect(save.eliteMedals?.['16']).toBe(3);
+    // Серебро за испытание 25 записано в сейв, а не нарисовано на экране.
+    expect(save.eliteMedals?.['25']).toBe(2);
   });
 
   test('Endless Yard continues, stores best streak and resets a new run', async ({ page }) => {

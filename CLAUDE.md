@@ -6,13 +6,15 @@
 - `npm run dev` — дев-сервер
 - `npm run typecheck` — tsc --noEmit
 - `npm run lint` — eslint (floating promises и т.п., что tsc не ловит)
-- `npm run check` — typecheck + lint + test одной командой; гонять перед коммитом
+- `npm run check` — typecheck + lint + unit + solver + verify:ice + verify:docs одной командой; гонять перед коммитом
 - `npm test` — unit-тесты (vitest)
 - `npm run solve` — решатель по всем уровням (печатает оптимум)
 - `npm run analyze` — сложность и дубликаты всей кампании (`-- --json out.json`; ~2.5 мин, exit 1 только при дефектах)
 - `npm run build` — production-сборка в `dist/`
 - `npm run verify:dist` — проверка production-архива (запрещённые маркеры, домены, промо-PNG)
 - `npm run verify:ice` — доказательство, что каждая ледяная клетка кампании значима (входит в `check`)
+- `npm run verify:docs` — сверка чисел в документах с данными (входит в `check`); `-- --write` перегенерирует `GENERATED_PROJECT_STATS.md`
+- `npm run check:release` — всё перед публикацией: `check` + solve + build + verify:dist + e2e
 - `npm run e2e` — браузерные тесты (playwright, требует `npm run build`)
 
 ## Жёсткие правила

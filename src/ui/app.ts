@@ -1337,6 +1337,8 @@ export class App {
         (achievement) =>
           !achievementsBefore.has(achievement.key) && unlockedAchievementKeys(this.store.data).has(achievement.key)
       );
+      // Выданное фиксируется в сейве: цели растут вместе с кампанией, награда — нет.
+      this.store.rememberAchievements(unlockedAchievementKeys(this.store.data));
       this.store.markBossDone(def.id);
       // Финальный босс (слот 100) открывает Высшую лигу той же логикой, что и
       // обычный уровень 100: при первом прохождении — финальная сцена вместо
@@ -2125,6 +2127,8 @@ export class App {
       (achievement) =>
         !achievementsBefore.has(achievement.key) && unlockedAchievementKeys(this.store.data).has(achievement.key)
     );
+    // Выданное фиксируется в сейве: цели растут вместе с кампанией, награда — нет.
+    this.store.rememberAchievements(unlockedAchievementKeys(this.store.data));
     this.audio.play('win');
 
     const idx = daily ? -1 : LEVELS.findIndex((l) => l.id === level.id);
@@ -2280,6 +2284,8 @@ export class App {
       (achievement) =>
         !achievementsBefore.has(achievement.key) && unlockedAchievementKeys(this.store.data).has(achievement.key)
     );
+    // Выданное фиксируется в сейве: цели растут вместе с кампанией, награда — нет.
+    this.store.rememberAchievements(unlockedAchievementKeys(this.store.data));
     this.audio.play('win');
     const achievementNote = newAchievements
       .map(

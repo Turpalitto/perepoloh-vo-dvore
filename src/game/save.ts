@@ -55,6 +55,14 @@ export interface SaveData {
   liveYard?: boolean;
   /** Слоты пройденных сюжетных боссов (прогресс пишется только после победы). */
   bossDone?: number[];
+  /**
+   * Уже выданные достижения. Раньше набор вычислялся заново из прогресса, и
+   * это ломалось при росте кампании: цели «пройти всё» и «собрать все звёзды»
+   * деривируются из данных, поэтому игрок со 100 из 100 уровней после
+   * расширения до 108 увидел бы достижение снова закрытым. Выданное не
+   * отнимается — список только пополняется.
+   */
+  achievements?: string[];
 }
 
 export function defaultSave(): SaveData {
@@ -133,6 +141,12 @@ export function sanitizeSave(raw: unknown): SaveData | null {
         })()
       : undefined,
     liveYard: r.liveYard === false ? false : undefined,
+    achievements: Array.isArray(r.achievements)
+      ? (() => {
+          const list = [...new Set(r.achievements.filter((k): k is string => typeof k === 'string'))].slice(0, 100);
+          return list.length ? list : undefined;
+        })()
+      : undefined,
     bossDone: Array.isArray(r.bossDone)
       ? (() => {
           const list = [...new Set(r.bossDone.filter((n): n is number => Number.isInteger(n) && n > 0))];
@@ -226,7 +240,8 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
     bossDone: (() => {
       const set = new Set([...(a.bossDone ?? []), ...(b.bossDone ?? [])]);
       return set.size ? [...set] : undefined;
-    })()
+    })(),
+    achievements: mergeSeen(a.achievements, b.achievements)
   };
 }
 
@@ -441,6 +456,20 @@ export class SaveStore {
     if (set.has(bossId)) return;
     set.add(bossId);
     this.data.bossDone = [...set];
+    this.persist();
+  }
+
+  /**
+   * Фиксирует выданные достижения. Вызывается после каждого пересчёта: набор
+   * целей может измениться вместе с данными кампании, а уже полученная награда
+   * — нет.
+   */
+  rememberAchievements(keys: Iterable<string>): void {
+    const seen = new Set(this.data.achievements ?? []);
+    const before = seen.size;
+    for (const key of keys) seen.add(key);
+    if (seen.size === before) return;
+    this.data.achievements = [...seen].slice(0, 100);
     this.persist();
   }
 

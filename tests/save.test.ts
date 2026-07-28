@@ -11,6 +11,14 @@ describe('сохранения', () => {
     expect(sanitizeSave({ ...defaultSave(), lang: 'tr', langChosen: true })?.langChosen).toBe(true);
   });
 
+  it('выданные достижения переживают слияние и не теряются', () => {
+    const base = defaultSave();
+    const local: SaveData = { ...base, achievements: ['yardLegend'] };
+    const cloud: SaveData = { ...base, achievements: ['master'] };
+    expect(new Set(mergeSave(local, cloud).achievements)).toEqual(new Set(['yardLegend', 'master']));
+    expect(sanitizeSave({ ...base, achievements: ['master', 'master'] })?.achievements).toEqual(['master']);
+  });
+
   it('lastLevel при слиянии выбирается по позиции в кампании, а не по большему id', () => {
     // Уровни, вставленные после релиза, имеют id 105+ и стоят В СЕРЕДИНЕ
     // кампании (105 — это 42-я позиция). Прежний Math.max по id объявлял бы

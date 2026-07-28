@@ -8,7 +8,7 @@ on:
 
 jobs:
   check:
-    name: typecheck + lint + unit + solver + solve + build + verify:dist
+    name: typecheck + lint + unit + solver + ice + docs + solve + build + verify:dist
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +21,8 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:solver
+      - run: npm run verify:ice
+      - run: npm run verify:docs
       - run: npm run solve
       - run: npm run build
       - run: npm run verify:dist

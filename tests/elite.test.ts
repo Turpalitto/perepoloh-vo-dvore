@@ -14,7 +14,17 @@ import {
   rankFor
 } from '../src/game/elite';
 import type { AttemptResult } from '../src/game/elite';
-import { ELITE_CHALLENGES, campaignImpliedMedals, eliteChallenge, sourceLevel } from '../src/levels/elite-challenges';
+import {
+  DIVISIONS,
+  ELITE_CHALLENGES,
+  campaignImpliedMedals,
+  challengeUnlocked,
+  divisionMedals,
+  divisionOf,
+  divisionUnlocked,
+  eliteChallenge,
+  sourceLevel
+} from '../src/levels/elite-challenges';
 import { SaveStore } from '../src/game/save';
 import type { Platform } from '../src/platform/types';
 import { createState, starsFor } from '../src/core/game';
@@ -265,5 +275,47 @@ describe('Высшая лига — медали, заслуженные в ка
     expect(fresh.grantEliteMedals(implied)).toBe(1);
     // повторный вызов ничего не выдаёт
     expect(fresh.grantEliteMedals(implied)).toBe(0);
+  });
+});
+
+describe('Высшая лига — дивизионы', () => {
+  it('пять блоков по пять испытаний покрывают весь список без пересечений', () => {
+    expect(DIVISIONS).toHaveLength(5);
+    expect(DIVISIONS.reduce((sum, d) => sum + (d.to - d.from + 1), 0)).toBe(ELITE_CHALLENGES.length);
+    for (const c of ELITE_CHALLENGES) {
+      const division = DIVISIONS[divisionOf(c.id) - 1];
+      expect(c.id).toBeGreaterThanOrEqual(division.from);
+      expect(c.id).toBeLessThanOrEqual(division.to);
+    }
+  });
+
+  it('первый дивизион открыт всегда, остальные — по трём медалям предыдущего', () => {
+    expect(divisionUnlocked({}, 1)).toBe(true);
+    expect(divisionUnlocked({}, 2)).toBe(false);
+    // две медали — ещё мало
+    expect(divisionUnlocked({ '1': 1, '2': 3 }, 2)).toBe(false);
+    expect(divisionUnlocked({ '1': 1, '2': 3, '3': 1 }, 2)).toBe(true);
+    // медали чужого дивизиона не открывают
+    expect(divisionUnlocked({ '11': 3, '12': 3, '13': 3 }, 2)).toBe(false);
+  });
+
+  it('challengeUnlocked повторяет правило дивизиона, а не собственный прогресс', () => {
+    const medals = { '1': 1, '2': 1, '3': 1 };
+    // весь второй дивизион открыт целиком, а не по одному испытанию
+    for (let id = DIVISIONS[1].from; id <= DIVISIONS[1].to; id++) {
+      expect(challengeUnlocked(medals, id)).toBe(true);
+    }
+    expect(challengeUnlocked(medals, DIVISIONS[2].from)).toBe(false);
+  });
+
+  it('перенос из кампании сам по себе не открывает лигу целиком', () => {
+    const allThree: Record<string, number> = {};
+    for (const c of ELITE_CHALLENGES) allThree[String(c.sourceLevelId)] = 3;
+    const implied = campaignImpliedMedals(allThree);
+    // первый дивизион получает медали и открывает второй…
+    expect(divisionUnlocked(implied, 2)).toBe(true);
+    // …но дальше третьего блока без игры не пройти
+    expect(divisionUnlocked(implied, 3)).toBe(false);
+    expect(divisionMedals(implied, 3)).toBe(0);
   });
 });

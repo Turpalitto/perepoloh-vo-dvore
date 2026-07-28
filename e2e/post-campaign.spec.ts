@@ -150,10 +150,16 @@ test.describe('Post-campaign', () => {
 
   test('all 25 Elite challenges open and enforce their configured modifiers', async ({ page }) => {
     test.setTimeout(120_000);
-    await seedSave(page, { eliteMedals: { '1': 1 } });
+    // По три медали в каждом из первых четырёх дивизионов — иначе следующий
+    // блок закрыт и его карточки нельзя открыть кликом.
+    const unlockAll = Object.fromEntries(
+      [1, 2, 3, 6, 7, 8, 11, 12, 13, 16, 17, 18].map((id) => [String(id), 1])
+    );
+    await seedSave(page, { eliteMedals: unlockAll });
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await openElite(page);
     await expect(page.locator('.elite-card')).toHaveCount(25);
+    await expect(page.locator('.elite-card.locked')).toHaveCount(0);
 
     for (let id = 1; id <= 25; id++) {
       await page.getByTestId(`elite-card-${id}`).click();
@@ -169,6 +175,30 @@ test.describe('Post-campaign', () => {
       await page.getByTestId('btn-exit-menu').click();
       await openElite(page);
     }
+  });
+
+  test('divisions gate the league and open on the third medal of the previous block', async ({ page }) => {
+    await seedSave(page, { eliteMedals: { '1': 1, '2': 1 } });
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await openElite(page);
+    await expect(page.getByTestId('elite-division-1')).toContainText('Дворовый претендент');
+    await expect(page.getByTestId('elite-division-2')).toContainText('Бронзовый дивизион');
+    // Две медали в первом блоке — второй ещё закрыт.
+    await expect(page.getByTestId('elite-card-6')).toBeDisabled();
+    await expect(page.getByTestId('elite-division-2')).toContainText('🔒');
+
+    // Третья медаль открывает второй дивизион.
+    await page.getByTestId('elite-card-3').click();
+    await page.evaluate(() =>
+      (window as unknown as { __e2eWinLevel: (opts: { starCollected: boolean }) => void }).__e2eWinLevel({
+        starCollected: true
+      })
+    );
+    await page.getByTestId('elite-back').click();
+    await expect(page.getByTestId('elite-card-6')).toBeEnabled();
+    await expect(page.getByTestId('elite-division-2')).not.toContainText('🔒');
+    // Третий блок остаётся закрытым: его правило считает медали второго.
+    await expect(page.getByTestId('elite-card-11')).toBeDisabled();
   });
 
   test('Elite medals improve once, rank up, retry, next and persist', async ({ page }) => {

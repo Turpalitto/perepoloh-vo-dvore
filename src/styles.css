@@ -2068,8 +2068,25 @@ html[data-daytime='night'] .yard-lamp-light {
   text-align: right;
 }
 .elite-section {
-  margin: 6px 14px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 14px 6px;
   color: #6b4a1f;
+}
+.elite-section.locked {
+  opacity: 0.6;
+}
+.elite-section-sub {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+.elite-card.locked {
+  opacity: 0.5;
+  cursor: default;
 }
 .elite-grid {
   display: grid;

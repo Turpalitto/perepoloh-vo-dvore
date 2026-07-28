@@ -63,7 +63,18 @@ import {
   nextRank,
   rankFor
 } from '../game/elite';
-import { ELITE_CHALLENGES, type EliteChallenge, campaignImpliedMedals, sourceLevel } from '../levels/elite-challenges';
+import {
+  DIVISIONS,
+  DIVISION_UNLOCK_MEDALS,
+  ELITE_CHALLENGES,
+  type EliteChallenge,
+  campaignImpliedMedals,
+  challengeUnlocked,
+  divisionMedals,
+  divisionOf,
+  divisionUnlocked,
+  sourceLevel
+} from '../levels/elite-challenges';
 import { type RuleModifier, blocksHints, blocksUndo } from '../game/modifiers';
 import {
   type BossLevelDef,
@@ -2424,21 +2435,45 @@ export class App {
     const nx = nextRank(points);
     const done = medaledCount(this.store.data);
     const golds = goldCount(this.store.data);
-    const cards = ELITE_CHALLENGES.map((c) => {
-      const medal = medalOf(this.store.data, c.id);
-      const level = sourceLevel(c);
-      const mod = c.modifier !== 'none' ? `<span class="elite-mod">${t(`elite.mod.${c.modifier}`)}</span>` : '';
-      return `
-        <button class="elite-card${medal ? ' medaled' : ''}" data-testid="elite-card-${c.id}" data-challenge="${c.id}" title="${escapeHTML(
-          eliteGoalRows(c)
-            .map((r) => r.text)
-            .join(' · ')
+    const medals = this.store.data.eliteMedals ?? {};
+    const sections = DIVISIONS.map((division) => {
+      const open = divisionUnlocked(medals, division.index);
+      const size = division.to - division.from + 1;
+      const cards = ELITE_CHALLENGES.filter((c) => divisionOf(c.id) === division.index)
+        .map((c) => {
+          const medal = medalOf(this.store.data, c.id);
+          // Карточка может быть открыта в закрытом дивизионе: медаль по ней
+          // засчитана кампанией, и запрещать переигровку было бы враньём.
+          const playable = challengeUnlocked(medals, c.id);
+          const level = sourceLevel(c);
+          const mod = c.modifier !== 'none' ? `<span class="elite-mod">${t(`elite.mod.${c.modifier}`)}</span>` : '';
+          return `
+        <button class="elite-card${medal ? ' medaled' : ''}${playable ? '' : ' locked'}" data-testid="elite-card-${c.id}" data-challenge="${c.id}" ${
+          playable ? '' : 'disabled'
+        } title="${escapeHTML(
+          playable
+            ? eliteGoalRows(c)
+                .map((r) => r.text)
+                .join(' · ')
+            : t('elite.divisionLocked', { n: DIVISION_UNLOCK_MEDALS })
         )}">
-          <span class="elite-card-medal">${MEDAL_ICON[medal] || '·'}</span>
+          <span class="elite-card-medal">${playable ? MEDAL_ICON[medal] || '·' : '🔒'}</span>
           <span class="elite-card-num">${t('elite.challenge')} ${c.id}</span>
           <span class="elite-card-src">${escapeHTML(levelText('name', level.name) ?? level.name)}</span>
           ${mod}
         </button>`;
+        })
+        .join('');
+      return `
+        <h3 class="elite-section${open ? '' : ' locked'}" data-testid="elite-division-${division.index}">
+          <span>${t(`division.${division.index}`)}</span>
+          <span class="elite-section-sub">${
+            open
+              ? `🎖️ ${divisionMedals(medals, division.index)}/${size}`
+              : `🔒 ${t('elite.divisionLocked', { n: DIVISION_UNLOCK_MEDALS })}`
+          }</span>
+        </h3>
+        <div class="elite-grid">${cards}</div>`;
     }).join('');
     this.root.innerHTML = `
       <div class="screen elite-screen" data-testid="screen-elite">
@@ -2458,8 +2493,7 @@ export class App {
             ${(this.store.data.endlessBest ?? 0) > 0 ? `<span>🌀 ${t('elite.bestEndless', { n: this.store.data.endlessBest ?? 0 })}</span>` : ''}
           </div>
         </div>
-        <h3 class="elite-section">${t('elite.challenges')}</h3>
-        <div class="elite-grid">${cards}</div>
+        ${sections}
       </div>`;
     this.q('[data-testid=btn-back]').addEventListener('click', () => {
       this.audio.play('click');
@@ -2503,7 +2537,10 @@ export class App {
 
   private startEliteChallenge(id: number): void {
     const challenge = ELITE_CHALLENGES.find((c) => c.id === id);
-    if (!challenge) {
+    // Дивизион мог закрыться между рендером и кликом (например, «Следующее»
+    // после последнего испытания блока) — правило проверяется здесь, а не
+    // только атрибутом disabled на кнопке.
+    if (!challenge || !challengeUnlocked(this.store.data.eliteMedals ?? {}, id)) {
       this.showEliteScreen();
       return;
     }
@@ -2525,7 +2562,10 @@ export class App {
 
     const medalNow = next as Medal;
     const idx = ELITE_CHALLENGES.findIndex((c) => c.id === challenge.id);
-    const nextCh = idx >= 0 && idx < ELITE_CHALLENGES.length - 1 ? ELITE_CHALLENGES[idx + 1] : null;
+    const following = idx >= 0 && idx < ELITE_CHALLENGES.length - 1 ? ELITE_CHALLENGES[idx + 1] : null;
+    // «Следующее» не должно перепрыгивать закрытый дивизион: медаль за это
+    // испытание уже записана, поэтому проверка идёт по актуальному сейву.
+    const nextCh = following && challengeUnlocked(this.store.data.eliteMedals ?? {}, following.id) ? following : null;
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.setAttribute('data-testid', 'elite-result');

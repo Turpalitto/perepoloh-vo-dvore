@@ -121,6 +121,69 @@ export const ELITE_CHALLENGES: EliteChallenge[] = CURATED.map((entry, index) => 
   return { id: index + 1, sourceLevelId: entry.source, modifier: entry.modifier, ...buildGoals(level, entry.modifier) };
 });
 
+/**
+ * Дивизионы — пять блоков по пять испытаний.
+ *
+ * Раньше двадцать пять карточек лежали одной сеткой, и ранг был единственным
+ * признаком продвижения — то есть продвижение измерялось только суммой очков.
+ * Дивизион привязывает его к содержанию: блок открывается, когда предыдущий
+ * действительно освоен, и по нему видно, докуда игрок дошёл.
+ *
+ * Границы совпадают с порядком `CURATED` — он выстроен по возрастанию нагрузки,
+ * поэтому дивизион не приходится задавать отдельным списком id.
+ */
+export const DIVISION_SIZE = 5;
+
+/** Сколько медалей в дивизионе открывает следующий (из пяти). */
+export const DIVISION_UNLOCK_MEDALS = 3;
+
+export const DIVISIONS: ReadonlyArray<{ index: number; from: number; to: number }> = Array.from(
+  { length: Math.ceil(ELITE_CHALLENGES.length / DIVISION_SIZE) },
+  (_, i) => ({
+    index: i + 1,
+    from: i * DIVISION_SIZE + 1,
+    to: Math.min((i + 1) * DIVISION_SIZE, ELITE_CHALLENGES.length)
+  })
+);
+
+/** Номер дивизиона (с единицы) по id испытания. */
+export function divisionOf(challengeId: number): number {
+  const found = DIVISIONS.find((d) => challengeId >= d.from && challengeId <= d.to);
+  return found?.index ?? DIVISIONS.length;
+}
+
+/** Сколько испытаний дивизиона имеют хотя бы бронзу. */
+export function divisionMedals(medals: Record<string, number>, division: number): number {
+  const bounds = DIVISIONS[division - 1];
+  if (!bounds) return 0;
+  let count = 0;
+  for (let id = bounds.from; id <= bounds.to; id++) if ((medals[String(id)] ?? 0) > 0) count++;
+  return count;
+}
+
+/**
+ * Дивизион открыт: первый — всегда, остальные — когда в предыдущем набрано
+ * `DIVISION_UNLOCK_MEDALS` медалей. Порог намеренно не «все пять»: тупик в
+ * пост-кампании хуже, чем слишком быстрый доступ, а бронза берётся с запасом в
+ * два хода — она подтверждает, что блок пройден, а не что он выжат досуха.
+ */
+export function divisionUnlocked(medals: Record<string, number>, division: number): boolean {
+  if (division <= 1) return true;
+  return divisionMedals(medals, division - 1) >= DIVISION_UNLOCK_MEDALS;
+}
+
+/**
+ * Испытание доступно: его дивизион открыт — либо медаль по нему уже есть.
+ *
+ * Второе условие не косметика: медали засчитываются по кампании и попадают в
+ * ещё закрытые дивизионы. Без него игрок видел бы карточку с серебром и замком
+ * одновременно и не мог переиграть то, за что уже получил очки.
+ */
+export function challengeUnlocked(medals: Record<string, number>, challengeId: number): boolean {
+  if ((medals[String(challengeId)] ?? 0) > 0) return true;
+  return divisionUnlocked(medals, divisionOf(challengeId));
+}
+
 export function eliteChallenge(id: number): EliteChallenge | undefined {
   return ELITE_CHALLENGES.find((c) => c.id === id);
 }

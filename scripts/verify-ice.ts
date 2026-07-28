@@ -11,7 +11,9 @@
  *
  * Для каждого уровня с полем `ice`:
  *   1. уровень решаем, `par` совпадает с оптимумом, поиск не упёрся в лимит;
- *   2. удаление ЛЮБОЙ одной ледяной клетки снижает оптимум (клетка несёт вес);
+ *   2. удаление ЛЮБОЙ одной ледяной клетки ДОКАЗАННО снижает оптимум: поиск без
+ *      клетки обязан завершиться, исчерпанный лимит состояний — не доказательство,
+ *      а отсутствие ответа (и отклоняется отдельной ошибкой);
  *   3. у каждой клетки есть роль — «проезд» либо «запрет стоянки»;
  *   4. ни один ход оптимального решения не заканчивается на льду (страховка от
  *      расхождения решателя и правила: подсказка не может предложить
@@ -52,22 +54,34 @@ for (const level of iceLevels) {
   }
 
   for (const cell of impact.cells) {
+    if (cell.required) continue;
     const where = `(${cell.cell.x},${cell.cell.y})`;
-    if (cell.role === 'нет роли') {
-      problems.push(`${head}: ледяная клетка ${where} не участвует в решении — декорация`);
-    }
-    if (cell.solvableWithout && cell.optimalWithout >= impact.fullOptimal) {
+    if (cell.exhaustedWithout) {
+      // Ответа нет вовсе: принимать исчерпанный поиск за доказательство нельзя.
+      problems.push(`${head}: абляция ${where} упёрлась в лимит состояний — вклад клетки не доказан`);
+    } else if (!cell.solvableWithout) {
+      // Честно случиться не может: снятие льда только добавляет остановки.
+      problems.push(`${head}: снятие льда ${where} сделало уровень нерешаемым — противоречие в правилах или данных`);
+    } else if (cell.optimalWithout >= impact.fullOptimal) {
       problems.push(
         `${head}: ледяная клетка ${where} не несёт веса — без неё оптимум ${cell.optimalWithout} (было ${impact.fullOptimal})`
       );
+    } else if (cell.role === 'нет роли') {
+      problems.push(`${head}: ледяная клетка ${where} не участвует в решении — декорация`);
+    } else {
+      problems.push(`${head}: ледяная клетка ${where} не признана значимой (роль «${cell.role}»)`);
     }
   }
 
   const perCell = impact.cells
-    .map(
-      (c) =>
-        `(${c.cell.x},${c.cell.y})→${c.solvableWithout ? c.optimalWithout : 'нерешаем'} [${c.role}]`
-    )
+    .map((c) => {
+      const outcome = c.exhaustedWithout
+        ? 'лимит состояний'
+        : c.solvableWithout
+          ? String(c.optimalWithout)
+          : 'нерешаем';
+      return `(${c.cell.x},${c.cell.y})→${outcome} [${c.role}]`;
+    })
     .join(' ');
   console.log(`${head}: par ${level.par}, оптимум ${impact.fullOptimal}, без клетки: ${perCell}`);
 }

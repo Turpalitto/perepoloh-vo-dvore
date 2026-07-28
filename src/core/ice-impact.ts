@@ -10,6 +10,12 @@
  * «проезд» — оптимальный ход идёт по клетке насквозь; «запрет стоянки» — без
  * клетки короткое решение паркуется ровно на ней. Клетка без роли декоративная,
  * даже если оптимум формально просел: игрок не увидит, за что он платит ходами.
+ *
+ * Отдельная тонкость — неопределённый результат. Снятие ледяной клетки только
+ * ДОБАВЛЯЕТ легальные остановки, поэтому решаемый уровень без неё не может стать
+ * нерешаемым. Значит `solvable: false` от абляции — это всегда исчерпанный лимит
+ * состояний, то есть отсутствие ответа, а не доказательство значимости. Такой
+ * исход помечается `exhaustedWithout` и НЕ засчитывается как вклад клетки.
  */
 import type { IceDef, LevelDef } from './types';
 import { createState, pieceCells } from './game';
@@ -19,11 +25,18 @@ export type IceCellRole = 'проезд' | 'запрет стоянки' | 'не
 
 export interface IceCellImpact {
   cell: IceDef;
-  /** Оптимум уровня без этой клетки (-1, если стал нерешаемым). */
+  /** Оптимум уровня без этой клетки (-1, если ответа нет). */
   optimalWithout: number;
   solvableWithout: boolean;
+  /**
+   * Абляционный поиск упёрся в лимит состояний — ответа нет вообще. Отдельно от
+   * `solvableWithout`, потому что исчерпанный поиск возвращает те же
+   * `solvable: false, optimal: -1`, что и доказанная нерешаемость, и раньше
+   * молча принимался за доказательство значимости клетки.
+   */
+  exhaustedWithout: boolean;
   role: IceCellRole;
-  /** Клетка несёт вес: без неё задача мельчает и роль в решении есть. */
+  /** Клетка несёт вес: доказано, что без неё задача мельчает, и роль есть. */
   required: boolean;
 }
 
@@ -34,6 +47,28 @@ export interface IceImpact {
   /** Оптимальный ход останавливается на льду (расхождение решателя и правил). */
   landsOnIce: boolean;
   cells: IceCellImpact[];
+}
+
+/** Итог абляции одной клетки — вход правила «клетка несёт вес». */
+export interface AblationOutcome {
+  solvableWithout: boolean;
+  exhaustedWithout: boolean;
+  optimalWithout: number;
+  role: IceCellRole;
+}
+
+/**
+ * Правило значимости, вынесенное отдельно: его нельзя проверить на настоящем
+ * поле, потому что подобрать расклад с исчерпанной абляцией и завершённым
+ * полным поиском практически невозможно — снятие льда обычно УМЕНЬШАЕТ глубину
+ * решения. А ошибиться в правиле легко: именно здесь незнание («ответа нет»)
+ * когда-то трактовалось как доказательство.
+ */
+export function cellCarriesWeight(outcome: AblationOutcome, fullOptimal: number): boolean {
+  if (outcome.exhaustedWithout) return false; // ответа нет — доказательства нет
+  if (!outcome.solvableWithout) return false; // невозможно честно: лёд только ограничивает
+  if (outcome.optimalWithout >= fullOptimal) return false; // без клетки не легче — декорация
+  return outcome.role !== 'нет роли';
 }
 
 /** Клетки, пройденные фигурой за ход, включая стартовую и конечную позиции. */
@@ -71,9 +106,9 @@ function landingKeys(level: LevelDef, path: SolveMove[]): Set<string> {
   return keys;
 }
 
-export function analyzeIceImpact(level: LevelDef): IceImpact {
+export function analyzeIceImpact(level: LevelDef, opts: { stateLimit?: number } = {}): IceImpact {
   const ice = level.ice ?? [];
-  const full = solve(level);
+  const full = solve(level, opts);
   if (!full.solvable) {
     return {
       fullOptimal: full.optimal,
@@ -84,6 +119,7 @@ export function analyzeIceImpact(level: LevelDef): IceImpact {
         cell,
         optimalWithout: -1,
         solvableWithout: false,
+        exhaustedWithout: false,
         role: 'нет роли',
         required: false
       }))
@@ -97,22 +133,24 @@ export function analyzeIceImpact(level: LevelDef): IceImpact {
 
   const cells = ice.map((cell, index) => {
     const key = `${cell.x},${cell.y}`;
-    const without = solve({ ...level, ice: ice.filter((_, k) => k !== index) });
+    const without = solve({ ...level, ice: ice.filter((_, k) => k !== index) }, opts);
     // Роль «запрет стоянки» доказывается коротким решением без этой клетки:
     // если оно паркуется ровно на ней, лёд отнял у игрока именно эту позицию.
+    // Отсутствие решения такой ролью НЕ считается: снятие льда только добавляет
+    // легальные остановки, поэтому решаемый уровень без клетки не может стать
+    // нерешаемым — такой ответ означает исчерпанный поиск, то есть незнание.
     const altLandsHere = without.solvable && landingKeys(level, without.path).has(key);
-    const role: IceCellRole = swept.has(key)
-      ? 'проезд'
-      : altLandsHere || !without.solvable
-        ? 'запрет стоянки'
-        : 'нет роли';
-    const weighs = !without.solvable || without.optimal < full.optimal;
+    const role: IceCellRole = swept.has(key) ? 'проезд' : altLandsHere ? 'запрет стоянки' : 'нет роли';
+    const outcome: AblationOutcome = {
+      solvableWithout: without.solvable,
+      exhaustedWithout: without.exhausted,
+      optimalWithout: without.optimal,
+      role
+    };
     return {
       cell,
-      optimalWithout: without.optimal,
-      solvableWithout: without.solvable,
-      role,
-      required: weighs && role !== 'нет роли'
+      ...outcome,
+      required: cellCarriesWeight(outcome, full.optimal)
     };
   });
 

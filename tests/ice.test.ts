@@ -3,7 +3,7 @@ import { applyMove, createState, maxSteps } from '../src/core/game';
 import { solve } from '../src/core/solver';
 import type { LevelDef } from '../src/core/types';
 import { validateLevel } from '../src/core/validator';
-import { analyzeIceImpact } from '../src/core/ice-impact';
+import { type AblationOutcome, analyzeIceImpact, cellCarriesWeight } from '../src/core/ice-impact';
 import { LEVELS } from '../src/game/campaign';
 
 /**
@@ -173,6 +173,72 @@ describe('ледяная колея — семантика applyMove/maxSteps', 
   });
 });
 
+describe('абляция льда — неопределённый результат не доказательство', () => {
+  // Исчерпанный поиск возвращает те же `solvable: false, optimal: -1`, что и
+  // доказанная нерешаемость, и раньше трактовался как «без клетки уровень
+  // ломается, значит клетка важна» — то есть незнание считалось доказательством.
+  // Правило проверяется напрямую: подобрать поле, где абляция упирается в лимит,
+  // а полный поиск нет, практически нельзя — снятие льда обычно уменьшает
+  // глубину решения, поэтому именно правило и есть предмет проверки.
+  const proven: AblationOutcome = {
+    solvableWithout: true,
+    exhaustedWithout: false,
+    optimalWithout: 5,
+    role: 'проезд'
+  };
+
+  it('доказанная просадка оптимума с ролью — клетка несёт вес', () => {
+    expect(cellCarriesWeight(proven, 7)).toBe(true);
+  });
+
+  it('упор в лимит состояний не доказывает ничего', () => {
+    expect(cellCarriesWeight({ ...proven, exhaustedWithout: true, optimalWithout: -1 }, 7)).toBe(false);
+    // Даже если поиск заодно сообщил «нерешаем» — это тот же неопределённый исход.
+    expect(
+      cellCarriesWeight({ ...proven, solvableWithout: false, exhaustedWithout: true, optimalWithout: -1 }, 7)
+    ).toBe(false);
+  });
+
+  it('«нерешаем» без исчерпания тоже не доказательство — так честно не бывает', () => {
+    // Снятие льда только ДОБАВЛЯЕТ легальные остановки, поэтому решаемый уровень
+    // без клетки нерешаемым стать не может: это дефект данных или правил.
+    expect(cellCarriesWeight({ ...proven, solvableWithout: false, optimalWithout: -1 }, 7)).toBe(false);
+  });
+
+  it('равный или больший оптимум без клетки — декорация', () => {
+    expect(cellCarriesWeight({ ...proven, optimalWithout: 7 }, 7)).toBe(false);
+    expect(cellCarriesWeight({ ...proven, optimalWithout: 9 }, 7)).toBe(false);
+  });
+
+  it('просадка без роли в решении не засчитывается', () => {
+    expect(cellCarriesWeight({ ...proven, role: 'нет роли' }, 7)).toBe(false);
+  });
+
+  it('на реальном уровне полный разбор помечает исход абляции', () => {
+    const level: LevelDef = {
+      id: 0,
+      name: 'ice-ablation',
+      width: 6,
+      height: 6,
+      exit: { side: 'right', index: 2 },
+      pieces: [
+        { id: 'T', kind: 'target', x: 0, y: 2, len: 2, dir: 'h' },
+        { id: 'A', kind: 'car', x: 3, y: 2, len: 2, dir: 'v' },
+        { id: 'B', kind: 'car', x: 3, y: 0, len: 2, dir: 'h' }
+      ],
+      ice: [{ x: 3, y: 4 }],
+      par: 3,
+      par2: 5,
+      difficulty: 'easy',
+      mechanics: ['ice']
+    };
+    expect(analyzeIceImpact(level).cells[0]).toMatchObject({ exhaustedWithout: false, required: true });
+    // Урезанный лимит: разбор ничего не доказывает и значимость не выдаёт.
+    const starved = analyzeIceImpact(level, { stateLimit: 1 });
+    expect(starved.cells.every((cell) => !cell.required)).toBe(true);
+  });
+});
+
 describe('лёд в кампании — постфактум-абляция каждой клетки', () => {
   // `npm run verify:ice` печатает подробный отчёт, но это отдельная команда.
   // Гарантия обязана жить и в обычном прогоне тестов: жадная расстановка в
@@ -190,6 +256,12 @@ describe('лёд в кампании — постфактум-абляция к�
       const impact = analyzeIceImpact(level);
       expect(impact.solvable && !impact.exhausted).toBe(true);
       expect(impact.fullOptimal).toBe(level.par);
+      // Абляция обязана давать определённый ответ: упор в лимит состояний
+      // ничего не доказывает, и «значимость» такой клетки была бы фикцией.
+      for (const cell of impact.cells) {
+        expect(cell.exhaustedWithout, `клетка (${cell.cell.x},${cell.cell.y}): абляция без ответа`).toBe(false);
+        expect(cell.solvableWithout, `клетка (${cell.cell.x},${cell.cell.y}): без неё уровень нерешаем`).toBe(true);
+      }
       // Подсказка берёт первый ход оптимального решения: если бы оно вставало
       // на лёд, игра предлагала бы невозможный ход.
       expect(impact.landsOnIce).toBe(false);

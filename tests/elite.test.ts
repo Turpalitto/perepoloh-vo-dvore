@@ -345,12 +345,10 @@ describe('Высшая лига — ремиксы', () => {
     for (const c of remixes) {
       const level = sourceLevel(c);
       const hit = campaign.get(canonicalKey(level));
-      const pureFlip = (level.ice?.length ?? 0) === (originLevel(c).ice?.length ?? 0)
-        && (level.walls?.length ?? 0) === (originLevel(c).walls?.length ?? 0);
       // Отражение с точностью до симметрии — тот же уровень, и совпасть оно
-      // может только со своим источником. Ремикс с новым препятствием не имеет
-      // права совпасть ни с чем.
-      expect(hit).toBe(pureFlip ? c.sourceLevelId : undefined);
+      // может только со своим источником. Ремикс с изменёнными правилами не
+      // имеет права совпасть ни с чем.
+      expect(hit).toBe(c.remixChangedRules ? undefined : c.sourceLevelId);
     }
   });
 
@@ -375,7 +373,10 @@ describe('Высшая лига — ремиксы', () => {
   });
 
   it('ремиксов достаточно, чтобы лига не была одним повтором кампании', () => {
-    expect(remixes.length).toBeGreaterThanOrEqual(10);
+    expect(remixes.length).toBeGreaterThanOrEqual(14);
+    // Большинство ремиксов должны менять задачу, а не только систему координат.
+    const ruleChanging = remixes.filter((c) => c.remixChangedRules);
+    expect(ruleChanging.length).toBeGreaterThan(remixes.length / 2);
     // Ремикс играется на своём раскладе, а не на уровне кампании.
     for (const c of remixes) {
       expect(sourceLevel(c).id).not.toBe(c.sourceLevelId);
@@ -414,9 +415,7 @@ describe('Высшая лига — ремиксы', () => {
       for (const c of remixes) {
         const level = sourceLevel(c);
         const origin = originLevel(c);
-        const addedIce = (level.ice?.length ?? 0) - (origin.ice?.length ?? 0);
-        const addedWalls = (level.walls?.length ?? 0) - (origin.walls?.length ?? 0);
-        if (addedIce === 0 && addedWalls === 0) {
+        if (!c.remixChangedRules) {
           // Чистое отражение — изоморфизм: другой оптимум означал бы ошибку
           // в преобразовании поля, а не новый уровень.
           expect(level.par).toBe(origin.par);

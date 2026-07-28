@@ -995,7 +995,10 @@ const TR: Dict = {
 const EN_NAMES: Dict = {
   // Ремиксы Высшей лиги — тот же двор, изменённый расклад.
   'Сено и бочка': 'Hay and Barrel',
-  'Погреб наоборот': 'Cellar Reversed',
+  'Погреб переставлен': 'Cellar Rearranged',
+  'Ярмарка врассыпную': 'Fair Scattered',
+  'Уборка наизнанку': 'Cleanup Inside Out',
+  'Переполох переставлен': 'Chaos Rearranged',
   'Курятник и бочка': 'Coop and Barrel',
   'Улей во льду': 'Hive on Ice',
   'Зной во льду': 'Heat on Ice',
@@ -1172,7 +1175,10 @@ const EN_HINTS: Dict = {
 const TR_NAMES: Dict = {
   // Ремиксы Высшей лиги — тот же двор, изменённый расклад.
   'Сено и бочка': 'Saman ve Fıçı',
-  'Погреб наоборот': 'Ters Kiler',
+  'Погреб переставлен': 'Yeniden Dizilmiş Kiler',
+  'Ярмарка врассыпную': 'Dağılmış Panayır',
+  'Уборка наизнанку': 'Tersine Temizlik',
+  'Переполох переставлен': 'Yeniden Dizilmiş Kargaşa',
   'Курятник и бочка': 'Kümes ve Fıçı',
   'Улей во льду': 'Buzda Kovan',
   'Зной во льду': 'Buzda Sıcak',

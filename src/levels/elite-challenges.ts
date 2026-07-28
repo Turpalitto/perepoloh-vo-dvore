@@ -10,7 +10,7 @@ import type { LevelDef } from '../core/types';
 import type { EliteGoal, Medal } from '../game/elite';
 import { medalFromCampaign } from '../game/elite';
 import { blocksUndo } from '../game/modifiers';
-import { buildRemix, type RemixSpec } from './remix';
+import { buildRemix, remixChangesRules, type RemixSpec } from './remix';
 
 const LEVELS = levelsJson as LevelDef[];
 
@@ -37,6 +37,15 @@ export interface EliteChallenge {
   level: LevelDef;
   /** Поле преобразовано: старое решение не работает. */
   remixed: boolean;
+  /**
+   * Ремикс меняет саму задачу (препятствие, лёд или сдвиг старта), а не только
+   * систему координат.
+   *
+   * Отдельное поле, а не вывод «par отличается от исходного»: сдвиг стартовой
+   * позиции не меняет ни состав двора, ни число препятствий, и любая попытка
+   * угадать класс преобразования по данным уровня рано или поздно ошибётся.
+   */
+  remixChangedRules: boolean;
   modifier: EliteModifier;
   bronze: EliteGoal;
   silver: EliteGoal;
@@ -63,12 +72,19 @@ const REMIX_ID_BASE = 900;
  * источников ровно четыре (у 101–104 массив `ice` пустой — это обычные
  * вставки), поэтому берём все четыре.
  *
- * Одиннадцать испытаний — ремиксы (`remix`), а не сам уровень кампании. Без них
- * лига читается как «пройди то же ещё раз», сколько ограничений ни навешивай:
- * двор знаком, и заученный маршрут работает. Пять ремиксов — отражения
- * (оптимум тот же, ломается только узнавание), шесть добавляют бочку или
- * ледяную клетку и сдвигают оптимум. Все `par` здесь — не формула, а числа из
- * решателя (`scripts/remix-report.ts`), и тест сверяет каждое.
+ * Четырнадцать испытаний — ремиксы (`remix`), а не сам уровень кампании. Без
+ * них лига читается как «пройди то же ещё раз», сколько ограничений ни
+ * навешивай: двор знаком, и заученный маршрут работает. Четыре ремикса — чистые
+ * отражения (оптимум тот же, ломается только узнавание), десять сдвигают
+ * оптимум бочкой, ледяной клеткой или сдвигом стартовой позиции.
+ *
+ * Сдвиг старта появился вторым проходом: перебор с добавленной клеткой дал
+ * варианты лишь по семи дворам из двадцати трёх — на большинстве полей лишнее
+ * препятствие либо ничего не меняет, либо убивает звезду. Сдвиг бьёт по другому
+ * месту: состав двора тот же, а порядок разъезда другой.
+ *
+ * Все `par` здесь — не формула, а числа из решателя (`scripts/remix-report.ts`
+ * и `scripts/remix-shift-report.ts`), и тест сверяет каждое.
  *
  * Модификаторов «none» осталось 5 из 25: испытание со знакомой геометрией и без
  * единого ограничения отличается от кампании только счётчиком ходов, и таких
@@ -90,10 +106,20 @@ const CURATED: Array<{ source: number; modifier: EliteModifier; remix?: Omit<Rem
   { source: 22, modifier: 'noUndo' },
   // Дивизион 2 — вход через лёд, дальше снимаются страховки.
   { source: 105, modifier: 'none' },
+  // 106 остаётся исходным двором: сдвиг любой фигуры делал одну из его ледяных
+  // клеток инертной, и verify:ice отклонял ремикс как декоративный лёд.
   { source: 106, modifier: 'noUndo' },
-  { source: 25, modifier: 'noHints', remix: { flip: 'x', name: 'Погреб наоборот', par: 8, par2: 10 } },
   { source: 28, modifier: 'noUndo' },
-  { source: 31, modifier: 'noUndo' },
+  {
+    source: 31,
+    modifier: 'noUndo',
+    remix: { flip: 'x', shift: [{ piece: 'H', dx: 2, dy: -2 }], name: 'Ярмарка врассыпную', par: 10, par2: 12 }
+  },
+  {
+    source: 25,
+    modifier: 'noHints',
+    remix: { flip: 'x', shift: [{ piece: 'F', dx: -2, dy: 1 }], name: 'Погреб переставлен', par: 11, par2: 13 }
+  },
   // Дивизион 3 — плотнее всего ремиксов: двор знаком, решение уже нет.
   { source: 107, modifier: 'noUndoNoHints' },
   {
@@ -115,9 +141,17 @@ const CURATED: Array<{ source: number; modifier: EliteModifier; remix?: Omit<Rem
   // Дивизион 4 — лёд со звездой и длинные уровни.
   { source: 108, modifier: 'noUndoNoHints' },
   { source: 50, modifier: 'noUndoNoHints', remix: { flip: 'x', name: 'Закуток наоборот', par: 10, par2: 12 } },
-  { source: 55, modifier: 'noUndo' },
-  { source: 64, modifier: 'noHints' },
+  {
+    source: 55,
+    modifier: 'noUndo',
+    remix: { flip: 'x', shift: [{ piece: 'C', dx: -2, dy: 0 }], name: 'Уборка наизнанку', par: 12, par2: 14 }
+  },
   { source: 72, modifier: 'noUndoNoHints', remix: { flip: 'y', name: 'Задний двор наоборот', par: 12, par2: 14 } },
+  {
+    source: 64,
+    modifier: 'noHints',
+    remix: { flip: 'x', shift: [{ piece: 'C', dx: -2, dy: -1 }], name: 'Переполох переставлен', par: 15, par2: 17 }
+  },
   // Дивизион 5 — самые длинные оптимумы кампании.
   { source: 92, modifier: 'noHints', remix: { flip: 'y', name: 'Сеновал наоборот', par: 14, par2: 16 } },
   {
@@ -175,6 +209,7 @@ export const ELITE_CHALLENGES: EliteChallenge[] = CURATED.map((entry, index) => 
     sourceLevelId: entry.source,
     level,
     remixed: Boolean(entry.remix),
+    remixChangedRules: entry.remix ? remixChangesRules({ ...entry.remix, source: entry.source }) : false,
     modifier: entry.modifier,
     ...buildGoals(level, entry.modifier)
   };

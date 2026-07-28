@@ -13,8 +13,8 @@ type SaveData = {
 // Испытания, где кнопка скрыта. Комбинированный модификатор noUndoNoHints
 // попадает в оба набора — именно он раньше молча ломал проверки на равенство
 // строке 'noUndo' / 'noHints'.
-const NO_UNDO = new Set([2, 5, 7, 9, 10, 11, 13, 15, 16, 17, 18, 20, 22, 23, 24]);
-const NO_HINTS = new Set([8, 11, 12, 14, 16, 17, 19, 20, 21, 23, 24]);
+const NO_UNDO = new Set([2, 5, 7, 8, 9, 11, 13, 15, 16, 17, 18, 19, 22, 23, 24]);
+const NO_HINTS = new Set([10, 11, 12, 14, 16, 17, 19, 20, 21, 23, 24]);
 
 async function seedSave(page: Page, overrides: SaveData = {}): Promise<void> {
   await page.addInitScript((data) => {

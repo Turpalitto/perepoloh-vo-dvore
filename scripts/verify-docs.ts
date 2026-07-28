@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { ACHIEVEMENTS } from '../src/game/achievements';
 import { CAMPAIGN_MAX_STARS, CHAPTERS, LEVELS } from '../src/game/campaign';
-import { DIVISIONS, DIVISION_SIZE, DIVISION_UNLOCK_MEDALS, ELITE_CHALLENGES, originLevel, sourceLevel } from '../src/levels/elite-challenges';
+import { DIVISIONS, DIVISION_SIZE, DIVISION_UNLOCK_MEDALS, ELITE_CHALLENGES } from '../src/levels/elite-challenges';
 import { ENDLESS_TEASER_AT, ENDLESS_UNLOCK_AT } from '../src/game/progression';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -29,9 +29,7 @@ const SNAPSHOT = 'GENERATED_PROJECT_STATS.md';
 
 const iceLevels = LEVELS.filter((level) => (level.ice?.length ?? 0) > 0);
 const remixes = ELITE_CHALLENGES.filter((c) => c.remixed);
-// Отражение сохраняет оптимум, поэтому «изменённые правила» считаем по нему:
-// добавленная бочка, ледяная клетка или сдвиг старта par всегда сдвигают.
-const ruleChangingRemixes = remixes.filter((c) => sourceLevel(c).par !== originLevel(c).par).length;
+const ruleChangingRemixes = remixes.filter((c) => c.remixChangedRules).length;
 
 function snapshot(): string {
   return [

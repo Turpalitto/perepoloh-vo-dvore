@@ -41,10 +41,29 @@ export function achievementProgress(save: SaveData, achievement: Achievement): n
   return Math.min(achievement.goal, Math.max(0, achievement.progress(save)));
 }
 
-export function unlockedAchievementKeys(save: SaveData): Set<string> {
+/** Достижения, заслуженные текущим прогрессом (без учёта уже выданных). */
+export function earnedAchievementKeys(save: SaveData): Set<string> {
   return new Set(
     ACHIEVEMENTS.filter((achievement) => achievementProgress(save, achievement) >= achievement.goal).map(
       (achievement) => achievement.key
     )
   );
+}
+
+/**
+ * Открытые достижения: заслуженные сейчас ПЛЮС выданные когда-то.
+ *
+ * Цели «пройти всю кампанию» и «собрать все звёзды» деривируются из данных,
+ * поэтому растут вместе с контентом. Без объединения с сохранённым списком
+ * игрок, честно закрывший кампанию из 100 уровней, после расширения до 108
+ * увидел бы «Легенду двора» и «Мастера» снова закрытыми — то есть обновление
+ * отняло бы у него награду. Это тот же принцип, по которому не поднимаются
+ * старые пороги улучшений двора.
+ */
+export function unlockedAchievementKeys(save: SaveData): Set<string> {
+  const keys = earnedAchievementKeys(save);
+  for (const key of save.achievements ?? []) {
+    if (ACHIEVEMENTS.some((achievement) => achievement.key === key)) keys.add(key);
+  }
+  return keys;
 }

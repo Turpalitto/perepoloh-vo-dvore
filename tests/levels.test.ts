@@ -3,6 +3,8 @@ import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import { validateLevel } from '../src/core/validator';
 import { BOSSES } from '../src/game/boss';
+import { chapterCount } from '../src/game/campaign';
+import { setLang, t } from '../src/game/i18n';
 import { SOLVER_SHARDS } from './solver-shards';
 
 const LEVELS = levelsJson as LevelDef[];
@@ -56,6 +58,26 @@ describe('уровни игры', () => {
       );
       i = end + 1;
     }
+  });
+
+  it('число глав не превышает переводы chapter.N', () => {
+    // Экран уровней рисует заголовок `chapter.<номер>`; главы режутся по
+    // CHAPTER_SIZE позиций. Вставка контента молча создаёт следующую главу, и
+    // без этой проверки она появилась бы в UI ключом без перевода. Реальный
+    // случай: 109-й уровень увёл бы финального босса в несуществующую главу 10.
+    // setLang проставляет lang документу; в node-окружении хватает заглушки.
+    if (typeof globalThis.document === 'undefined') {
+      (globalThis as { document?: unknown }).document = { documentElement: { lang: 'ru' } };
+    }
+    const chapters = chapterCount(LEVELS);
+    for (const lang of ['ru', 'en', 'tr'] as const) {
+      setLang(lang);
+      for (let chapter = 1; chapter <= chapters; chapter++) {
+        const key = `chapter.${chapter}`;
+        expect(t(key), `${lang}: нет перевода ${key}`).not.toBe(key);
+      }
+    }
+    setLang('ru');
   });
 
   it('каждый уровень покрыт ровно одним шардом решателя', () => {

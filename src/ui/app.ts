@@ -2,8 +2,15 @@
  * Экраны и игровой контроллер. Никакой игровой логики —
  * только связывание core, BoardView, платформы и сохранений.
  */
-import levelsJson from '../levels/levels.json';
 import type { LevelDef } from '../core/types';
+import {
+  CAMPAIGN_LAST_ID,
+  LEVELS,
+  chapterLevels,
+  chapterOfPosition,
+  isChapterEnd,
+  isChapterStart
+} from '../game/campaign';
 import { GameState, createState, starsFor } from '../core/game';
 import { track } from '../game/analytics';
 import type { RewardedContext } from '../game/analytics';
@@ -78,11 +85,8 @@ import { TARGET_SKINS, setTargetSkin } from './sprites';
 import { levelThumbnail } from './thumbnail';
 import { yardSVG } from './yard';
 
-const CAMPAIGN_LAST_ID = 100;
 const MEDAL_ICON: Record<Medal, string> = { 0: '', 1: '🥉', 2: '🥈', 3: '🥇' };
 const MEDAL_KEY: Record<Medal, string> = { 0: 'medal.none', 1: 'medal.bronze', 2: 'medal.silver', 3: 'medal.gold' };
-
-const LEVELS = levelsJson as LevelDef[];
 
 const soundOnIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 9 h4 l5 -4 v14 l-5 -4 H4 Z" fill="currentColor"/><path d="M16 8 q3 4 0 8 M18.5 5.5 q5 6.5 0 13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
 const soundOffIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 9 h4 l5 -4 v14 l-5 -4 H4 Z" fill="currentColor"/><path d="M16 9 l6 6 M22 9 l-6 6" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>`;
@@ -1159,12 +1163,13 @@ export class App {
     // Главы режутся по позиции в кампании, а не по id: вставленные уровни
     // получают id 101+, и деление по id развалило бы и заголовки, и подсчёт звёзд.
     LEVELS.forEach((l, index) => {
-      if (index % 12 === 0) {
-        const chapter = Math.floor(index / 12) + 1;
-        const chapterLevels = LEVELS.slice((chapter - 1) * 12, chapter * 12);
-        const chapterStars = chapterLevels.reduce((sum, chapterLevel) => sum + this.store.starsOf(chapterLevel.id), 0);
+      const position = index + 1;
+      if (isChapterStart(position) || position === 1) {
+        const chapter = chapterOfPosition(position);
+        const levelsOfChapter = chapterLevels(chapter);
+        const chapterStars = levelsOfChapter.reduce((sum, chapterLevel) => sum + this.store.starsOf(chapterLevel.id), 0);
         parts.push(
-          `<div class="chapter-header"><span>${t(`chapter.${chapter}`)}</span><small>★ ${chapterStars} / ${chapterLevels.length * 3}</small></div>`
+          `<div class="chapter-header"><span>${t(`chapter.${chapter}`)}</span><small>★ ${chapterStars} / ${levelsOfChapter.length * 3}</small></div>`
         );
       }
       const unlocked = isLevelUnlocked(LEVELS, this.store.data, l.id);
@@ -1772,8 +1777,7 @@ export class App {
         // отмечал бы главу не на той карточке.
         if (!finished) {
           const position = campaignNumber(LEVELS, level.id);
-          const chapterOpener = position > 1 && (position - 1) % 12 === 0;
-          this.yardDirector?.react(chapterOpener ? 'chapter-start' : 'level-start');
+          this.yardDirector?.react(isChapterStart(position) ? 'chapter-start' : 'level-start');
         }
       },
       hasOnboardingToast ? 5000 : 650
@@ -2139,9 +2143,9 @@ export class App {
     // и счёт по id объявлял бы «главу пройдена» в произвольных местах.
     const campaignPos = campaignNumber(LEVELS, level.id);
     const chapterNote =
-      !daily && campaignPos > 0 && (campaignPos % 12 === 0 || level.id === CAMPAIGN_LAST_ID)
+      !daily && isChapterEnd(campaignPos, LEVELS)
         ? `<div class="win-master chapter-complete" data-testid="win-chapter">${t('win.chapter', {
-            n: Math.ceil(campaignPos / 12)
+            n: chapterOfPosition(campaignPos)
           })}</div>`
         : '';
     const eliteReplayNote =

@@ -10,6 +10,7 @@ import type { LevelDef } from '../core/types';
 import type { EliteGoal, Medal } from '../game/elite';
 import { medalFromCampaign } from '../game/elite';
 import { blocksUndo } from '../game/modifiers';
+import { buildRemix, type RemixSpec } from './remix';
 
 const LEVELS = levelsJson as LevelDef[];
 
@@ -26,12 +27,27 @@ export type EliteModifier = 'none' | 'noHints' | 'noUndo' | 'noUndoNoHints';
 export interface EliteChallenge {
   /** Порядковый id испытания (1..25). */
   id: number;
+  /** Уровень кампании, из которого испытание сделано. */
   sourceLevelId: number;
+  /**
+   * Расклад испытания. Для обычного испытания это сам уровень кампании; для
+   * ремикса — преобразованная копия, и тогда `sourceLevelId` означает только
+   * происхождение двора, а не то, во что играют.
+   */
+  level: LevelDef;
+  /** Поле преобразовано: старое решение не работает. */
+  remixed: boolean;
   modifier: EliteModifier;
   bronze: EliteGoal;
   silver: EliteGoal;
   gold: EliteGoal;
 }
+
+/**
+ * Id ремиксов лежат заведомо вне кампании. По id считаются звёзды, главы и
+ * реплики деда — ремикс не должен попадать ни в один из этих счётчиков.
+ */
+const REMIX_ID_BASE = 900;
 
 /**
  * Кураторский список: уровень-источник + модификатор-«вкус».
@@ -45,6 +61,13 @@ export interface EliteChallenge {
  * источников ровно четыре (у 101–104 массив `ice` пустой — это обычные
  * вставки), поэтому берём все четыре.
  *
+ * Одиннадцать испытаний — ремиксы (`remix`), а не сам уровень кампании. Без них
+ * лига читается как «пройди то же ещё раз», сколько ограничений ни навешивай:
+ * двор знаком, и заученный маршрут работает. Пять ремиксов — отражения
+ * (оптимум тот же, ломается только узнавание), шесть добавляют бочку или
+ * ледяную клетку и сдвигают оптимум. Все `par` здесь — не формула, а числа из
+ * решателя (`scripts/remix-report.ts`), и тест сверяет каждое.
+ *
  * Модификаторов «none» осталось 5 из 25: испытание со знакомой геометрией и без
  * единого ограничения отличается от кампании только счётчиком ходов, и таких
  * должно быть меньшинство. Распределение: none 5, noUndo 9, noHints 5,
@@ -52,35 +75,59 @@ export interface EliteChallenge {
  *
  * Пороги задаются не здесь, а выводятся из уровня (см. buildGoals).
  */
-const CURATED: Array<{ source: number; modifier: EliteModifier }> = [
-  // Знакомство: короткие уровни, ограничения ещё мягкие.
+const CURATED: Array<{ source: number; modifier: EliteModifier; remix?: Omit<RemixSpec, 'source'> }> = [
+  // Дивизион 1 — знакомство: короткие уровни, ограничения ещё мягкие.
   { source: 8, modifier: 'none' },
-  { source: 12, modifier: 'none' },
+  {
+    source: 12,
+    modifier: 'none',
+    remix: { flip: 'x', walls: [{ x: 1, y: 3, kind: 'barrel' }], name: 'Сено и бочка', par: 8, par2: 10 }
+  },
   { source: 15, modifier: 'noUndo' },
   { source: 18, modifier: 'none' },
   { source: 22, modifier: 'noUndo' },
-  // Снимаются страховки, появляется лёд.
-  { source: 25, modifier: 'noHints' },
+  // Дивизион 2 — снимаются страховки, появляется лёд.
+  { source: 25, modifier: 'noHints', remix: { flip: 'x', name: 'Погреб наоборот', par: 8, par2: 10 } },
   { source: 28, modifier: 'noUndo' },
   { source: 105, modifier: 'none' },
   { source: 106, modifier: 'noUndo' },
   { source: 31, modifier: 'noUndo' },
-  // Середина: первые комбинированные.
-  { source: 35, modifier: 'noHints' },
-  { source: 38, modifier: 'noUndo' },
+  // Дивизион 3 — плотнее всего ремиксов: двор знаком, решение уже нет.
+  {
+    source: 35,
+    modifier: 'noHints',
+    remix: { flip: 'x', walls: [{ x: 0, y: 1, kind: 'barrel' }], name: 'Курятник и бочка', par: 10, par2: 12 }
+  },
+  {
+    source: 38,
+    modifier: 'noUndo',
+    remix: { flip: 'x', ice: [{ x: 2, y: 4 }], name: 'Улей во льду', par: 10, par2: 12 }
+  },
   { source: 107, modifier: 'noUndoNoHints' },
-  { source: 42, modifier: 'noUndo' },
-  { source: 45, modifier: 'noHints' },
-  // Лёд со звездой и длинные уровни.
-  { source: 50, modifier: 'noUndoNoHints' },
+  {
+    source: 42,
+    modifier: 'noUndo',
+    remix: { flip: 'x', ice: [{ x: 2, y: 3 }], name: 'Зной во льду', par: 12, par2: 14 }
+  },
+  { source: 45, modifier: 'noHints', remix: { flip: 'x', name: 'Круговорот наоборот', par: 10, par2: 12 } },
+  // Дивизион 4 — лёд со звездой и длинные уровни.
+  { source: 50, modifier: 'noUndoNoHints', remix: { flip: 'x', name: 'Закуток наоборот', par: 10, par2: 12 } },
   { source: 108, modifier: 'noUndoNoHints' },
   { source: 55, modifier: 'noUndo' },
   { source: 64, modifier: 'noHints' },
-  { source: 72, modifier: 'noUndoNoHints' },
-  // Финальный блок: самые длинные оптимумы кампании.
-  { source: 88, modifier: 'noUndoNoHints' },
-  { source: 92, modifier: 'noHints' },
-  { source: 95, modifier: 'noUndo' },
+  { source: 72, modifier: 'noUndoNoHints', remix: { flip: 'y', name: 'Задний двор наоборот', par: 12, par2: 14 } },
+  // Дивизион 5 — самые длинные оптимумы кампании.
+  {
+    source: 88,
+    modifier: 'noUndoNoHints',
+    remix: { flip: 'x', ice: [{ x: 3, y: 4 }], name: 'Дым во льду', par: 18, par2: 20 }
+  },
+  { source: 92, modifier: 'noHints', remix: { flip: 'y', name: 'Сеновал наоборот', par: 14, par2: 16 } },
+  {
+    source: 95,
+    modifier: 'noUndo',
+    remix: { flip: 'x', ice: [{ x: 0, y: 3 }], name: 'Капкан во льду', par: 17, par2: 19 }
+  },
   { source: 98, modifier: 'noUndoNoHints' },
   { source: 100, modifier: 'none' }
 ];
@@ -116,9 +163,19 @@ function buildGoals(level: LevelDef, modifier: EliteModifier): Pick<EliteChallen
 }
 
 export const ELITE_CHALLENGES: EliteChallenge[] = CURATED.map((entry, index) => {
-  const level = LEVELS.find((l) => l.id === entry.source);
-  if (!level) throw new Error(`Мастер-испытание ссылается на несуществующий уровень ${entry.source}`);
-  return { id: index + 1, sourceLevelId: entry.source, modifier: entry.modifier, ...buildGoals(level, entry.modifier) };
+  const base = LEVELS.find((l) => l.id === entry.source);
+  if (!base) throw new Error(`Мастер-испытание ссылается на несуществующий уровень ${entry.source}`);
+  const level = entry.remix
+    ? buildRemix(base, { ...entry.remix, source: entry.source }, REMIX_ID_BASE + index + 1)
+    : base;
+  return {
+    id: index + 1,
+    sourceLevelId: entry.source,
+    level,
+    remixed: Boolean(entry.remix),
+    modifier: entry.modifier,
+    ...buildGoals(level, entry.modifier)
+  };
 });
 
 /**
@@ -188,7 +245,13 @@ export function eliteChallenge(id: number): EliteChallenge | undefined {
   return ELITE_CHALLENGES.find((c) => c.id === id);
 }
 
+/** Расклад, в который играют: сам уровень кампании либо его ремикс. */
 export function sourceLevel(challenge: EliteChallenge): LevelDef {
+  return challenge.level;
+}
+
+/** Исходный двор кампании — нужен там, где важно происхождение, а не расклад. */
+export function originLevel(challenge: EliteChallenge): LevelDef {
   return LEVELS.find((l) => l.id === challenge.sourceLevelId)!;
 }
 
@@ -207,9 +270,10 @@ export function sourceLevel(challenge: EliteChallenge): LevelDef {
 export function campaignImpliedMedals(stars: Record<string, number>): Record<string, Medal> {
   const out: Record<string, Medal> = {};
   for (const challenge of ELITE_CHALLENGES) {
-    if (challenge.modifier !== 'none') continue;
+    // Ремикс — другая задача: результат на исходном дворе о нём ничего не говорит.
+    if (challenge.modifier !== 'none' || challenge.remixed) continue;
     const level = sourceLevel(challenge);
-    const medal = medalFromCampaign(challenge, level, stars[String(level.id)] ?? 0);
+    const medal = medalFromCampaign(challenge, level, stars[String(challenge.sourceLevelId)] ?? 0);
     if (medal > 0) out[String(challenge.id)] = medal;
   }
   return out;

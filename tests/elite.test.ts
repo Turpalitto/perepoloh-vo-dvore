@@ -23,12 +23,14 @@ import {
   divisionOf,
   divisionUnlocked,
   eliteChallenge,
+  originLevel,
   sourceLevel
 } from '../src/levels/elite-challenges';
 import { SaveStore } from '../src/game/save';
 import type { Platform } from '../src/platform/types';
 import { createState, starsFor } from '../src/core/game';
 import { solve } from '../src/core/solver';
+import { validateLevel } from '../src/core/validator';
 
 const attempt = (over: Partial<AttemptResult> = {}): AttemptResult => ({
   moves: 0,
@@ -246,8 +248,10 @@ describe('Высшая лига — медали, заслуженные в ка
     for (const c of ELITE_CHALLENGES) allThree[String(c.sourceLevelId)] = 3;
     const granted = campaignImpliedMedals(allThree);
     expect(Object.values(granted).every((m) => m <= 2)).toBe(true);
-    // и переносятся ровно испытания без модификатора
-    expect(Object.keys(granted).length).toBe(ELITE_CHALLENGES.filter((c) => c.modifier === 'none').length);
+    // и переносятся ровно испытания без модификатора, кроме ремиксов
+    expect(Object.keys(granted).length).toBe(
+      ELITE_CHALLENGES.filter((c) => c.modifier === 'none' && !c.remixed).length
+    );
   });
 
   it('полная кампания на три звезды не выносит игрока выше серебряного ранга', () => {
@@ -312,10 +316,78 @@ describe('Высшая лига — дивизионы', () => {
     const allThree: Record<string, number> = {};
     for (const c of ELITE_CHALLENGES) allThree[String(c.sourceLevelId)] = 3;
     const implied = campaignImpliedMedals(allThree);
-    // первый дивизион получает медали и открывает второй…
-    expect(divisionUnlocked(implied, 2)).toBe(true);
-    // …но дальше третьего блока без игры не пройти
-    expect(divisionUnlocked(implied, 3)).toBe(false);
+    // Первый дивизион получает медали, но не три: даже идеальная кампания не
+    // открывает лигу дальше первого блока без единой сыгранной попытки.
+    expect(divisionMedals(implied, 1)).toBeGreaterThan(0);
+    expect(divisionUnlocked(implied, 2)).toBe(false);
     expect(divisionMedals(implied, 3)).toBe(0);
+  });
+});
+
+describe('Высшая лига — ремиксы', () => {
+  const remixes = ELITE_CHALLENGES.filter((c) => c.remixed);
+
+  it('ремиксов достаточно, чтобы лига не была одним повтором кампании', () => {
+    expect(remixes.length).toBeGreaterThanOrEqual(10);
+    // Ремикс играется на своём раскладе, а не на уровне кампании.
+    for (const c of remixes) {
+      expect(sourceLevel(c).id).not.toBe(c.sourceLevelId);
+      expect(sourceLevel(c).id).toBeGreaterThan(500);
+      // Обучающая подсказка источника после преобразования врала бы.
+      expect(sourceLevel(c).hint).toBeUndefined();
+    }
+    // Id раскладов уникальны: иначе два ремикса делили бы реплики и аналитику.
+    expect(new Set(remixes.map((c) => sourceLevel(c).id)).size).toBe(remixes.length);
+  });
+
+  it(
+    'объявленный par ремикса — это оптимум решателя, три звезды достижимы',
+    async () => {
+      for (const c of remixes) {
+        const level = sourceLevel(c);
+        expect(validateLevel(level)).toEqual([]);
+        const res = solve(level);
+        expect(res.solvable).toBe(true);
+        expect(res.exhausted).toBe(false);
+        expect(res.optimal).toBe(level.par);
+        if (level.star) {
+          const withStar = solve(level, { requireStar: true });
+          expect(withStar.solvable).toBe(true);
+          expect(withStar.optimal).toBeLessThanOrEqual(level.par2);
+        }
+        await yieldToEventLoop();
+      }
+    },
+    240_000
+  );
+
+  it(
+    'отражение сохраняет оптимум источника, добавленное препятствие — сдвигает',
+    async () => {
+      for (const c of remixes) {
+        const level = sourceLevel(c);
+        const origin = originLevel(c);
+        const addedIce = (level.ice?.length ?? 0) - (origin.ice?.length ?? 0);
+        const addedWalls = (level.walls?.length ?? 0) - (origin.walls?.length ?? 0);
+        if (addedIce === 0 && addedWalls === 0) {
+          // Чистое отражение — изоморфизм: другой оптимум означал бы ошибку
+          // в преобразовании поля, а не новый уровень.
+          expect(level.par).toBe(origin.par);
+        } else {
+          // Декоративное препятствие запрещено тем же правилом, что и лёд
+          // в кампании: если задача не изменилась, это переставленная мебель.
+          expect(level.par).toBeGreaterThan(origin.par);
+        }
+        await yieldToEventLoop();
+      }
+    },
+    120_000
+  );
+
+  it('результат кампании не переносится на ремикс', () => {
+    const allThree: Record<string, number> = {};
+    for (const c of ELITE_CHALLENGES) allThree[String(c.sourceLevelId)] = 3;
+    const implied = campaignImpliedMedals(allThree);
+    for (const c of remixes) expect(implied[String(c.id)]).toBeUndefined();
   });
 });

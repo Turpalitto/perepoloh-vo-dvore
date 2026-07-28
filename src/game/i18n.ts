@@ -213,6 +213,9 @@ const RU: Dict = {
   'elite.maxRank': 'Высший ранг достигнут!',
   'elite.challenges': 'Мастер-испытания',
   'elite.divisionLocked': 'нужно {n} медали в предыдущем дивизионе',
+  'elite.remix': 'Ремикс',
+  'elite.remixOrigin': 'перестроенный двор «{name}»',
+  'elite.intro.4': '{n} дворов перестроены: отражены или с новым препятствием — старое решение не сработает.',
   'division.1': 'Дворовый претендент',
   'division.2': 'Бронзовый дивизион',
   'division.3': 'Серебряный дивизион',
@@ -529,6 +532,9 @@ const EN: Dict = {
   'elite.maxRank': 'Top rank reached!',
   'elite.challenges': 'Master challenges',
   'elite.divisionLocked': 'needs {n} medals in the previous division',
+  'elite.remix': 'Remix',
+  'elite.remixOrigin': 'a rebuilt “{name}”',
+  'elite.intro.4': '{n} yards are rebuilt — mirrored or with a new obstacle, so the old solution will not work.',
   'division.1': 'Yard Contender',
   'division.2': 'Bronze Division',
   'division.3': 'Silver Division',
@@ -845,6 +851,9 @@ const TR: Dict = {
   'elite.maxRank': 'En yüksek rütbe!',
   'elite.challenges': 'Usta görevleri',
   'elite.divisionLocked': 'önceki grupta {n} madalya gerekir',
+  'elite.remix': 'Remiks',
+  'elite.remixOrigin': 'yeniden kurulmuş “{name}”',
+  'elite.intro.4': '{n} bahçe yeniden kuruldu: aynalandı ya da yeni bir engel eklendi — eski çözüm işe yaramaz.',
   'division.1': 'Bahçe Adayı',
   'division.2': 'Bronz Grubu',
   'division.3': 'Gümüş Grubu',
@@ -963,6 +972,18 @@ const TR: Dict = {
  * уровней по сложности, а название с содержимым не меняется.
  */
 const EN_NAMES: Dict = {
+  // Ремиксы Высшей лиги — тот же двор, изменённый расклад.
+  'Сено и бочка': 'Hay and Barrel',
+  'Погреб наоборот': 'Cellar Reversed',
+  'Курятник и бочка': 'Coop and Barrel',
+  'Улей во льду': 'Hive on Ice',
+  'Зной во льду': 'Heat on Ice',
+  'Круговорот наоборот': 'Roundabout Reversed',
+  'Закуток наоборот': 'Nook Reversed',
+  'Задний двор наоборот': 'Backyard Reversed',
+  'Дым во льду': 'Smoke on Ice',
+  'Сеновал наоборот': 'Hayloft Reversed',
+  'Капкан во льду': 'Trap on Ice',
   'Первый выезд': 'First Ride',
   'Соседи приехали': 'Neighbours Arrive',
   'Длинный грузовик': 'The Long Truck',
@@ -1128,6 +1149,18 @@ const EN_HINTS: Dict = {
 };
 
 const TR_NAMES: Dict = {
+  // Ремиксы Высшей лиги — тот же двор, изменённый расклад.
+  'Сено и бочка': 'Saman ve Fıçı',
+  'Погреб наоборот': 'Ters Kiler',
+  'Курятник и бочка': 'Kümes ve Fıçı',
+  'Улей во льду': 'Buzda Kovan',
+  'Зной во льду': 'Buzda Sıcak',
+  'Круговорот наоборот': 'Ters Dönüş',
+  'Закуток наоборот': 'Ters Köşe',
+  'Задний двор наоборот': 'Ters Arka Bahçe',
+  'Дым во льду': 'Buzda Duman',
+  'Сеновал наоборот': 'Ters Samanlık',
+  'Капкан во льду': 'Buzda Kapan',
   'Первый выезд': 'İlk Sürüş',
   'Соседи приехали': 'Komşular Geldi',
   'Длинный грузовик': 'Uzun Kamyon',

@@ -70,6 +70,7 @@ import {
   type EliteChallenge,
   campaignImpliedMedals,
   challengeUnlocked,
+  originLevel,
   divisionMedals,
   divisionOf,
   divisionUnlocked,
@@ -2447,20 +2448,30 @@ export class App {
           const playable = challengeUnlocked(medals, c.id);
           const level = sourceLevel(c);
           const mod = c.modifier !== 'none' ? `<span class="elite-mod">${t(`elite.mod.${c.modifier}`)}</span>` : '';
+          // Ремикс подписан честно: игрок должен знать, что двор перестроен, а
+          // не решить, что игра переименовала знакомый уровень.
+          const remix = c.remixed ? `<span class="elite-mod elite-remix">${t('elite.remix')}</span>` : '';
           return `
         <button class="elite-card${medal ? ' medaled' : ''}${playable ? '' : ' locked'}" data-testid="elite-card-${c.id}" data-challenge="${c.id}" ${
           playable ? '' : 'disabled'
         } title="${escapeHTML(
           playable
-            ? eliteGoalRows(c)
-                .map((r) => r.text)
+            ? [
+                c.remixed
+                  ? t('elite.remixOrigin', {
+                      name: levelText('name', originLevel(c).name) ?? originLevel(c).name
+                    })
+                  : '',
+                ...eliteGoalRows(c).map((r) => r.text)
+              ]
+                .filter(Boolean)
                 .join(' · ')
             : t('elite.divisionLocked', { n: DIVISION_UNLOCK_MEDALS })
         )}">
           <span class="elite-card-medal">${playable ? MEDAL_ICON[medal] || '·' : '🔒'}</span>
           <span class="elite-card-num">${t('elite.challenge')} ${c.id}</span>
           <span class="elite-card-src">${escapeHTML(levelText('name', level.name) ?? level.name)}</span>
-          ${mod}
+          ${remix}${mod}
         </button>`;
         })
         .join('');
@@ -2521,6 +2532,7 @@ export class App {
         <ul class="rules-list">
           <li>${t('elite.intro.1')}</li>
           <li>${t('elite.intro.2')}</li>
+          <li>${t('elite.intro.4', { n: ELITE_CHALLENGES.filter((c) => c.remixed).length })}</li>
           <li>${t('elite.intro.3')}</li>
           <li>${t('elite.fromCampaign')}</li>
         </ul>

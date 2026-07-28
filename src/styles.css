@@ -2132,6 +2132,10 @@ html[data-daytime='night'] .yard-lamp-light {
   background: rgba(226, 87, 76, 0.16);
   color: #a83a33;
 }
+.elite-remix {
+  background: rgba(58, 122, 168, 0.18);
+  color: #24597c;
+}
 .elite-result-medal {
   font-size: 64px;
   text-align: center;

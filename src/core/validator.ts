@@ -102,28 +102,24 @@ export function validateLevel(level: LevelDef, opts: { withSolver?: boolean } = 
     }
   }
 
-  // Звезда
-  if (level.star) {
-    if (!inside(level.star.x, level.star.y)) err(`звезда (${level.star.x},${level.star.y}) вне поля`);
-    const k = `${level.star.x},${level.star.y}`;
-    if (occupied.has(k)) err(`звезда стоит на занятой клетке (${occupied.get(k)})`);
-  }
-
-  // Ледяная колея
-  for (const ice of level.ice ?? []) {
-    if (!inside(ice.x, ice.y)) err(`лёд (${ice.x},${ice.y}) вне поля`);
-    const k = `${ice.x},${ice.y}`;
-    if (occupied.has(k)) err(`лёд стоит на занятой клетке (${occupied.get(k)})`);
-    if (level.star?.x === ice.x && level.star.y === ice.y) err(`лёд пересекается со звездой (${ice.x},${ice.y})`);
-  }
-
-  // Нажимная кнопка ворот
+  // Напольные объекты: звезда, ледяные клетки, кнопка ворот. Проверка одна на
+  // всех, потому что раздельные ветки сверяли не все пары: лёд на кнопке ворот
+  // и продублированная ледяная клетка проходили молча. Генератор так не делает,
+  // но QA-редактор и рукописный JSON — запросто.
+  const floorObjects: Array<{ name: string; x: number; y: number }> = [];
+  if (level.star) floorObjects.push({ name: 'звезда', x: level.star.x, y: level.star.y });
+  for (const ice of level.ice ?? []) floorObjects.push({ name: 'лёд', x: ice.x, y: ice.y });
   if (level.gateSwitch) {
-    const { x, y } = level.gateSwitch;
-    if (!inside(x, y)) err(`кнопка ворот (${x},${y}) вне поля`);
-    const k = `${x},${y}`;
-    if (occupied.has(k)) err(`кнопка ворот стоит на занятой клетке (${occupied.get(k)})`);
-    if (level.star?.x === x && level.star.y === y) err(`кнопка ворот пересекается со звездой (${x},${y})`);
+    floorObjects.push({ name: 'кнопка ворот', x: level.gateSwitch.x, y: level.gateSwitch.y });
+  }
+  const floorAt = new Map<string, string>();
+  for (const obj of floorObjects) {
+    if (!inside(obj.x, obj.y)) err(`${obj.name} (${obj.x},${obj.y}) вне поля`);
+    const k = `${obj.x},${obj.y}`;
+    if (occupied.has(k)) err(`${obj.name} стоит на занятой клетке (${occupied.get(k)})`);
+    const already = floorAt.get(k);
+    if (already !== undefined) err(`${obj.name} (${obj.x},${obj.y}) пересекается: уже занято «${already}»`);
+    else floorAt.set(k, obj.name);
   }
 
   // Пороги звёзд

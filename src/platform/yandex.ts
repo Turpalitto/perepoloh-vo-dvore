@@ -430,25 +430,32 @@ export function createYandexPlatform(): Platform {
       }
     },
 
-    showInterstitial(h: AdHandlers): Promise<void> {
+    /**
+     * Возвращает, был ли показ на самом деле. Яндекс вызывает onClose и когда
+     * ролик не показан — например, при слишком частых вызовах, — и сообщает это
+     * аргументом wasShown. Без него аналитика считала показом каждую попытку:
+     * отсутствие SDK, offline и параллельную рекламу тоже.
+     */
+    showInterstitial(h: AdHandlers): Promise<boolean> {
       return new Promise((resolve) => {
         if (!ysdk?.adv || adActive) {
-          resolve();
+          resolve(false);
           return;
         }
         adActive = true;
         let paused = false;
         let settled = false;
         let timer = 0;
-        const finish = () => {
+        const finish = (wasShown: boolean) => {
           if (settled) return;
           settled = true;
           if (timer) clearTimeout(timer);
           adActive = false;
           if (paused) h.onResume();
-          resolve();
+          resolve(wasShown);
         };
-        timer = setTimeout(finish, AD_SAFETY_TIMEOUT_MS) as unknown as number;
+        // Молчащий SDK: показ считаем несостоявшимся, домысливать нечего.
+        timer = setTimeout(() => finish(false), AD_SAFETY_TIMEOUT_MS) as unknown as number;
         try {
           ysdk.adv.showFullscreenAdv({
             callbacks: {
@@ -457,17 +464,17 @@ export function createYandexPlatform(): Platform {
                 paused = true;
                 h.onPause();
               },
-              onClose: finish,
+              onClose: (wasShown) => finish(wasShown !== false),
               onError: (e) => {
                 console.warn('[platform] interstitial:', e);
-                finish();
+                finish(false);
               },
-              onOffline: finish
+              onOffline: () => finish(false)
             }
           });
         } catch (e) {
           console.warn('[platform] interstitial:', e);
-          finish();
+          finish(false);
         }
       });
     },

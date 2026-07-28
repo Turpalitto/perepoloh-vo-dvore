@@ -29,6 +29,49 @@ async function installLogHook(page: Page): Promise<void> {
 
 const typesOf = (events: TrackedEvent[], type: string) => events.filter((e) => e.type === type);
 
+test.describe('Аналитика: interstitial показан или нет', () => {
+  // Событие показа раньше отправлялось ДО вызова платформы, поэтому воронка
+  // считала показом любую попытку. Платформа теперь возвращает wasShown, и пара
+  // «вызвали → показали/не показали» обязана сходиться в обоих исходах.
+  // `?adNow=1` снимает пороги частоты, иначе рекламный путь недостижим.
+
+  test('показанная реклама даёт requested и shown', async ({ page }) => {
+    await installLogHook(page);
+    await page.goto('/?mock=1&lang=ru&analyticsDebug=1&adNow=1');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await page.evaluate(() => (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel());
+    await expect(page.getByTestId('win-overlay')).toBeVisible();
+    await page.getByTestId('btn-next').click();
+
+    const close = page.getByTestId('mock-ad-close');
+    await expect(close).toBeEnabled({ timeout: 5000 });
+    await close.click();
+
+    const events = await eventDetails(page);
+    expect(typesOf(events, 'interstitial_requested')).toHaveLength(1);
+    expect(typesOf(events, 'interstitial_shown')).toHaveLength(1);
+    expect(typesOf(events, 'interstitial_not_shown')).toHaveLength(0);
+  });
+
+  test('отказ платформы даёт requested и not_shown, без события показа', async ({ page }) => {
+    await installLogHook(page);
+    await page.goto('/?mock=1&lang=ru&analyticsDebug=1&adNow=1&adSkip=1');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await page.evaluate(() => (window as unknown as { __e2eWinLevel: () => void }).__e2eWinLevel());
+    await expect(page.getByTestId('win-overlay')).toBeVisible();
+    await page.getByTestId('btn-next').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+
+    const events = await eventDetails(page);
+    await expect(page.getByTestId('mock-ad')).toHaveCount(0);
+    expect(typesOf(events, 'interstitial_requested')).toHaveLength(1);
+    expect(typesOf(events, 'interstitial_shown')).toHaveLength(0);
+    expect(typesOf(events, 'interstitial_not_shown')).toHaveLength(1);
+  });
+});
+
 test.describe('Аналитика: воронка без дублей', () => {
   test('старт уровня и победа дают ровно по одному событию', async ({ page }) => {
     await installLogHook(page);

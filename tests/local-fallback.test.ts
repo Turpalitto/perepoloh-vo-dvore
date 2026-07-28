@@ -39,9 +39,9 @@ describe('local-fallback платформа', () => {
     await expect(platform.showRewarded({ onPause: () => {}, onResume: () => {} })).resolves.toBe(false);
   });
 
-  it('interstitial завершается сразу, без рекламы', async () => {
+  it('interstitial завершается сразу и сообщает, что показа не было', async () => {
     const platform = createLocalFallbackPlatform();
-    await expect(platform.showInterstitial({ onPause: () => {}, onResume: () => {} })).resolves.toBeUndefined();
+    await expect(platform.showInterstitial({ onPause: () => {}, onResume: () => {} })).resolves.toBe(false);
   });
 
   it('leaderboards возвращают пустой результат', async () => {

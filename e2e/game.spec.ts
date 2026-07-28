@@ -66,18 +66,24 @@ async function touchDragPiece(page: Page, pieceId: string, dxCells: number, dyCe
   await page.waitForTimeout(220);
 }
 
-async function seedCampaignBefore(page: Page, levelId: number, starsPerLevel = 1): Promise<void> {
+/**
+ * «Пройдена кампания до N-го уровня» — именно позиция, а не id: уровни,
+ * добавленные в середину после релиза, имеют id вне 1..N, и сид по диапазону id
+ * оставлял бы их непройденными. Тогда «Продолжить» уводит не туда, а пороги,
+ * считающие пройденные уровни (двор, достижения), срабатывают не на том уровне.
+ */
+async function seedCampaignBefore(page: Page, position: number, starsPerLevel = 1): Promise<void> {
+  const clearedIds = CAMPAIGN_LEVEL_IDS.slice(0, position - 1);
+  const currentId = CAMPAIGN_LEVEL_IDS[position - 1];
   await page.addInitScript(
-    ({ levelId, starsPerLevel }) => {
-      const stars = Object.fromEntries(
-        Array.from({ length: levelId - 1 }, (_, index) => [String(index + 1), starsPerLevel])
-      );
+    ({ clearedIds, currentId, starsPerLevel }) => {
+      const stars = Object.fromEntries(clearedIds.map((id) => [String(id), starsPerLevel]));
       localStorage.setItem(
         'parkovka.save.v1',
-        JSON.stringify({ v: 1, stars, sound: true, music: true, lang: 'ru', lastLevel: levelId, targetSkin: 0 })
+        JSON.stringify({ v: 1, stars, sound: true, music: true, lang: 'ru', lastLevel: currentId, targetSkin: 0 })
       );
     },
-    { levelId, starsPerLevel }
+    { clearedIds, currentId, starsPerLevel }
   );
 }
 
@@ -123,12 +129,13 @@ test.describe('Переполох во дворе', () => {
     expect(errors).toEqual([]);
   });
 
-  for (const { levelId, chapterComplete } of [
-    { levelId: 42, chapterComplete: false },
-    { levelId: 48, chapterComplete: true }
+  // Границы глав — каждые 12 позиций кампании; 48-я позиция закрывает главу 4.
+  for (const { position, chapterComplete } of [
+    { position: 42, chapterComplete: false },
+    { position: 48, chapterComplete: true }
   ]) {
-    test(`завершение главы ${chapterComplete ? 'показывается' : 'не показывается'} после уровня ${levelId}`, async ({ page }) => {
-      await seedCampaignBefore(page, levelId);
+    test(`завершение главы ${chapterComplete ? 'показывается' : 'не показывается'} после уровня ${position}`, async ({ page }) => {
+      await seedCampaignBefore(page, position);
       await page.goto('/?mock=1&lang=ru');
       await page.getByTestId('menu-play').click();
       await expect(page.getByTestId('board')).toBeVisible();
@@ -982,13 +989,30 @@ test.describe('Боссы 25/50/75/100', () => {
       expect(save.bossDone).toContain(boss.slot);
       expect(save.stars[String(boss.slot)]).toBeGreaterThanOrEqual(1);
       expect(save.weekly).toMatchObject({ win: 1, perfect: 1 });
-      if (boss.slot === 50) {
-        await expect(page.getByTestId('win-upgrade')).toContainText('пруд');
-        await expect(page.getByTestId('win-achievement')).toContainText('Полдвора позади');
-      }
       expect(errors).toEqual([]);
     });
   }
+
+  test('пруд и «Полдвора позади» выдаются по счёту звёзд и уровней, а не по слоту босса', async ({ page }) => {
+    // Пруд открывается на 150 звёздах, достижение — на 50 пройденных уровнях.
+    // Раньше проверка висела на боссе 50, потому что он и был 50-м по счёту;
+    // после вставки уровней в середину кампании совпадение исчезло.
+    // 49 пройденных × 3 звезды = 147, победа со звездой добавляет ровно 3.
+    const errors = trackErrors(page);
+    await seedCampaignBefore(page, 50, 3);
+    await page.goto('/?mock=1&lang=ru');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await page.evaluate(() =>
+      (window as unknown as { __e2eWinLevel: (opts?: { starCollected?: boolean }) => void }).__e2eWinLevel({
+        starCollected: true
+      })
+    );
+    await expect(page.getByTestId('win-overlay')).toBeVisible();
+    await expect(page.getByTestId('win-upgrade')).toContainText('пруд');
+    await expect(page.getByTestId('win-achievement')).toContainText('Полдвора позади');
+    expect(errors).toEqual([]);
+  });
 
   test('босс 25: выезд без звезды на фазе requireStar не переводит на победу и не пишет прогресс', async ({ page }) => {
     const errors = trackErrors(page);

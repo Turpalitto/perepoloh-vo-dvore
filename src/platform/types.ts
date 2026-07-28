@@ -73,8 +73,13 @@ export interface Platform {
   gameplayStop(): void;
   loadData(): Promise<SaveData | null>;
   saveData(data: SaveData): Promise<void>;
-  /** Полноэкранная реклама между уровнями. Никогда не отклоняется. */
-  showInterstitial(h: AdHandlers): Promise<void>;
+  /**
+   * Полноэкранная реклама между уровнями. Никогда не отклоняется; результат —
+   * состоялся ли показ на самом деле. Платформа возвращает false и при отказе
+   * (слишком частые вызовы, offline, SDK недоступен), поэтому «вызвали» и
+   * «показали» — разные события воронки.
+   */
+  showInterstitial(h: AdHandlers): Promise<boolean>;
   /** Rewarded-видео; true — награда заслужена. */
   showRewarded(h: AdHandlers): Promise<boolean>;
   /**

@@ -3,6 +3,8 @@ import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import { validateLevel } from '../src/core/validator';
 import { BOSSES } from '../src/game/boss';
+import { CHAPTERS, CHAPTERS_TOTAL, chapterCount } from '../src/game/campaign';
+import { setLang, t } from '../src/game/i18n';
 import { SOLVER_SHARDS } from './solver-shards';
 
 const LEVELS = levelsJson as LevelDef[];
@@ -55,6 +57,43 @@ describe('уровни игры', () => {
         before
       );
       i = end + 1;
+    }
+  });
+
+  it('число глав не превышает переводы chapter.N', () => {
+    // Экран уровней рисует заголовок `chapter.<номер>` по таблице глав. Новая
+    // глава без перевода показала бы игроку сырой ключ. Реальный случай:
+    // 109-й уровень увёл бы финального босса в несуществующую главу 10.
+    // setLang проставляет lang документу; в node-окружении хватает заглушки.
+    if (typeof globalThis.document === 'undefined') {
+      (globalThis as { document?: unknown }).document = { documentElement: { lang: 'ru' } };
+    }
+    const chapters = chapterCount();
+    for (const lang of ['ru', 'en', 'tr'] as const) {
+      setLang(lang);
+      for (let chapter = 1; chapter <= chapters; chapter++) {
+        const key = `chapter.${chapter}`;
+        expect(t(key), `${lang}: нет перевода ${key}`).not.toBe(key);
+      }
+    }
+    setLang('ru');
+  });
+
+  it('таблица глав покрывает кампанию ровно один раз', () => {
+    // Главы заданы данными (CHAPTER_SIZES), а не правилом «каждые 12». Вставка
+    // уровней без правки таблицы оставила бы хвост кампании вне всех глав —
+    // карточки без заголовка и «глава завершена» не там, где надо.
+    expect(CHAPTERS_TOTAL).toBe(LEVELS.length);
+    let expectedFrom = 1;
+    for (const chapter of CHAPTERS) {
+      expect(chapter.from, `глава ${chapter.index} начинается не там`).toBe(expectedFrom);
+      expect(chapter.to).toBe(chapter.from + chapter.size - 1);
+      expectedFrom = chapter.to + 1;
+    }
+    expect(CHAPTERS.at(-1)!.to).toBe(LEVELS.length);
+    for (let position = 1; position <= LEVELS.length; position++) {
+      const owners = CHAPTERS.filter((c) => position >= c.from && position <= c.to);
+      expect(owners, `позиция ${position}: глав ${owners.length}, нужна ровно 1`).toHaveLength(1);
     }
   });
 
@@ -112,6 +151,27 @@ describe('уровни игры', () => {
     expect(intro?.pieces.length).toBeLessThanOrEqual(8);
   });
 
+  it('лёд вводится отдельной обучающей мини-главой, без других механик разом', () => {
+    // Правило льда контринтуитивно (упор в препятствие не даёт остановиться),
+    // поэтому знакомство с ним не должно конкурировать за внимание с грузовиком,
+    // трактором, ящиком, звездой или кнопкой ворот.
+    const intro = LEVELS.find((level) => level.mechanics.includes('ice'));
+    expect(intro?.id).toBe(105);
+    expect(intro?.mechanics).toEqual(['ice']);
+    expect(intro?.star).toBeUndefined();
+    expect(intro?.gateSwitch).toBeUndefined();
+
+    // Мини-глава идёт подряд и усложняется: механики только добавляются.
+    const chapter = LEVELS.filter((level) => level.mechanics.includes('ice'));
+    const positions = chapter.map((level) => LEVELS.indexOf(level));
+    for (let i = 1; i < positions.length; i++) expect(positions[i]).toBe(positions[i - 1] + 1);
+    for (let i = 1; i < chapter.length; i++) {
+      for (const mechanic of chapter[i - 1].mechanics) {
+        expect(chapter[i].mechanics, `уровень ${chapter[i].id}: механика ${mechanic} пропала`).toContain(mechanic);
+      }
+    }
+  });
+
   it('не содержит повторяющихся раскладок', () => {
     const signatures = LEVELS.map((level) =>
       JSON.stringify({
@@ -139,6 +199,7 @@ describe('уровни игры', () => {
     expect(all).toContain('crate');
     expect(all).toContain('star');
     expect(all).toContain('gate-switch');
+    expect(all).toContain('ice');
   });
 
   for (const level of LEVELS) {

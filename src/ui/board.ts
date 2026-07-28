@@ -26,6 +26,12 @@ export interface BoardEvents {
   /** Ход применён; state уже обновлён внутри BoardView. */
   onCommit(res: MoveResult, piece: number): void;
   onBump(): void;
+  /**
+   * Ход отклонён именно льдом: ехать было куда, но ни одна точка остановки в
+   * эту сторону не легальна. Отдельно от `onBump`, потому что игроку нужно
+   * объяснение — упор в стену и запрет остановки выглядят одинаково.
+   */
+  onIceBlocked(): void;
   onGateSwitch(): void;
   onGateOpen(): void;
   /** Анимация выезда закончилась. */
@@ -781,8 +787,7 @@ export class BoardView {
       result = applyMove(this.level, this.state, move.idx, dx, dy, steps);
     }
     if (!result) {
-      this.bumpPiece(move.idx, move.axis);
-      this.events.onBump();
+      this.refuseMove(move.idx, move.axis);
       this.endTVMove(true);
       return;
     }
@@ -1038,8 +1043,7 @@ export class BoardView {
         return;
       }
       // легальной остановки в эту сторону нет вовсе — отдача, как при упоре
-      this.bumpPiece(d.idx, axis);
-      this.events.onBump();
+      this.refuseMove(d.idx, axis);
     }
     // снап назад
     el.style.transform = this.pieceTransform(d.idx);
@@ -1189,6 +1193,17 @@ export class BoardView {
             ? { x: lane, y: H }
             : { x: lane, y: 0 };
     this.spawnDust(mouth.x, mouth.y);
+  }
+
+  /**
+   * Отказ по уже начатому жесту: ехать было куда, но легальной точки остановки
+   * в эту сторону нет. На ледяных уровнях к отдаче добавляется отдельный сигнал
+   * — иначе запрет остановки неотличим от обычного упора в забор.
+   */
+  private refuseMove(idx: number, axis: 'x' | 'y'): void {
+    this.bumpPiece(idx, axis);
+    this.events.onBump();
+    if (this.level.ice?.length) this.events.onIceBlocked();
   }
 
   private bumpPiece(idx: number, axis: 'x' | 'y'): void {

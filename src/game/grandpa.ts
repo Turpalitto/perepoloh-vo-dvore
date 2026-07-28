@@ -16,6 +16,8 @@ export type GrandpaEvent =
   | 'collision'
   | 'blocked'
   | 'tractor'
+  /** Игрок попробовал закончить ход на льду — правило нужно объяснить словами. */
+  | 'ice'
   | 'star'
   | 'gate'
   | 'hint'
@@ -89,6 +91,11 @@ export const GRANDPA_LINES: GrandpaLine[] = [
   // Трактор
   { id: 'tractor1', event: 'tractor', mood: 'happy', cooldownMs: 15000 },
   { id: 'tractor2', event: 'tractor', mood: 'surprised', cooldownMs: 15000 },
+  // Лёд: правило контринтуитивное (машина упёрлась, но встать не может),
+  // поэтому реплика обходит глобальный кулдаун — иначе первое столкновение с
+  // механикой останется без объяснения.
+  { id: 'ice1', event: 'ice', mood: 'pointing', priority: 1, cooldownMs: 12000 },
+  { id: 'ice2', event: 'ice', mood: 'grumpy', priority: 1, cooldownMs: 12000 },
   // Звезда
   { id: 'star1', event: 'star', mood: 'celebrating' },
   { id: 'star2', event: 'star', mood: 'happy' },

@@ -118,6 +118,33 @@ test.describe('ледяная колея на поле', () => {
     expect(errors).toEqual([]);
   });
 
+  test('дед объясняет правило, а undo после ледяного хода возвращает то же состояние', async ({ page }) => {
+    const errors = trackErrors(page);
+    await openIceLevel(page);
+
+    const before = await pieceTransform(page, 'A');
+    await dragPiece(page, 'A', 0, 2); // отказ по льду
+    // Именно ледяная реплика, а не любая: пузырь уже мог быть занят стартовой.
+    await expect(page.getByTestId('grandpa-bubble')).toHaveText(/На льду не удержишься|Тут каток/, {
+      timeout: 7000
+    });
+
+    await dragPiece(page, 'A', 0, -2); // легальный ход вверх
+    await expect(page.getByTestId('hud-moves')).toHaveText('1');
+    const after = await pieceTransform(page, 'A');
+
+    await page.getByTestId('btn-undo').click();
+    await page.waitForTimeout(220);
+    await expect(page.getByTestId('hud-moves')).toHaveText('0');
+    expect(await pieceTransform(page, 'A')).toBe(before);
+
+    // повтор того же хода даёт ровно ту же позицию — состояние восстановлено точно
+    await dragPiece(page, 'A', 0, -2);
+    await expect(page.getByTestId('hud-moves')).toHaveText('1');
+    expect(await pieceTransform(page, 'A')).toBe(after);
+    expect(errors).toEqual([]);
+  });
+
   test('клавиатура/пульт: подтверждение хода на лёд отклоняется без зависания', async ({ page }) => {
     const errors = trackErrors(page);
     await openIceLevel(page);

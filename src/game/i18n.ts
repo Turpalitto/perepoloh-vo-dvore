@@ -175,7 +175,6 @@ const RU: Dict = {
   'endless.continue': 'Дальше по кругу',
   'endless.stop': 'Закончить забег',
   'endless.newBest': '🏆 Новый рекорд серии!',
-  'endless.locked': 'Откроется после уровня 100',
   'season.newyear': '❄️ Новогодний двор — подарок дня увеличен!',
   'boss.chip': 'Босс',
   'skins.title': 'Цвет машины',
@@ -202,7 +201,6 @@ const RU: Dict = {
   'chapter.8': 'Глава 8 · Испытание мастера',
   'chapter.9': 'Глава 9 · Финальный аврал',
   'elite.menu': 'Высшая лига',
-  'elite.locked': 'Пройдите уровень 100',
   'elite.title': 'Высшая лига двора',
   'elite.subtitle': 'Мастер-испытания, медали и ранги',
   'elite.enter': 'Войти в Высшую лигу',
@@ -259,6 +257,8 @@ const RU: Dict = {
   'grandpa.blocked1': 'Этой туда никак. Зажали со всех сторон.',
   'grandpa.tractor1': 'Этот трактор с места только по праздникам трогается.',
   'grandpa.tractor2': 'Сейчас дым пойдёт — значит, завёлся.',
+  'grandpa.ice1': 'На льду не удержишься — тормози раньше или проскакивай насквозь.',
+  'grandpa.ice2': 'Куда встал? Тут каток, а не стоянка.',
   'grandpa.star1': 'Вот это по-хозяйски!',
   'grandpa.star2': 'И выехал, и порядок навёл.',
   'grandpa.gate1': 'Во! Теперь и ворота видно.',
@@ -481,7 +481,6 @@ const EN: Dict = {
   'endless.continue': 'Next in the run',
   'endless.stop': 'End the run',
   'endless.newBest': '🏆 New streak record!',
-  'endless.locked': 'Unlocks after level 100',
   'season.newyear': "❄️ New Year yard — today's gift is bigger!",
   'boss.chip': 'Boss',
   'skins.title': 'Car colour',
@@ -508,7 +507,6 @@ const EN: Dict = {
   'chapter.8': "Chapter 8 · Master's Trial",
   'chapter.9': 'Chapter 9 · Final Frenzy',
   'elite.menu': 'Elite League',
-  'elite.locked': 'Clear level 100',
   'elite.title': 'Elite Yard League',
   'elite.subtitle': 'Master challenges, medals and ranks',
   'elite.enter': 'Enter the Elite League',
@@ -565,6 +563,8 @@ const EN: Dict = {
   'grandpa.blocked1': 'No way through for that one. Boxed in on all sides.',
   'grandpa.tractor1': 'That tractor only starts on holidays.',
   'grandpa.tractor2': 'Smoke’s coming — means it caught.',
+  'grandpa.ice1': 'No holding on ice — brake earlier or slide clean through.',
+  'grandpa.ice2': 'Parking there? That’s a skating rink, not a spot.',
   'grandpa.star1': 'Now that’s proper work!',
   'grandpa.star2': 'Got out and tidied up too.',
   'grandpa.gate1': 'There! Now I can see the gate.',
@@ -787,7 +787,6 @@ const TR: Dict = {
   'endless.continue': 'Sıradaki bölüm',
   'endless.stop': 'Koşuyu bitir',
   'endless.newBest': '🏆 Yeni seri rekoru!',
-  'endless.locked': '100. bölümden sonra açılır',
   'season.newyear': '❄️ Yılbaşı bahçesi — bugünün hediyesi daha büyük!',
   'boss.chip': 'Boss',
   'skins.title': 'Araba rengi',
@@ -814,7 +813,6 @@ const TR: Dict = {
   'chapter.8': 'Bölüm 8 · Usta Sınavı',
   'chapter.9': 'Bölüm 9 · Son Karmaşa',
   'elite.menu': 'Elit Lig',
-  'elite.locked': '100. bölümü geç',
   'elite.title': 'Elit Bahçe Ligi',
   'elite.subtitle': 'Usta görevleri, madalyalar ve rütbeler',
   'elite.enter': 'Elit Lige gir',
@@ -871,6 +869,8 @@ const TR: Dict = {
   'grandpa.blocked1': 'Ona yol yok. Her yandan sıkışmış.',
   'grandpa.tractor1': 'Bu traktör sadece bayramlarda çalışır.',
   'grandpa.tractor2': 'Duman çıkıyor — demek çalıştı.',
+  'grandpa.ice1': 'Buzda tutunamazsın — erken fren yap ya da baştan sona kay.',
+  'grandpa.ice2': 'Oraya mı park? Orası buz pisti, park yeri değil.',
   'grandpa.star1': 'İşte buna hamaratlık derim!',
   'grandpa.star2': 'Hem çıktı hem düzeni sağladı.',
   'grandpa.gate1': 'İşte! Şimdi kapı göründü.',
@@ -1037,7 +1037,12 @@ const EN_NAMES: Dict = {
   'Полдник во дворе': 'Afternoon Snack',
   'Тихий час': 'Quiet Hour',
   'Передышка у сарая': 'Breather by the Barn',
-  'Чай на крыльце': 'Tea on the Porch'
+  'Чай на крыльце': 'Tea on the Porch',
+  // Обучающая мини-глава ледяной колеи.
+  'Первый гололёд': 'First Frost',
+  'Ледяная колея': 'The Icy Rut',
+  'Скользкий выезд': 'Slippery Exit',
+  'Каток у сарая': 'Rink by the Barn'
 };
 
 const EN_HINTS: Dict = {
@@ -1076,6 +1081,15 @@ const EN_HINTS: Dict = {
   'Сад зарос — сначала расчисти ближние ряды': 'The orchard is overgrown — clear the near rows first',
   'Дым застилает двор — считай ходы заранее': 'Smoke fills the yard — plan your moves ahead',
   'Ледник в углу двора — обходи его через дальнюю полосу': 'The icehouse sits in the corner — go around via the far lane',
+  // Ледяная колея: подсказки объясняют правило «на льду нельзя закончить ход».
+  'На льду машина не удержится — останавливай её до наледи':
+    "A car can't hold on ice — bring it to a stop before the patch",
+  'Колея длинная: проскочи её целиком, встать посередине не выйдет':
+    "The rut is long: slide all the way across, you can't stop halfway",
+  'Короткий путь застыл — ищи, где соседям вообще можно встать':
+    'The short way is frozen over — find where the neighbours can park at all',
+  'Лёд отнял места для стоянки — считай, куда денется каждый сосед':
+    'The ice took the parking spots — work out where each neighbour ends up',
   'Сеновал сверху — расчищай снизу вверх': 'The hayloft is above — clear from the bottom up',
   'Каретный двор тесный — здесь пригодится каждая машина': 'The carriage yard is tight — every vehicle matters here',
   'Кузница — испытание на внимательность, считай каждый ход': 'The forge is a test of focus — count every move',
@@ -1188,7 +1202,12 @@ const TR_NAMES: Dict = {
   'Полдник во дворе': 'İkindi Molası',
   'Тихий час': 'Sessiz Saat',
   'Передышка у сарая': 'Ahırda Mola',
-  'Чай на крыльце': 'Verandada Çay'
+  'Чай на крыльце': 'Verandada Çay',
+  // Обучающая мини-глава ледяной колеи.
+  'Первый гололёд': 'İlk Buzlanma',
+  'Ледяная колея': 'Buzlu İz',
+  'Скользкий выезд': 'Kaygan Çıkış',
+  'Каток у сарая': 'Ahır Yanında Buz Pisti'
 };
 
 const TR_HINTS: Dict = {
@@ -1227,6 +1246,14 @@ const TR_HINTS: Dict = {
   'Сад зарос — сначала расчисти ближние ряды': 'Bahçe yabanileşmiş — önce yakın sıraları aç',
   'Дым застилает двор — считай ходы заранее': 'Duman bahçeyi kaplıyor — hamleleri önceden planla',
   'Ледник в углу двора — обходи его через дальнюю полосу': 'Buzhane bahçenin köşesinde — uzak şeritten dolaş',
+  // Ледяная колея: подсказки объясняют правило «на льду нельзя закончить ход».
+  'На льду машина не удержится — останавливай её до наледи': 'Araba buzda tutunamaz — buzdan önce durdur',
+  'Колея длинная: проскочи её целиком, встать посередине не выйдет':
+    'İz uzun: baştan sona kay, ortada duramazsın',
+  'Короткий путь застыл — ищи, где соседям вообще можно встать':
+    'Kısa yol dondu — komşuların nereye park edebileceğini bul',
+  'Лёд отнял места для стоянки — считай, куда денется каждый сосед':
+    'Buz park yerlerini aldı — her komşunun nereye gideceğini hesapla',
   'Сеновал сверху — расчищай снизу вверх': 'Samanlık yukarıda — aşağıdan yukarı aç',
   'Каретный двор тесный — здесь пригодится каждая машина': 'Fayton avlusu dar — burada her araç işe yarar',
   'Кузница — испытание на внимательность, считай каждый ход': 'Demirci dükkanı dikkat testi — her hamleyi say',

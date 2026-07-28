@@ -3,7 +3,7 @@ import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import { validateLevel } from '../src/core/validator';
 import { BOSSES } from '../src/game/boss';
-import { chapterCount } from '../src/game/campaign';
+import { CHAPTERS, CHAPTERS_TOTAL, chapterCount } from '../src/game/campaign';
 import { setLang, t } from '../src/game/i18n';
 import { SOLVER_SHARDS } from './solver-shards';
 
@@ -61,15 +61,14 @@ describe('уровни игры', () => {
   });
 
   it('число глав не превышает переводы chapter.N', () => {
-    // Экран уровней рисует заголовок `chapter.<номер>`; главы режутся по
-    // CHAPTER_SIZE позиций. Вставка контента молча создаёт следующую главу, и
-    // без этой проверки она появилась бы в UI ключом без перевода. Реальный
-    // случай: 109-й уровень увёл бы финального босса в несуществующую главу 10.
+    // Экран уровней рисует заголовок `chapter.<номер>` по таблице глав. Новая
+    // глава без перевода показала бы игроку сырой ключ. Реальный случай:
+    // 109-й уровень увёл бы финального босса в несуществующую главу 10.
     // setLang проставляет lang документу; в node-окружении хватает заглушки.
     if (typeof globalThis.document === 'undefined') {
       (globalThis as { document?: unknown }).document = { documentElement: { lang: 'ru' } };
     }
-    const chapters = chapterCount(LEVELS);
+    const chapters = chapterCount();
     for (const lang of ['ru', 'en', 'tr'] as const) {
       setLang(lang);
       for (let chapter = 1; chapter <= chapters; chapter++) {
@@ -78,6 +77,24 @@ describe('уровни игры', () => {
       }
     }
     setLang('ru');
+  });
+
+  it('таблица глав покрывает кампанию ровно один раз', () => {
+    // Главы заданы данными (CHAPTER_SIZES), а не правилом «каждые 12». Вставка
+    // уровней без правки таблицы оставила бы хвост кампании вне всех глав —
+    // карточки без заголовка и «глава завершена» не там, где надо.
+    expect(CHAPTERS_TOTAL).toBe(LEVELS.length);
+    let expectedFrom = 1;
+    for (const chapter of CHAPTERS) {
+      expect(chapter.from, `глава ${chapter.index} начинается не там`).toBe(expectedFrom);
+      expect(chapter.to).toBe(chapter.from + chapter.size - 1);
+      expectedFrom = chapter.to + 1;
+    }
+    expect(CHAPTERS.at(-1)!.to).toBe(LEVELS.length);
+    for (let position = 1; position <= LEVELS.length; position++) {
+      const owners = CHAPTERS.filter((c) => position >= c.from && position <= c.to);
+      expect(owners, `позиция ${position}: глав ${owners.length}, нужна ровно 1`).toHaveLength(1);
+    }
   });
 
   it('каждый уровень покрыт ровно одним шардом решателя', () => {

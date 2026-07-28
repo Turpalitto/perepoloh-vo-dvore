@@ -26,37 +26,70 @@ export const CAMPAIGN_MAX_STARS = LEVELS.length * 3;
 export const CAMPAIGN_LEVEL_IDS: ReadonlySet<number> = new Set(LEVELS.map((level) => level.id));
 
 /**
- * Длина главы в позициях. Держится числом, а не набором явных границ, потому
- * что деление ровное и правит его только вставка контента; важно лишь, чтобы
- * оно было записано один раз. Число глав обязано укладываться в переводы
- * `chapter.N` — это проверяет `levels.test.ts`.
+ * Структура глав — данные, а не правило «каждые 12 подряд».
+ *
+ * Раньше деление жило числом в трёх местах UI. Пока кампания росла ровными
+ * блоками, это работало; но контент вставляется в середину, и однажды поделить
+ * его поровну станет нельзя — обучающая мини-глава или финальный блок окажутся
+ * длиной не 12. Явная таблица позволяет задать такую главу, не трогая код: она
+ * же остаётся единственным местом, где номер главы превращается в позиции.
+ *
+ * Сейчас размеры ровные и совпадают с прежним поведением до карточки. Ледяная
+ * четвёрка намеренно НЕ выделена в отдельную главу: она стоит внутри главы 4
+ * (позиции 42–45), и её отделение оставило бы вокруг обрубки в 5 и 7 уровней.
+ * Это правится одной строкой здесь, когда для соседних блоков появятся тексты.
+ *
+ * Инварианты (`levels.test.ts`): сумма размеров равна числу уровней, и у каждой
+ * главы есть перевод `chapter.N` во всех языках.
  */
-export const CHAPTER_SIZE = 12;
+const CHAPTER_SIZES: number[] = [12, 12, 12, 12, 12, 12, 12, 12, 12];
 
-/** Сколько глав в кампании сейчас (последняя может быть неполной). */
-export function chapterCount(levels: LevelDef[] = LEVELS): number {
-  return Math.ceil(levels.length / CHAPTER_SIZE);
+/** Границы глав в позициях (с единицы), включительно. */
+export const CHAPTERS: ReadonlyArray<{ index: number; from: number; to: number; size: number }> =
+  CHAPTER_SIZES.map((size, i) => {
+    const from = CHAPTER_SIZES.slice(0, i).reduce((sum, n) => sum + n, 1);
+    return { index: i + 1, from, to: from + size - 1, size };
+  });
+
+/** Сумма размеров глав: обязана совпадать с длиной кампании. */
+export const CHAPTERS_TOTAL = CHAPTER_SIZES.reduce((sum, n) => sum + n, 0);
+
+/** Сколько глав в кампании. */
+export function chapterCount(): number {
+  return CHAPTERS.length;
 }
 
 /** Номер главы (с единицы) для позиции в кампании (тоже с единицы). */
 export function chapterOfPosition(position: number): number {
-  return Math.ceil(position / CHAPTER_SIZE);
+  const chapter = CHAPTERS.find((c) => position >= c.from && position <= c.to);
+  // Уровень за пределами таблицы — уже дефект данных, но UI не должен падать:
+  // относим его к последней главе, а несоответствие ловит тест.
+  return chapter?.index ?? CHAPTERS.length;
 }
 
 /** Уровни главы по её номеру (с единицы). */
 export function chapterLevels(chapter: number, levels: LevelDef[] = LEVELS): LevelDef[] {
-  return levels.slice((chapter - 1) * CHAPTER_SIZE, chapter * CHAPTER_SIZE);
+  const bounds = CHAPTERS[chapter - 1];
+  return bounds ? levels.slice(bounds.from - 1, bounds.to) : [];
 }
 
 /** Позиция закрывает главу — момент «Глава N завершена». */
 export function isChapterEnd(position: number, levels: LevelDef[] = LEVELS): boolean {
-  return position > 0 && (position % CHAPTER_SIZE === 0 || position === levels.length);
+  if (position <= 0) return false;
+  return position === levels.length || CHAPTERS.some((c) => c.to === position);
 }
 
-/** Позиция открывает главу (кроме самой первой — там своё приветствие). */
+/** Позиция открывает главу (первая тоже — с неё начинается заголовок списка). */
 export function isChapterStart(position: number): boolean {
-  return position > 1 && (position - 1) % CHAPTER_SIZE === 0;
+  return CHAPTERS.some((c) => c.from === position);
 }
+
+/** Позиция уровня в кампании (с единицы); 0 — уровня нет в данных. */
+export function campaignPositionOf(id: number): number {
+  return POSITION_BY_ID.get(id) ?? 0;
+}
+
+const POSITION_BY_ID = new Map(LEVELS.map((level, index) => [level.id, index + 1]));
 
 /** Сумма звёзд по уровням кампании: чужие ключи сейва не считаются. */
 export function campaignStars(stars: Record<string, number>): number {

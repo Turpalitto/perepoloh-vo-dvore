@@ -1170,7 +1170,7 @@ export class App {
     // получают id 101+, и деление по id развалило бы и заголовки, и подсчёт звёзд.
     LEVELS.forEach((l, index) => {
       const position = index + 1;
-      if (isChapterStart(position) || position === 1) {
+      if (isChapterStart(position)) {
         const chapter = chapterOfPosition(position);
         const levelsOfChapter = chapterLevels(chapter);
         const chapterStars = levelsOfChapter.reduce((sum, chapterLevel) => sum + this.store.starsOf(chapterLevel.id), 0);

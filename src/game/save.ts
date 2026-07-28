@@ -1,3 +1,4 @@
+import { campaignPositionOf } from './campaign';
 import type { DailyState } from './daily';
 import type { Platform } from '../platform/types';
 import { applyWeeklyClaim, applyWeeklyEvent, type WeeklyQuestKind, type WeeklyState } from './weekly';
@@ -153,6 +154,22 @@ function sanitizeMedals(raw: unknown): Record<string, number> | undefined {
 }
 
 /**
+ * Какой из двух `lastLevel` «дальше» по кампании. Раньше брался Math.max по id,
+ * и это молча сломалось, когда уровни начали вставлять в середину: id 105 стоит
+ * на 42-й позиции, то есть РАНЬШЕ уровня 50. Считаем по позиции; уровень,
+ * которого уже нет в данных, проигрывает известному (а из двух неизвестных
+ * берём больший id — прежнее поведение).
+ */
+function laterLevel(a: number, b: number): number {
+  const posA = campaignPositionOf(a);
+  const posB = campaignPositionOf(b);
+  if (posA === 0 && posB === 0) return Math.max(a, b);
+  if (posA === 0) return b;
+  if (posB === 0) return a;
+  return posA >= posB ? a : b;
+}
+
+/**
  * Слияние локального и облачного сейва: максимум звёзд по каждому уровню.
  * Прогресс (звёзды, streak, кубки, endless, подсказки) объединяется без потерь
  * через max/union. Настройки (звук, музыка, язык, скин) НЕ порядко-независимы:
@@ -181,7 +198,7 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
     music: b.music,
     lang: b.lang,
     langChosen: a.langChosen || b.langChosen || undefined,
-    lastLevel: Math.max(a.lastLevel, b.lastLevel),
+    lastLevel: laterLevel(a.lastLevel, b.lastLevel),
     targetSkin: b.targetSkin,
     daily,
     hintTokens: Math.max(a.hintTokens ?? 0, b.hintTokens ?? 0) || undefined,

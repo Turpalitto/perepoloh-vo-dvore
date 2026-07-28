@@ -11,6 +11,21 @@ describe('сохранения', () => {
     expect(sanitizeSave({ ...defaultSave(), lang: 'tr', langChosen: true })?.langChosen).toBe(true);
   });
 
+  it('lastLevel при слиянии выбирается по позиции в кампании, а не по большему id', () => {
+    // Уровни, вставленные после релиза, имеют id 105+ и стоят В СЕРЕДИНЕ
+    // кампании (105 — это 42-я позиция). Прежний Math.max по id объявлял бы
+    // такой сейв «более поздним», чем сейв игрока на уровне 50.
+    const base = defaultSave();
+    const early: SaveData = { ...base, lastLevel: 105 };
+    const late: SaveData = { ...base, lastLevel: 50 };
+    expect(mergeSave(early, late).lastLevel).toBe(50);
+    expect(mergeSave(late, early).lastLevel).toBe(50);
+
+    // Уровень, которого больше нет в данных, не должен побеждать существующий.
+    const unknown: SaveData = { ...base, lastLevel: 9999 };
+    expect(mergeSave(unknown, late).lastLevel).toBe(50);
+  });
+
   it('объединяет звёзды, недельные дни и кубки без потери прогресса', () => {
     const a = {
       ...defaultSave(),

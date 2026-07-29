@@ -10,6 +10,7 @@ import {
   buildGrid,
   exitSteps,
   exitVector,
+  gateOpen,
   maxSteps,
   targetIndex
 } from '../core/game';
@@ -598,7 +599,7 @@ export class BoardView {
   private updateGateSwitch(animate: boolean): void {
     if (!this.gateSwitchEl) return;
     const wasPressed = this.gateSwitchEl.classList.contains('pressed');
-    const pressed = this.state.gateUnlocked;
+    const pressed = gateOpen(this.level, this.state, buildGrid(this.level, this.state));
     this.gateSwitchEl.classList.toggle('pressed', pressed);
     this.gateSwitchEl.setAttribute('data-pressed', String(pressed));
     if (animate && pressed && !wasPressed) {
@@ -611,7 +612,7 @@ export class BoardView {
   }
 
   private updateGate(sound: boolean): void {
-    const unlocked = !this.level.gateSwitch || this.state.gateUnlocked;
+    const unlocked = !this.level.gateSwitch || gateOpen(this.level, this.state, buildGrid(this.level, this.state));
     this.svg.querySelector<SVGGElement>('.gate-lock')?.classList.toggle('unlocked', unlocked);
     const open = exitSteps(this.level, this.state) >= 0 || this.state.won;
     if (open === this.gateOpen) return;

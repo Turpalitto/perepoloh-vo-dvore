@@ -127,11 +127,26 @@ export function allowedDirs(def: PieceDef): { dx: number; dy: number }[] {
   ];
 }
 
+/**
+ * Открыты ли ворота прямо сейчас.
+ * `once` — читает sticky-флаг (разблокировано навсегда после первого проезда).
+ * `held` — пересчитывается заново из текущего расклада: клетка кнопки должна
+ * быть физически занята какой-либо фигурой именно в состоянии `s`. Ничего не
+ * кэшируется, поэтому «уехал с кнопки — ворота закрылись» получается само
+ * собой, без отдельного случая для частично выехавшей целевой машины.
+ */
+export function gateOpen(level: LevelDef, s: GameState, grid: number[][]): boolean {
+  const gs = level.gateSwitch;
+  if (!gs) return true;
+  if ((gs.holdType ?? 'once') !== 'held') return s.gateUnlocked;
+  return (grid[gs.y]?.[gs.x] ?? EMPTY) >= 0; // >=0 — индекс фигуры, клетка занята
+}
+
 /** Движется ли фигура в сторону ворот по их ряду/колонке (только целевая). */
-function isExitLane(level: LevelDef, i: number, s: GameState, dx: number, dy: number): boolean {
+function isExitLane(level: LevelDef, i: number, s: GameState, dx: number, dy: number, grid: number[][]): boolean {
   const def = level.pieces[i];
   if (def.kind !== 'target') return false;
-  if (level.gateSwitch && !s.gateUnlocked) return false;
+  if (level.gateSwitch && !gateOpen(level, s, grid)) return false;
   const v = exitVector(level.exit);
   if (dx !== v.dx || dy !== v.dy) return false;
   if (v.dy === 0) return def.dir === 'h' && s.pieces[i].y === level.exit.index;
@@ -169,7 +184,7 @@ export function maxSteps(
     const cy = lead.y + (k + 1) * dy;
     const inside = cx >= 0 && cx < level.width && cy >= 0 && cy < level.height;
     if (!inside) {
-      if (isExitLane(level, i, s, dx, dy)) k += def.len; // полный выезд
+      if (isExitLane(level, i, s, dx, dy, grid)) k += def.len; // полный выезд
       break;
     }
     if (grid[cy][cx] !== EMPTY) break;

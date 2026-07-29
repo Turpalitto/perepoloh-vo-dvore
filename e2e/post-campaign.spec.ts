@@ -231,6 +231,21 @@ test.describe('Post-campaign', () => {
     expect(remixWalls).toBe(originWalls + 1);
   });
 
+  test('three restarts in a challenge do not offer the campaign skip button', async ({ page }) => {
+    // «Пропустить за рекламу» умеет только кампанию: пишет звезду по level.id и
+    // уходит на следующий уровень списка. В лиге это выбрасывало из режима, а
+    // порог в три рестарта здесь берётся легко — режим построен на переигровке.
+    await seedSave(page);
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await openElite(page);
+    await page.getByTestId('elite-card-1').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+
+    for (let i = 0; i < 4; i++) await page.getByTestId('btn-restart').click();
+    await expect(page.getByTestId('btn-skip')).toBeHidden();
+    await expect(page.getByTestId('screen-game')).toContainText('Испытание 1');
+  });
+
   test('Elite medals improve once, rank up, retry, next and persist', async ({ page }) => {
     // 14 золотых = 700 очков, плюс 25 за серебро, засчитанное по трём звёздам
     // финального уровня кампании (испытание 25 — без модификатора) = 725.

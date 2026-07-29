@@ -305,7 +305,18 @@ export class BoardView {
       g.setAttribute('data-piece', def.id);
       const rotate =
         def.dir === 'v' && def.kind !== 'crate' ? ` transform="rotate(90) translate(0,-${CELL})"` : '';
-      g.innerHTML = `<g class="mid enter" style="animation-delay:${60 + i * 55}ms"><g class="art"${rotate}>${pieceArt(def)}</g><text class="kind-badge" x="14" y="30">${kindBadge(def.kind)}</text></g>`;
+      // Спрайт целевой машины нарисован «носом вперёд»: фары, стрелка и стоп-огни
+      // рассчитаны на выезд вправо (или вниз для вертикальной). Все уровни
+      // кампании такие, а вот отражённые ремиксы лиги выезжают влево — там
+      // машина смотрела бы в противоположную от ворот сторону, и жёлтая стрелка
+      // на кузове указывала бы не туда, куда ехать.
+      const facesExit =
+        def.kind === 'target' && (level.exit.side === 'left' || level.exit.side === 'top')
+          ? ` transform="translate(${def.dir === 'v' ? 0 : def.len * CELL},${def.dir === 'v' ? def.len * CELL : 0}) scale(${
+              def.dir === 'v' ? '1,-1' : '-1,1'
+            })"`
+          : '';
+      g.innerHTML = `<g class="mid enter" style="animation-delay:${60 + i * 55}ms"><g class="facing"${facesExit}><g class="art"${rotate}>${pieceArt(def)}</g></g><text class="kind-badge" x="14" y="30">${kindBadge(def.kind)}</text></g>`;
       this.svg.appendChild(g);
       this.pieceEls.push(g);
     }

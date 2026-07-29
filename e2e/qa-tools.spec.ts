@@ -30,6 +30,16 @@ test('QA button unlocks everything without changing real progress', async ({ pag
   await expect(page.getByTestId('menu-elite')).toBeVisible();
   await expect(page.getByTestId('menu-endless')).toBeVisible();
 
+  // «Открыть всё» обязано открывать и лигу целиком: без медалей она осталась бы
+  // за собственным гейтом дивизионов, и проверяющий увидел бы блок из пяти
+  // испытаний вместо двадцати пяти.
+  await page.getByTestId('menu-elite').click();
+  await expect(page.locator('.elite-card')).toHaveCount(25);
+  await expect(page.locator('.elite-card.locked')).toHaveCount(0);
+  // Золота нет намеренно: улучшение медали и повышение ранга остаются проверяемыми.
+  await expect(page.getByTestId('elite-medals')).toContainText('🥇 0');
+  await page.getByTestId('btn-back').click();
+
   await page.getByTestId('menu-levels').click();
   await expect(page.locator('.level-card')).toHaveCount(CAMPAIGN_LEVEL_IDS.length);
   await expect(page.locator('.level-card.locked')).toHaveCount(0);

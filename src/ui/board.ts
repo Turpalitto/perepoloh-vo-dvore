@@ -15,7 +15,7 @@ import {
 } from '../core/game';
 import type { SolveMove } from '../core/solver';
 import { t } from '../game/i18n';
-import { CELL, chickenArt, iceArt, kindBadge, pieceArt, starArt, wallArt, wellArt } from './sprites';
+import { CELL, chickenArt, fieldChickenArt, iceArt, kindBadge, pieceArt, plankArt, starArt, wallArt, wellArt } from './sprites';
 
 const M = 90; // поля вокруг двора: забор, куры
 
@@ -102,6 +102,8 @@ export class BoardView {
   private rangeLayer!: SVGGElement;
   private hintLayer!: SVGGElement;
   private chickenEls: SVGGElement[] = [];
+  private plankEls: SVGGElement[] = [];
+  private fieldChickenEls: { current: SVGGElement; next: SVGGElement }[] = [];
   private gateOpen = false;
   private drag: DragInfo | null = null;
   private animLock = false;
@@ -253,6 +255,31 @@ export class BoardView {
     }
     if (iceHtml) make(iceHtml).classList.add('layer-ice');
 
+    // хрупкие доски: цела/сломана обновляется в updatePlanks()
+    for (const plank of level.planks ?? []) {
+      const g = document.createElementNS(ns, 'g');
+      g.classList.add('plank-cell');
+      g.setAttribute('data-testid', 'plank');
+      g.innerHTML = plankArt(false);
+      g.style.transform = `translate(${plank.x * CELL}px, ${plank.y * CELL}px)`;
+      this.svg.appendChild(g);
+      this.plankEls.push(g);
+    }
+
+    // куры-игровой объект: видны сразу в обеих позициях цикла — «где сейчас» /
+    // «куда переместится» (актуальная непрозрачная, следующая полупрозрачная).
+    (level.chickens ?? []).forEach((c) => {
+      const mk = (cell: { x: number; y: number }, testid: string) => {
+        const g = document.createElementNS(ns, 'g');
+        g.classList.add('field-chicken');
+        g.setAttribute('data-testid', testid);
+        g.style.transform = `translate(${cell.x * CELL}px, ${cell.y * CELL}px)`;
+        this.svg.appendChild(g);
+        return g;
+      };
+      this.fieldChickenEls.push({ current: mk(c.a, 'field-chicken-a'), next: mk(c.b, 'field-chicken-b') });
+    });
+
     // следы колёс
     this.tracksLayer = make('');
     this.tracksLayer.classList.add('layer-tracks');
@@ -348,6 +375,8 @@ export class BoardView {
 
     this.syncPieces(false);
     this.refreshCrateBadges();
+    this.updatePlanks();
+    this.updateFieldChickens();
   }
 
   /** Прямоугольник ряда/колонки ворот. */
@@ -523,6 +552,8 @@ export class BoardView {
     this.updateStarVisibility();
     this.updateGateSwitch(animate);
     this.updateGate(true);
+    this.updatePlanks();
+    this.updateFieldChickens();
     if (this.state.pieces[this.selectedPiece]?.gone) this.selectedPiece = this.firstVisiblePiece();
     this.updateTVSelection();
   }
@@ -541,6 +572,27 @@ export class BoardView {
   private updateStarVisibility(): void {
     if (!this.starEl) return;
     this.starEl.classList.toggle('collected', this.state.starCollected);
+  }
+
+  private updatePlanks(): void {
+    const planks = this.level.planks ?? [];
+    this.plankEls.forEach((el, i) => {
+      const plank = planks[i];
+      const broken = this.state.brokenPlanks.includes(`${plank.x},${plank.y}`);
+      el.classList.toggle('broken', broken);
+      el.innerHTML = plankArt(broken);
+    });
+  }
+
+  private updateFieldChickens(): void {
+    (this.level.chickens ?? []).forEach((_, i) => {
+      const pair = this.fieldChickenEls[i];
+      const activeIsA = this.state.chickenAt[i] === 'a';
+      pair.current.innerHTML = fieldChickenArt(!activeIsA);
+      pair.next.innerHTML = fieldChickenArt(activeIsA);
+      pair.current.classList.toggle('chicken-active', activeIsA);
+      pair.next.classList.toggle('chicken-active', !activeIsA);
+    });
   }
 
   private updateGateSwitch(animate: boolean): void {
@@ -1099,6 +1151,8 @@ export class BoardView {
     this.updateGateSwitch(res.gateActivated);
     if (res.gateActivated) this.events.onGateSwitch();
     this.updateGate(true);
+    this.updatePlanks();
+    this.updateFieldChickens();
     this.flutterChickens();
     this.events.onCommit(res, idx);
   }

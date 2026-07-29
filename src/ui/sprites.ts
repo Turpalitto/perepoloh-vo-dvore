@@ -295,6 +295,26 @@ export function starArt(): string {
       fill="#f6c445" stroke="#d9a520" stroke-width="4" stroke-linejoin="round"/>`;
 }
 
+/** Хрупкая доска (клетка поля): цела — дощатый настил, сломана — трещина и провал. */
+export function plankArt(broken: boolean): string {
+  if (broken) {
+    return `
+      <ellipse cx="50" cy="58" rx="40" ry="30" fill="#3d2c1e" opacity="0.55"/>
+      <path d="M18 50 L38 62 L28 74 L50 68 L58 82 L70 60 L86 66" fill="none" stroke="#8f6a35" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M30 40 L46 50" stroke="#8f6a35" stroke-width="4" stroke-linecap="round"/>`;
+  }
+  return `
+    <rect x="10" y="34" width="80" height="16" rx="4" fill="#c89b5a" stroke="#8f6a35" stroke-width="3"/>
+    <rect x="10" y="54" width="80" height="16" rx="4" fill="#b9884a" stroke="#8f6a35" stroke-width="3"/>
+    <line x1="14" y1="42" x2="86" y2="42" stroke="#8f6a35" stroke-width="2" opacity="0.6"/>
+    <line x1="14" y1="62" x2="86" y2="62" stroke="#8f6a35" stroke-width="2" opacity="0.6"/>`;
+}
+
+/** Курица на поле (игровой объект, не декорация двора): полупрозрачная — «куда переместится». */
+export function fieldChickenArt(ghost: boolean): string {
+  return `<g class="field-chicken-art" opacity="${ghost ? 0.38 : 1}" transform="translate(50,58) scale(2.1)">${chickenArt()}</g>`;
+}
+
 export function chickenArt(): string {
   return `
     <ellipse cx="0" cy="14" rx="15" ry="4" fill="rgba(43,29,10,0.2)"/>

@@ -112,11 +112,20 @@ export function validateLevel(level: LevelDef, opts: { withSolver?: boolean } = 
   if (level.gateSwitch) {
     floorObjects.push({ name: 'кнопка ворот', x: level.gateSwitch.x, y: level.gateSwitch.y });
   }
+  for (const plank of level.planks ?? []) floorObjects.push({ name: 'доска', x: plank.x, y: plank.y });
+  level.chickens?.forEach((c, i) => {
+    floorObjects.push({ name: `курица ${i} (A)`, x: c.a.x, y: c.a.y });
+    floorObjects.push({ name: `курица ${i} (B)`, x: c.b.x, y: c.b.y });
+    if (c.a.x === c.b.x && c.a.y === c.b.y) err(`курица ${i}: клетки A и B совпадают (${c.a.x},${c.a.y})`);
+  });
   const floorAt = new Map<string, string>();
   for (const obj of floorObjects) {
     if (!inside(obj.x, obj.y)) err(`${obj.name} (${obj.x},${obj.y}) вне поля`);
     const k = `${obj.x},${obj.y}`;
-    if (occupied.has(k)) err(`${obj.name} стоит на занятой клетке (${occupied.get(k)})`);
+    // Клетка B курицы в начале уровня свободна от фигур — там пока никого нет,
+    // поэтому с фигурами сверяем только против стен и других напольных
+    // объектов, не против occupied (фигуры) для клетки B.
+    if (occupied.has(k) && !obj.name.includes('(B)')) err(`${obj.name} стоит на занятой клетке (${occupied.get(k)})`);
     const already = floorAt.get(k);
     if (already !== undefined) err(`${obj.name} (${obj.x},${obj.y}) пересекается: уже занято «${already}»`);
     else floorAt.set(k, obj.name);

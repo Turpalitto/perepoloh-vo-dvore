@@ -54,6 +54,28 @@ export interface IceDef {
   y: number;
 }
 
+/**
+ * Хрупкая доска: как лёд, на ней нельзя останавливаться. Отличие — доска
+ * помнит проезд: любая фигура, прометнувшая клетку за ход, ломает её
+ * навсегда (`GameState.brokenPlanks`), и с этого момента клетка становится
+ * стеной. Проезд один раз, дальше — не проехать вообще.
+ */
+export interface PlankDef {
+  x: number;
+  y: number;
+}
+
+/**
+ * Курица во дворе: две фиксированные клетки A/B, между которыми она
+ * детерминированно переключается после КАЖДОГО хода игрока — независимо от
+ * того, какая фигура ходила. Текущая клетка блокирует проезд, как стена.
+ * Никакой случайности; для нескольких кур циклы независимы.
+ */
+export interface ChickenDef {
+  a: { x: number; y: number };
+  b: { x: number; y: number };
+}
+
 type Difficulty = 'easy' | 'medium' | 'hard';
 
 /**
@@ -76,6 +98,8 @@ export interface LevelDef {
   star?: StarDef;
   gateSwitch?: GateSwitchDef;
   ice?: IceDef[];
+  planks?: PlankDef[];
+  chickens?: ChickenDef[];
   /** Оптимум решателя (проверяется тестом). */
   par: number;
   /** Порог двух звёзд: ходов <= par2. */

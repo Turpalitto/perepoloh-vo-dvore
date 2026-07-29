@@ -32,6 +32,8 @@ function stateKey(s: GameState): string {
   for (const p of s.pieces) {
     k += p.gone ? '|g' : `|${p.x},${p.y},${p.used}`;
   }
+  if (s.brokenPlanks.length) k += `|p:${[...s.brokenPlanks].sort().join(',')}`;
+  if (s.chickenAt.length) k += `|c:${s.chickenAt.join('')}`;
   return k;
 }
 

@@ -16,6 +16,10 @@ export interface GameState {
   /** Ворота разблокированы нажимной кнопкой; на обычных уровнях true с начала. */
   gateUnlocked: boolean;
   won: boolean;
+  /** Сломанные доски (стали стеной); ключ `"x,y"`. */
+  brokenPlanks: string[];
+  /** Текущая клетка каждой курицы (индекс совпадает с `level.chickens`). */
+  chickenAt: ('a' | 'b')[];
 }
 
 export interface MoveResult {
@@ -37,7 +41,9 @@ export function createState(level: LevelDef): GameState {
     moves: 0,
     starCollected: false,
     gateUnlocked: level.gateSwitch === undefined,
-    won: false
+    won: false,
+    brokenPlanks: [],
+    chickenAt: (level.chickens ?? []).map(() => 'a')
   };
 }
 
@@ -47,8 +53,16 @@ export function cloneState(s: GameState): GameState {
     moves: s.moves,
     starCollected: s.starCollected,
     gateUnlocked: s.gateUnlocked,
-    won: s.won
+    won: s.won,
+    brokenPlanks: [...s.brokenPlanks],
+    chickenAt: [...s.chickenAt]
   };
+}
+
+/** Клетка курицы i в данном состоянии. */
+function chickenCell(level: LevelDef, s: GameState, i: number): { x: number; y: number } {
+  const def = level.chickens![i];
+  return s.chickenAt[i] === 'a' ? def.a : def.b;
 }
 
 export function targetIndex(level: LevelDef): number {
@@ -71,6 +85,16 @@ export function buildGrid(level: LevelDef, s: GameState): number[][] {
   for (const w of level.walls ?? []) {
     if (w.y >= 0 && w.y < level.height && w.x >= 0 && w.x < level.width) g[w.y][w.x] = WALL;
   }
+  // Сломанная доска — стена: проезд один раз, дальше клетка непроходима вовсе.
+  for (const key of s.brokenPlanks) {
+    const [x, y] = key.split(',').map(Number);
+    if (y >= 0 && y < level.height && x >= 0 && x < level.width) g[y][x] = WALL;
+  }
+  // Курица блокирует свою текущую клетку, как стена.
+  (level.chickens ?? []).forEach((_, i) => {
+    const c = chickenCell(level, s, i);
+    if (c.y >= 0 && c.y < level.height && c.x >= 0 && c.x < level.width) g[c.y][c.x] = WALL;
+  });
   level.pieces.forEach((def, i) => {
     for (const c of pieceCells(def, s.pieces[i])) {
       if (c.y >= 0 && c.y < level.height && c.x >= 0 && c.x < level.width) g[c.y][c.x] = i;
@@ -205,8 +229,35 @@ export function applyMove(
     const landed = pieceCells(def, { x: ps0.x + dx * steps, y: ps0.y + dy * steps, gone: false });
     if (landed.some((c) => level.ice!.some((ice) => ice.x === c.x && ice.y === c.y))) return null;
   }
+  // Хрупкая доска, пока цела, ведёт себя как лёд: остановиться нельзя, только
+  // проехать насквозь. Сломанные доски сюда не попадают — они уже WALL в
+  // grid, и maxSteps не пустит фигуру на такую клетку вовсе.
+  if (level.planks?.length) {
+    const ps0 = s.pieces[i];
+    const landed = pieceCells(def, { x: ps0.x + dx * steps, y: ps0.y + dy * steps, gone: false });
+    const intact = level.planks.filter((p) => !s.brokenPlanks.includes(`${p.x},${p.y}`));
+    if (landed.some((c) => intact.some((p) => p.x === c.x && p.y === c.y))) return null;
+  }
   const ns = cloneState(s);
   const ps = ns.pieces[i];
+
+  // Доски, прометённые фигурой за ход (включая старт и конец), ломаются —
+  // тем же приёмом, что сбор звезды и кнопка ворот ниже.
+  if (level.planks?.length) {
+    for (const plank of level.planks) {
+      const key = `${plank.x},${plank.y}`;
+      if (ns.brokenPlanks.includes(key)) continue;
+      for (let t = 0; t <= steps; t++) {
+        const hit = pieceCells(def, { x: ps.x + dx * t, y: ps.y + dy * t, gone: false }).some(
+          (c) => c.x === plank.x && c.y === plank.y
+        );
+        if (hit) {
+          ns.brokenPlanks.push(key);
+          break;
+        }
+      }
+    }
+  }
 
   // Сбор звезды: любая клетка, «прометённая» фигурой за время скольжения.
   let starHit = false;
@@ -249,6 +300,21 @@ export function applyMove(
   ns.moves++;
   if (starHit) ns.starCollected = true;
   if (gateActivated) ns.gateUnlocked = true;
+  // Куры переключаются после КАЖДОГО хода, независимо от того, какая фигура
+  // ходила. Защита от порчи состояния: если ровно в эту клетку сейчас встала
+  // фигура (не должно случаться при разумной расстановке уровня), курица
+  // пропускает переключение и ждёт следующего хода — так двум объектам
+  // никогда не оказаться на одной клетке.
+  if (level.chickens?.length) {
+    const occupied = new Set<string>();
+    level.pieces.forEach((pd, idx) => {
+      for (const c of pieceCells(pd, ns.pieces[idx])) occupied.add(`${c.x},${c.y}`);
+    });
+    ns.chickenAt = ns.chickenAt.map((side, idx) => {
+      const other = side === 'a' ? level.chickens![idx].b : level.chickens![idx].a;
+      return occupied.has(`${other.x},${other.y}`) ? side : side === 'a' ? 'b' : 'a';
+    });
+  }
   return { state: ns, starCollected: starHit, exited, gateActivated };
 }
 

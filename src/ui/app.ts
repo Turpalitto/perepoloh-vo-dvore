@@ -856,7 +856,9 @@ export class App {
                 }</button>
               </div>
               <div class="menu-meta-row">
-                <button class="btn" data-testid="menu-leaderboard">🏆 ${t('menu.leaderboard')}</button>
+                <button class="btn" data-testid="menu-leaderboard" aria-label="${t(
+                  'menu.leaderboard'
+                )}" title="${t('menu.leaderboard')}">🏆</button>
                 <button class="btn" data-testid="menu-achievements" aria-label="${t(
                   'achievements.title'
                 )}">🏅 ${achievementCount}/${ACHIEVEMENTS.length}</button>
@@ -1859,8 +1861,22 @@ export class App {
       updateDeadlock();
     });
     const skipBtn = this.q<HTMLButtonElement>('[data-testid=btn-skip]');
+    /**
+     * «Пропустить за рекламу» существует ради одного случая: игрок застрял в
+     * кампании и дальше не идёт. В остальных режимах кнопка не просто лишняя —
+     * она ломает сеанс, потому что её обработчик умеет только кампанию: пишет
+     * звезду по `level.id` и уходит на следующий уровень СПИСКА кампании.
+     *
+     * В мастер-испытании это выбрасывало игрока из лиги (у ремикса id вне
+     * кампании, поиск не находил соседа — и сеанс заканчивался в меню; у
+     * обычного двора находил, и лига внезапно сменялась уровнем кампании).
+     * В бою с боссом — обрывало фазу на середине. Лига же вся построена на
+     * переигровке ради золота, так что порог в три рестарта там берётся легко,
+     * и до этой правки кнопка вылезала почти в каждом испытании.
+     */
+    const skippable = !daily && !endless && !challenge && !boss;
     const refreshSkip = () => {
-      skipBtn.style.display = !daily && !endless && (this.restartCounts.get(level.id) ?? 0) >= 3 ? '' : 'none';
+      skipBtn.style.display = skippable && (this.restartCounts.get(level.id) ?? 0) >= 3 ? '' : 'none';
     };
     refreshSkip();
     this.q('[data-testid=btn-restart]').addEventListener('click', () => {
@@ -1883,7 +1899,9 @@ export class App {
       }
     });
     skipBtn.addEventListener('click', async () => {
-      if (finished || cur.won || skipBtn.disabled) return;
+      // Видимость уже ограничена, но обработчик умеет только кампанию —
+      // проверка дублируется намеренно, цена ошибки здесь потерянный сеанс.
+      if (!skippable || finished || cur.won || skipBtn.disabled) return;
       this.audio.play('click');
       skipBtn.disabled = true;
       bv.interactive = false;

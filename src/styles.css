@@ -215,8 +215,8 @@ html.high-contrast .levels-grid {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
-  padding-bottom: max(26px, env(safe-area-inset-bottom));
+  gap: 12px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
   width: 100%;
 }
 .game-title {
@@ -224,8 +224,8 @@ html.high-contrast .levels-grid {
   display: flex;
   flex-direction: column;
   align-items: center;
-  line-height: 1.02;
-  font-size: clamp(38px, 9vw, 64px);
+  line-height: 1;
+  font-size: clamp(32px, 7.5vw, 64px);
   font-weight: 900;
   color: var(--cream);
   text-shadow:
@@ -234,18 +234,38 @@ html.high-contrast .levels-grid {
   letter-spacing: 0.5px;
   transform: rotate(-2deg);
 }
+/**
+ * Одна колонка на всё меню.
+ *
+ * Раньше ширина каждого блока определялась его содержимым: CTA 323px (длинная
+ * подпись), переключатель режимов 319, ряды событий 296, полоса прогресса 285.
+ * Четыре разных левых края в пределах 20 пикселей — глаз читает это не как
+ * иерархию, а как небрежность. Теперь ширину задаёт `--menu-col`, а не текст
+ * внутри кнопки.
+ */
+.menu-ui {
+  /* Поля по краям обязательны: на 296px колонка в 100% упиралась в самые
+     границы экрана, и кнопки выглядели вырезанными по краю. */
+  --menu-col: min(100% - 24px, 340px);
+}
 .menu-buttons {
   display: flex;
   flex-direction: column;
   gap: 12px;
   align-items: center;
+  width: var(--menu-col);
+}
+.menu-buttons > .btn,
+.menu-buttons > .mode-switch,
+.menu-buttons > .menu-events {
+  width: 100%;
 }
 .menu-events {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding-top: 10px;
+  gap: 6px;
+  padding-top: 8px;
   border-top: 2px solid rgba(255, 247, 230, 0.42);
 }
 .weekly-progress {
@@ -256,13 +276,33 @@ html.high-contrast .levels-grid {
   font-size: 13px;
   font-weight: 800;
 }
+/**
+ * Второстепенные ряды меню — сетка с равными колонками, а не flex-wrap.
+ *
+ * При переносе flex-wrap оставлял сироту: четыре кнопки на узком экране
+ * ложились как 3 + 1, последняя болталась по центру пустой строки, и ширины
+ * были все разные (160 / 86 / 69 / 86 px). Ряд читался как случайная россыпь.
+ * Сетка держит одну строку и одинаковый размер ячеек на любой ширине.
+ */
 .retention-row,
 .menu-meta-row {
+  display: grid;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+}
+.retention-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.menu-meta-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.retention-row > *,
+.menu-meta-row > * {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  min-width: 0;
 }
 .gift-btn {
   padding: 5px 10px;
@@ -274,8 +314,9 @@ html.high-contrast .levels-grid {
   opacity: 0.9;
 }
 .menu-meta-row .btn {
-  padding: 9px 12px;
+  padding: 9px 4px;
   font-size: 14px;
+  white-space: nowrap;
 }
 .weekly-quests-list {
   display: flex;
@@ -325,24 +366,31 @@ html.high-contrast .levels-grid {
 .btn-small:disabled {
   opacity: 0.6;
 }
+/**
+ * Прогресс — одна строка, а не две. Звёзды и подпись про следующее улучшение
+ * говорят об одном и том же и на телефоне занимали 58px вертикали ради двух
+ * коротких фраз.
+ */
 .menu-progress {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 8px;
   background: rgba(61, 44, 30, 0.55);
   color: var(--cream);
   border-radius: 14px;
-  padding: 8px 18px;
+  padding: 6px 14px;
   font-weight: 700;
 }
 .menu-progress .next-upgrade {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  opacity: 0.9;
+  opacity: 0.85;
 }
 .btn-daily {
-  font-size: 15px;
+  font-size: 14px;
+  width: 100%;
 }
 .btn-endless {
   font-size: 17px;
@@ -478,7 +526,13 @@ html.high-contrast .levels-grid {
   border: none;
   min-height: 44px;
   min-width: 44px;
-  padding: 5px 12px;
+  /* Табы делят ряд, а не жмутся к левому краю. Кроме вида это чинит навигацию
+     пультом: TV-фокус ищет ближайшего соседа по центрам, и одинокий таб у
+     левого края проигрывал кнопке ниже — стрелка вниз с главной кнопки уводила
+     мимо переключателя режимов. */
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 8px;
   border-radius: 12px;
   background: transparent;
   color: var(--cream);
@@ -1743,7 +1797,10 @@ html[data-daytime='night'] .yard-lamp-light {
   }
   .btn-big {
     min-width: 200px;
-    font-size: 19px;
+    /* Подпись главной кнопки бывает длинной («Продолжить в Высшей лиге») и на
+       320px переносилась на вторую строку, добавляя 24px высоты там, где её
+       меньше всего. Кегль тянется по ширине экрана вместо переноса. */
+    font-size: clamp(16px, 5vw, 19px);
   }
   .hud-level {
     font-size: 14px;
@@ -1927,10 +1984,11 @@ html[data-daytime='night'] .yard-lamp-light {
   }
 }
 
-/* Порог поднят с 360 до 400: при 361–400px .menu-meta-row (flex-wrap) мог
-   перенести кнопку на вторую строку из-за более широкого рендера кириллицы
-   системным шрифтом на Linux, и .menu-ui (align-content: center) выталкивал
-   контент за верхнюю границу видимой области. */
+/* Порог поднят с 360 до 400: при 361–400px .menu-meta-row переносил кнопку на
+   вторую строку из-за более широкого рендера кириллицы системным шрифтом на
+   Linux, и .menu-ui (align-content: center) выталкивал контент за верхнюю
+   границу видимой области. Сам перенос с тех пор невозможен — ряд стал сеткой
+   с фиксированным числом колонок, — но порог оставлен: он экономит вертикаль. */
 @media (orientation: landscape) and (min-height: 701px) and (max-height: 750px) {
   body.sticky-banner-bottom .menu-screen {
     justify-content: center;

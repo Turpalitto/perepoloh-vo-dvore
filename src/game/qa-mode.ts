@@ -1,4 +1,5 @@
 import levelsJson from '../levels/levels.json';
+import { ELITE_CHALLENGES } from '../levels/elite-challenges';
 import type { Platform } from '../platform/types';
 import { noopTracker } from './analytics';
 import { getLang } from './i18n';
@@ -12,7 +13,18 @@ export function createQaSave(base: SaveData): SaveData {
     lastLevel: levelsJson[levelsJson.length - 1].id,
     campaignDone: true,
     endingSeen: true,
-    eliteMedals: {},
+    eliteIntroSeen: true,
+    /**
+     * Бронза по всем испытаниям — чтобы «открыть всё» действительно открывало
+     * всё. Пустой список медалей оставлял лигу за её собственным гейтом:
+     * дивизион открывается тремя медалями предыдущего, и проверяющий видел
+     * только первый блок из пяти.
+     *
+     * Именно бронза, а не золото: все двадцать пять испытаний доступны, но
+     * улучшение медали, повышение ранга и достижения лиги остаются проверяемыми
+     * — с золотом по всем и то и другое было бы уже выдано.
+     */
+    eliteMedals: Object.fromEntries(ELITE_CHALLENGES.map((challenge) => [String(challenge.id), 1])),
     endlessBest: 0,
     hintTokens: 99,
     tutorialSeen: true

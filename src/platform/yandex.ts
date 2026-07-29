@@ -8,7 +8,7 @@ import { noopTracker } from '../game/analytics';
 import type { SaveData } from '../game/save';
 import { mergeSave, sanitizeSave } from '../game/save';
 import { DEFAULT_PLATFORM_CONFIG } from './types';
-import type { AdHandlers, LeaderboardSnapshot, Platform, PlatformConfig } from './types';
+import type { AdHandlers, LeaderboardName, LeaderboardSnapshot, Platform, PlatformConfig } from './types';
 
 const STORAGE_KEY = 'parkovka.save.v1';
 
@@ -284,8 +284,8 @@ export function createYandexPlatform(): Platform {
       return ysdk?.environment?.i18n?.lang ?? 'ru';
     },
 
-    /** Лидерборды «yardstars»/«dailystreak» настраиваются в консоли Яндекс Игр. */
-    async submitScore(board: 'yardstars' | 'dailystreak', value: number): Promise<void> {
+    /** Лидерборды «yardstars», «dailystreak», «eliteleague» настраиваются в консоли Яндекс Игр. */
+    async submitScore(board: LeaderboardName, value: number): Promise<void> {
       if (!ysdk) return;
       try {
         if (ysdk.isAvailableMethod && !(await ysdk.isAvailableMethod('leaderboards.setScore'))) return;
@@ -303,7 +303,7 @@ export function createYandexPlatform(): Platform {
      * сравнением player.getUniqueID() с entry.player.uniqueID в том же ответе.
      * Без авторизации или вне окна ответа — me: null, без ошибки.
      */
-    async getLeaderboardSnapshot(board: 'yardstars' | 'dailystreak'): Promise<LeaderboardSnapshot> {
+    async getLeaderboardSnapshot(board: LeaderboardName): Promise<LeaderboardSnapshot> {
       if (!ysdk) return { entries: [], me: null };
       try {
         const lb = ysdk.leaderboards ?? (await ysdk.getLeaderboards?.());

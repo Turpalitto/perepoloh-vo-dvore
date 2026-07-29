@@ -100,6 +100,18 @@ export function canonicalKey(level: LevelDef): string {
   return best!;
 }
 
+/**
+ * Ключ ТОЧНОГО расположения: без симметрий, но по-прежнему без id и имён.
+ *
+ * Нужен там, где важна именно картинка на экране. `canonicalKey` инвариантен к
+ * отражениям — по нему нельзя отличить уровень от его зеркала, а ремикс лиги
+ * ровно этим и занимается: отражением симметричного двора можно получить
+ * «ремикс», который выглядит один в один как источник.
+ */
+export function exactKey(level: LevelDef): string {
+  return encode(level, TRANSFORMS[0]);
+}
+
 export interface SimilarPair {
   a: number;
   b: number;

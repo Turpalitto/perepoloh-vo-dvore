@@ -51,6 +51,24 @@ export type GameAnalyticsEvent =
   // Метапрогрессия
   | { type: 'upgrade_unlocked'; key: string; stars: number }
   | { type: 'campaign_completed'; stars: number }
+  // Высшая лига. Режим стоит на гейте «три медали открывают следующий
+  // дивизион», и без этих событий нельзя увидеть ни где игрок встаёт, ни
+  // доходит ли он вообще до ремиксов — а балансировать вслепую дороже, чем
+  // отправить пять событий.
+  | { type: 'elite_opened'; points: number; rank: string; medals: number }
+  | { type: 'elite_challenge_started'; challengeId: number; division: number; modifier: string; remixed: boolean }
+  | {
+      type: 'elite_challenge_finished';
+      challengeId: number;
+      division: number;
+      modifier: string;
+      remixed: boolean;
+      medal: number;
+      previousMedal: number;
+      moves: number;
+    }
+  | { type: 'elite_division_unlocked'; division: number }
+  | { type: 'elite_rank_up'; rank: string; points: number }
   // Бесконечный двор
   | { type: 'endless_unlocked' }
   | { type: 'endless_started'; best: number }

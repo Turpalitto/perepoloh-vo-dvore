@@ -39,6 +39,16 @@ export interface LeaderboardSnapshot {
  * Единственная точка контакта игры с платформой.
  * Реализации: mock (локальная разработка) и yandex (Яндекс Игры).
  */
+/**
+ * Технические имена лидербордов из консоли Яндекс Игр.
+ *
+ * `eliteleague` — очки Высшей лиги. Режим называется лигой и имеет ранги, но до
+ * этой доски соревнования в нём не было вообще: игрок видел только собственный
+ * счёт. Доску нужно завести в консоли под этим же именем — SDK отклонит
+ * неизвестное имя, и вызов молча уйдёт в catch (см. yandex.ts).
+ */
+export type LeaderboardName = 'yardstars' | 'dailystreak' | 'eliteleague';
+
 export interface Platform {
   readonly name: 'mock' | 'yandex' | 'local-fallback';
   readonly config: PlatformConfig;
@@ -48,12 +58,12 @@ export interface Platform {
   /** Язык интерфейса платформы (например 'ru', 'en', 'tr'). */
   getLang(): string;
   /** Отправить результат в лидерборд (тихо игнорируется, если недоступно). */
-  submitScore(board: 'yardstars' | 'dailystreak', value: number): Promise<void>;
+  submitScore(board: LeaderboardName, value: number): Promise<void>;
   /**
    * Верхние строки + место текущего игрока — один сетевой запрос на таблицу
    * (раньше getLeaderboard/getMyRank дублировали один и тот же запрос).
    */
-  getLeaderboardSnapshot(board: 'yardstars' | 'dailystreak'): Promise<LeaderboardSnapshot>;
+  getLeaderboardSnapshot(board: LeaderboardName): Promise<LeaderboardSnapshot>;
   /** Предложить оценить игру; true, если нативный диалог удалось вызвать. */
   requestReview(): Promise<boolean>;
   /** Серверное время платформы, fallback — время устройства. */

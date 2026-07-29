@@ -10,8 +10,11 @@ type SaveData = {
   [key: string]: unknown;
 };
 
-const NO_UNDO = new Set([2, 6, 10, 14, 18, 22]);
-const NO_HINTS = new Set([4, 8, 12, 16, 20, 24]);
+// Испытания, где кнопка скрыта. Комбинированный модификатор noUndoNoHints
+// попадает в оба набора — именно он раньше молча ломал проверки на равенство
+// строке 'noUndo' / 'noHints'.
+const NO_UNDO = new Set([2, 5, 7, 8, 9, 11, 13, 15, 16, 17, 18, 19, 22, 23, 24]);
+const NO_HINTS = new Set([10, 11, 12, 14, 16, 17, 19, 20, 21, 23, 24]);
 
 async function seedSave(page: Page, overrides: SaveData = {}): Promise<void> {
   await page.addInitScript((data) => {
@@ -88,6 +91,14 @@ async function openElite(page: Page): Promise<void> {
   await expect(page.getByTestId('screen-elite')).toBeVisible();
   const intro = page.getByTestId('elite-intro-close');
   if (await intro.isVisible().catch(() => false)) await intro.click();
+  // Экран въезжает анимацией screen-in и до её конца смещён на 12px вниз.
+  // Раньше эти миллисекунды съедало закрытие интро; теперь интро показывается
+  // один раз за игрока, и измерения геометрии стали читать промежуточный кадр.
+  await page
+    .getByTestId('screen-elite')
+    .evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((a) => a.finished.catch(() => undefined)));
+    });
 }
 
 test.describe('Post-campaign', () => {
@@ -139,10 +150,16 @@ test.describe('Post-campaign', () => {
 
   test('all 25 Elite challenges open and enforce their configured modifiers', async ({ page }) => {
     test.setTimeout(120_000);
-    await seedSave(page, { eliteMedals: { '1': 1 } });
+    // По три медали в каждом из первых четырёх дивизионов — иначе следующий
+    // блок закрыт и его карточки нельзя открыть кликом.
+    const unlockAll = Object.fromEntries(
+      [1, 2, 3, 6, 7, 8, 11, 12, 13, 16, 17, 18].map((id) => [String(id), 1])
+    );
+    await seedSave(page, { eliteMedals: unlockAll });
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await openElite(page);
     await expect(page.locator('.elite-card')).toHaveCount(25);
+    await expect(page.locator('.elite-card.locked')).toHaveCount(0);
 
     for (let id = 1; id <= 25; id++) {
       await page.getByTestId(`elite-card-${id}`).click();
@@ -160,17 +177,74 @@ test.describe('Post-campaign', () => {
     }
   });
 
-  test('Elite medals improve once, rank up, retry, next and persist', async ({ page }) => {
-    const firstEightGold = Object.fromEntries(
-      Array.from({ length: 8 }, (_, index) => [String(index + 1), 3])
+  test('divisions gate the league and open on the third medal of the previous block', async ({ page }) => {
+    // stars пустые: перенесённые из кампании медали открыли бы блок сами.
+    await seedSave(page, { stars: {}, eliteMedals: { '1': 1, '2': 1 } });
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await openElite(page);
+    await expect(page.getByTestId('elite-division-1')).toContainText('Дворовый претендент');
+    await expect(page.getByTestId('elite-division-2')).toContainText('Бронзовый дивизион');
+    // Две медали в первом блоке — второй ещё закрыт.
+    await expect(page.getByTestId('elite-card-6')).toBeDisabled();
+    await expect(page.getByTestId('elite-division-2')).toContainText('🔒');
+
+    // Третья медаль открывает второй дивизион.
+    await page.getByTestId('elite-card-3').click();
+    await page.evaluate(() =>
+      (window as unknown as { __e2eWinLevel: (opts: { starCollected: boolean }) => void }).__e2eWinLevel({
+        starCollected: true
+      })
     );
-    await seedSave(page, { eliteMedals: firstEightGold });
+    await page.getByTestId('elite-back').click();
+    await expect(page.getByTestId('elite-card-6')).toBeEnabled();
+    await expect(page.getByTestId('elite-division-2')).not.toContainText('🔒');
+    // Третий блок остаётся закрытым: его правило считает медали второго.
+    await expect(page.getByTestId('elite-card-11')).toBeDisabled();
+  });
+
+  test('a remix challenge really plays a rebuilt yard, not the campaign level', async ({ page }) => {
+    // Испытание 3 — ремикс уровня 12: отражение плюс добавленная бочка.
+    // Проверяем именно то, ради чего ремиксы делались: на экране другой двор.
+    // Звёзды по всей кампании нужны, чтобы уровень 12 открывался для сравнения.
+    await seedSave(page, {
+      stars: Object.fromEntries(CAMPAIGN_LEVEL_IDS.map((id) => [String(id), 3]))
+    });
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await openElite(page);
+    const card = page.getByTestId('elite-card-3');
+    await expect(card).toContainText('Сено и бочка');
+    await expect(card).toContainText('Ремикс');
+    await expect(card).toHaveAttribute('title', /перестроенный двор «Свежее сено»/);
+
+    await card.click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('screen-game')).toContainText('Испытание 3');
+    const remixWalls = await page.locator('.layer-walls > g').count();
+
+    // Тот же двор в кампании: у него на одну бочку меньше и другая раскладка.
+    await page.getByTestId('btn-pause').click();
+    await page.getByTestId('btn-exit-menu').click();
+    await page.getByTestId('menu-levels').click();
+    await page.getByTestId('level-card-12').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    const originWalls = await page.locator('.layer-walls > g').count();
+    expect(remixWalls).toBe(originWalls + 1);
+  });
+
+  test('Elite medals improve once, rank up, retry, next and persist', async ({ page }) => {
+    // 14 золотых = 700 очков, плюс 25 за серебро, засчитанное по трём звёздам
+    // финального уровня кампании (испытание 25 — без модификатора) = 725.
+    // Это ещё серебряный ранг; золото за испытание 15 переводит через порог 750.
+    const firstFourteenGold = Object.fromEntries(
+      Array.from({ length: 14 }, (_, index) => [String(index + 1), 3])
+    );
+    await seedSave(page, { eliteMedals: firstFourteenGold });
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await openElite(page);
     await expect(page.getByTestId('elite-rank')).toHaveText('Серебряный мастер');
-    await expect(page.getByTestId('elite-points')).toContainText('400');
+    await expect(page.getByTestId('elite-points')).toContainText('725');
 
-    await page.getByTestId('elite-card-9').click();
+    await page.getByTestId('elite-card-15').click();
     await page.evaluate(() =>
       (window as unknown as { __e2eWinLevel: (opts: { starCollected: boolean }) => void }).__e2eWinLevel({
         starCollected: true
@@ -189,7 +263,7 @@ test.describe('Post-campaign', () => {
     await expect(page.getByTestId('elite-rankup')).toHaveCount(0);
 
     await page.getByTestId('elite-next').click();
-    await expect(page.getByTestId('screen-game')).toContainText('Испытание 10');
+    await expect(page.getByTestId('screen-game')).toContainText('Испытание 16');
     await page.evaluate(() =>
       (window as unknown as { __e2eWinLevel: (opts: { starCollected: boolean }) => void }).__e2eWinLevel({
         starCollected: true
@@ -197,14 +271,16 @@ test.describe('Post-campaign', () => {
     );
     await page.getByTestId('elite-back').click();
     await expect(page.getByTestId('elite-rank')).toHaveText('Золотой мастер');
-    await expect(page.getByTestId('elite-points')).toContainText('500');
+    await expect(page.getByTestId('elite-points')).toContainText('825');
 
     await page.reload();
     await openElite(page);
     await expect(page.getByTestId('elite-rank')).toHaveText('Золотой мастер');
     const save = await readSave(page);
-    expect(save.eliteMedals?.['9']).toBe(3);
-    expect(save.eliteMedals?.['10']).toBe(3);
+    expect(save.eliteMedals?.['15']).toBe(3);
+    expect(save.eliteMedals?.['16']).toBe(3);
+    // Серебро за испытание 25 записано в сейв, а не нарисовано на экране.
+    expect(save.eliteMedals?.['25']).toBe(2);
   });
 
   test('Endless Yard continues, stores best streak and resets a new run', async ({ page }) => {

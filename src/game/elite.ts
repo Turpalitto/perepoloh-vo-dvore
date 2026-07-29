@@ -9,6 +9,7 @@
  * не могут выдать награду дважды — идемпотентность встроена в модель данных.
  */
 import type { SaveData } from './save';
+import type { LevelDef } from '../core/types';
 import type { EliteChallenge } from '../levels/elite-challenges';
 
 /** 0 — не пройдено, 1 — бронза, 2 — серебро, 3 — золото. */
@@ -69,6 +70,33 @@ function goalMet(goal: EliteGoal, r: AttemptResult): boolean {
   return true;
 }
 
+/**
+ * Медаль, которую прохождение кампании УЖЕ доказало — чтобы не просить игрока
+ * доказывать доказанное.
+ *
+ * Сейв хранит по уровню только число звёзд (0..3), ходов в нём нет. Но звёзды
+ * жёстко связаны с лимитами (`starsFor`), поэтому из них выводится гарантия:
+ * 2 звезды ⇒ `moves ≤ par2`; 3 звезды на уровне со звездой ⇒ `moves ≤ par2` и
+ * звезда собрана; 3 звезды на уровне без звезды ⇒ `moves ≤ par`.
+ *
+ * Про подсказки, отмену и рестарт кампания не знает ничего, поэтому они
+ * считаются использованными. Это автоматически закрывает золото (оно требует
+ * «без подсказки») — золото всегда зарабатывается в самой лиге.
+ */
+export function medalFromCampaign(challenge: EliteChallenge, level: LevelDef, campaignStars: number): Medal {
+  if (campaignStars < 2) return 0;
+  const hasStar = level.star !== undefined;
+  // Худший исход, совместимый с числом звёзд: лимит, который звёзды гарантируют.
+  const guaranteedMoves = campaignStars === 3 && !hasStar ? level.par : level.par2;
+  return medalForAttempt(challenge, {
+    moves: guaranteedMoves,
+    starCollected: campaignStars === 3 && hasStar,
+    usedHint: true,
+    usedUndo: true,
+    usedRestart: true
+  });
+}
+
 /** Медаль по конкретному испытанию из сейва (0, если не пройдено). */
 export function medalOf(save: SaveData, challengeId: number): Medal {
   const m = save.eliteMedals?.[String(challengeId)] ?? 0;
@@ -101,17 +129,26 @@ export interface RankDef {
 }
 
 /**
- * Ранги. Пороги подобраны от объёма доступных очков: 25 испытаний ×
- * (10/25/50 за бронзу/серебро/золото) → максимум 25×50 = 1250. Первые ранги
- * даются быстро (не grind): вход в лигу — уже «Новичок двора».
+ * Ранги. Максимум прежний: 25 испытаний × 50 за золото = 1250.
+ *
+ * Пороги пересчитаны вместе с порогами медалей. Раньше бронза и серебро были
+ * почти недостижимо мягкими, и старая шкала (80/220/450/750/1050) считала их
+ * настоящим прогрессом. Теперь серебро берётся на любом испытании, которое
+ * игрок в кампании прошёл на три звезды, поэтому «все 25 серебром» = 625 очков
+ * должно означать не золотой ранг, а серебряный: медали собраны, ни одного
+ * оптимума не выбито.
+ *
+ * Отсюда шкала: 625 (всё серебро) остаётся ниже `gold`, а дальше ранг растёт
+ * ровно по числу золотых медалей — каждая даёт +25 сверх серебра.
+ * gold ⇒ ≥5 золотых, champion ⇒ ≥13, legend ⇒ ≥21 из 25.
  */
 export const RANKS: RankDef[] = [
   { key: 'novice', points: 0 },
-  { key: 'bronze', points: 80 },
-  { key: 'silver', points: 220 },
-  { key: 'gold', points: 450 },
-  { key: 'champion', points: 750 },
-  { key: 'legend', points: 1050 }
+  { key: 'bronze', points: 150 },
+  { key: 'silver', points: 400 },
+  { key: 'gold', points: 750 },
+  { key: 'champion', points: 950 },
+  { key: 'legend', points: 1150 }
 ];
 
 export function rankFor(points: number): RankDef {

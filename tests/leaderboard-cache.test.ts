@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { LeaderboardName } from '../src/platform/types';
 import { createLeaderboardCache } from '../src/game/leaderboard-cache';
 import type { LeaderboardSnapshot } from '../src/platform/types';
 
@@ -14,7 +15,7 @@ describe('leaderboard-cache', () => {
   });
 
   it('dailystreak кэшируется отдельно от yardstars', async () => {
-    const fetchSnapshot = vi.fn(async (board: 'yardstars' | 'dailystreak') => snap(board === 'dailystreak' ? 2 : 1));
+    const fetchSnapshot = vi.fn(async (board: LeaderboardName) => snap(board === 'dailystreak' ? 2 : 1));
     const cache = createLeaderboardCache(fetchSnapshot);
     await cache.get('yardstars');
     await cache.get('dailystreak');

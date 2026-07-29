@@ -1,6 +1,10 @@
 /**
- * Отчёт о значимости льда: доказывает, что ни одна ледяная клетка кампании не
- * декоративная.
+ * Отчёт о значимости льда: доказывает, что ни одна ледяная клетка не
+ * декоративная — ни в кампании, ни в ремиксах Высшей лиги.
+ *
+ * Ремиксы проверяются тем же кодом намеренно. Ледяную клетку в них ставит не
+ * автор уровня, а строка конфигурации, и соблазн «добавить льда для вида» там
+ * ровно тот же — а декоративный лёд уже однажды прошёл в кампанию.
  *
  * Проверка на «уровень стал сложнее» недостаточна — лёд легко поставить так,
  * что он выглядит механикой, но оптимум не трогает (замер прошлой редакции
@@ -25,13 +29,15 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { analyzeIceImpact } from '../src/core/ice-impact';
+import { ELITE_CHALLENGES, sourceLevel } from '../src/levels/elite-challenges';
 import type { LevelDef } from '../src/core/types';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const levels = JSON.parse(readFileSync(join(root, 'src/levels/levels.json'), 'utf8')) as LevelDef[];
+const remixes = ELITE_CHALLENGES.filter((c) => c.remixed).map(sourceLevel);
 
 const problems: string[] = [];
-const iceLevels = levels.filter((level) => (level.ice?.length ?? 0) > 0);
+const iceLevels = [...levels, ...remixes].filter((level) => (level.ice?.length ?? 0) > 0);
 
 if (iceLevels.length === 0) {
   console.log('уровней со льдом нет — проверять нечего');
@@ -91,4 +97,7 @@ if (problems.length > 0) {
   for (const p of problems) console.error(`  ${p}`);
   process.exit(1);
 }
-console.log(`\nвсе ледяные клетки значимы (уровней со льдом: ${iceLevels.length})`);
+const icyRemixes = remixes.filter((l) => (l.ice?.length ?? 0) > 0).length;
+console.log(
+  `\nвсе ледяные клетки значимы (раскладов со льдом: ${iceLevels.length}, из них ремиксов лиги: ${icyRemixes})`
+);

@@ -20,7 +20,7 @@ export interface PieceDef {
 }
 
 export type WallKind = 'hay' | 'barrel' | 'log';
-interface WallDef {
+export interface WallDef {
   x: number;
   y: number;
   kind: WallKind;

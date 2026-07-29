@@ -4,7 +4,8 @@ import type { SaveData } from '../game/save';
 import { sanitizeSave } from '../game/save';
 import { queryParam } from '../query';
 import { DEFAULT_PLATFORM_CONFIG } from './types';
-import type { AdHandlers, LeaderboardSnapshot, Platform } from './types';
+import type { AdHandlers, LeaderboardName, LeaderboardSnapshot, Platform } from './types';
+import { elitePoints } from '../game/elite';
 
 const STORAGE_KEY = 'parkovka.save.v1';
 
@@ -75,21 +76,28 @@ export function createMockPlatform(): Platform {
     getLang(): string {
       return navigator.language ?? 'ru';
     },
-    async submitScore(board: 'yardstars' | 'dailystreak', value: number): Promise<void> {
+    async submitScore(board: LeaderboardName, value: number): Promise<void> {
       console.info(`[platform] лидерборд ${board} (mock): ${value}`);
     },
-    async getLeaderboardSnapshot(board: 'yardstars' | 'dailystreak'): Promise<LeaderboardSnapshot> {
+    async getLeaderboardSnapshot(board: LeaderboardName): Promise<LeaderboardSnapshot> {
       const daily = board === 'dailystreak';
+      const league = board === 'eliteleague';
+      const top = (streak: number, points: number, stars: number): number =>
+        daily ? streak : league ? points : stars;
       const entries = [
-        { rank: 1, name: 'Марфа', score: daily ? 21 : 184 },
-        { rank: 2, name: 'Дед Егор', score: daily ? 14 : 142 },
-        { rank: 3, name: 'Сосед', score: daily ? 9 : 97 }
+        { rank: 1, name: 'Марфа', score: top(21, 1150, 184) },
+        { rank: 2, name: 'Дед Егор', score: top(14, 720, 142) },
+        { rank: 3, name: 'Сосед', score: top(9, 310, 97) }
       ];
       const raw = localStorage.getItem(STORAGE_KEY);
       const save = raw ? sanitizeSave(JSON.parse(raw)) : null;
       let me = null;
       if (save) {
-        const score = daily ? (save.daily?.streak ?? 0) : Object.values(save.stars).reduce((sum, n) => sum + n, 0);
+        const score = daily
+          ? (save.daily?.streak ?? 0)
+          : league
+            ? elitePoints(save)
+            : Object.values(save.stars).reduce((sum, n) => sum + n, 0);
         if (score > 0) {
           const rank = entries.filter((r) => r.score > score).length + 1;
           me = { rank, name: 'Вы', score, isMe: true };

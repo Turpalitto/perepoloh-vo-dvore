@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
 import { levelText, setLang } from '../src/game/i18n';
+import { ELITE_CHALLENGES, sourceLevel } from '../src/levels/elite-challenges';
 
 const LEVELS = levelsJson as LevelDef[];
 
@@ -36,6 +37,18 @@ describe('локализация текстов уровней', () => {
       const missing = LEVELS.filter(
         (level) => level.hint !== undefined && levelText('hint', level.hint) === level.hint
       ).map((level) => `${level.id}: ${level.hint}`);
+      expect(missing).toEqual([]);
+    });
+
+    // Ремиксы Высшей лиги — тоже уровни с собственными именами, и попадают они
+    // в тот же словарь по русскому тексту. Забытый перевод здесь молчит ровно
+    // так же, как молчал бы для уровня кампании.
+    it(`каждое название ремикса лиги переведено на ${lang}`, () => {
+      setLang(lang);
+      const missing = ELITE_CHALLENGES.filter((c) => c.remixed)
+        .map(sourceLevel)
+        .filter((level) => levelText('name', level.name) === level.name)
+        .map((level) => `${level.id}: ${level.name}`);
       expect(missing).toEqual([]);
     });
   }

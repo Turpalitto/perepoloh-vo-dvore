@@ -141,10 +141,10 @@ describe('Высшая лига — медали за попытку', () => {
   });
 });
 
-describe('Высшая лига — 25 мастер-испытаний валидны', () => {
-  it('ровно 25 испытаний с уникальными id и существующими уровнями', () => {
-    expect(ELITE_CHALLENGES).toHaveLength(25);
-    expect(new Set(ELITE_CHALLENGES.map((c) => c.id)).size).toBe(25);
+describe('Высшая лига — 28 мастер-испытаний валидны', () => {
+  it('ровно 28 испытаний с уникальными id и существующими уровнями', () => {
+    expect(ELITE_CHALLENGES).toHaveLength(28);
+    expect(new Set(ELITE_CHALLENGES.map((c) => c.id)).size).toBe(28);
     for (const c of ELITE_CHALLENGES) expect(sourceLevel(c)).toBeDefined();
   });
 
@@ -173,7 +173,7 @@ describe('Высшая лига — 25 мастер-испытаний вали�
         await yieldToEventLoop();
       }
     },
-    // solve() гоняется по 25 уровням — ~40с локально, CI-раннер медленнее дефолтных 60с
+    // solve() гоняется по 28 уровням — ~40с локально, CI-раннер медленнее дефолтных 60с
     120_000
   );
 
@@ -207,11 +207,11 @@ describe('Высшая лига — 25 мастер-испытаний вали�
     for (const ice of [105, 106, 107, 108]) expect(sources).toContain(ice);
     const byModifier = (m: string): number => ELITE_CHALLENGES.filter((c) => c.modifier === m).length;
     expect(byModifier('none')).toBe(5);
-    expect(byModifier('noUndo')).toBe(9);
-    expect(byModifier('noHints')).toBe(5);
-    expect(byModifier('noUndoNoHints')).toBe(6);
+    expect(byModifier('noUndo')).toBe(10);
+    expect(byModifier('noHints')).toBe(6);
+    expect(byModifier('noUndoNoHints')).toBe(7);
     expect(byModifier('none')).toBeLessThan(ELITE_CHALLENGES.length / 2);
-    // источники не повторяются: 25 разных уровней
+    // источники не повторяются: 28 разных уровней
     expect(new Set(sources).size).toBe(ELITE_CHALLENGES.length);
   });
 
@@ -263,7 +263,7 @@ describe('Высшая лига — медали, заслуженные в ка
     const allThree: Record<string, number> = {};
     for (const c of ELITE_CHALLENGES) allThree[String(c.sourceLevelId)] = 3;
     const save: SaveData = { ...defaultSave(), eliteMedals: campaignImpliedMedals(allThree) };
-    // все 25 серебром — потолок «переноса» — тоже ниже золотого ранга
+    // все 28 серебром — потолок «переноса» — тоже ниже золотого ранга
     const allSilver: SaveData = {
       ...defaultSave(),
       eliteMedals: Object.fromEntries(ELITE_CHALLENGES.map((c) => [String(c.id), 2]))
@@ -288,8 +288,8 @@ describe('Высшая лига — медали, заслуженные в ка
 });
 
 describe('Высшая лига — дивизионы', () => {
-  it('пять блоков по пять испытаний покрывают весь список без пересечений', () => {
-    expect(DIVISIONS).toHaveLength(5);
+  it('шесть блоков (пять по пять плюс капстоун-тройка) покрывают весь список без пересечений', () => {
+    expect(DIVISIONS).toHaveLength(6);
     expect(DIVISIONS.reduce((sum, d) => sum + (d.to - d.from + 1), 0)).toBe(ELITE_CHALLENGES.length);
     for (const c of ELITE_CHALLENGES) {
       const division = DIVISIONS[divisionOf(c.id) - 1];

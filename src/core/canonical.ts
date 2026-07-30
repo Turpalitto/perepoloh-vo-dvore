@@ -86,6 +86,7 @@ function encode(level: LevelDef, t: (typeof TRANSFORMS)[number]): string {
     cellList(level.walls, 'w') +
     cellList(level.star ? [level.star] : undefined, 's') +
     cellList(level.gateSwitch ? [level.gateSwitch] : undefined, 'g') +
+    (level.gateSwitch?.holdType === 'held' ? '|held' : '') +
     cellList(level.ice, 'i') +
     cellList(level.planks, 'p') +
     cellList(level.chickens?.flatMap((c) => [c.a, c.b]), 'c')

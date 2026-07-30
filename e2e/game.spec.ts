@@ -745,8 +745,8 @@ test.describe('Высшая лига', () => {
     // В сейве три звезды за уровень 100 — источник испытания 25 без модификатора.
     // Серебро по нему засчитывается сразу: переигрывать доказанное не нужно.
     await expect(page.getByTestId('elite-points')).toContainText('25');
-    await expect(page.getByTestId('elite-medals')).toContainText('1/25 · 🥇 0');
-    // закрываем интро и проверяем 25 карточек
+    await expect(page.getByTestId('elite-medals')).toContainText('1/28 · 🥇 0');
+    // закрываем интро и проверяем карточки (28 испытаний, включая дивизион 6)
     await page.getByTestId('elite-intro-close').click();
     await expect(page.getByTestId('elite-card-1')).toBeVisible();
     await expect(page.getByTestId('elite-card-25')).toBeVisible();

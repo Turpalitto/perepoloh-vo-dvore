@@ -21,7 +21,7 @@
  * Модуль остаётся чистым: на вход `LevelDef`, на выход `LevelDef`. Решатель тут
  * не вызывается — иначе он бы отработал на старте игры.
  */
-import type { IceDef, LevelDef, PieceDef, WallDef } from '../core/types';
+import type { ChickenDef, IceDef, LevelDef, PieceDef, PlankDef, WallDef } from '../core/types';
 
 /** Ось отражения: 'x' — левое-правое, 'y' — верх-низ. */
 export type FlipAxis = 'x' | 'y';
@@ -44,6 +44,16 @@ export interface RemixSpec {
    * дублировать правила размещения значит однажды их разойти.
    */
   shift?: Array<{ piece: string; dx: number; dy: number }>;
+  /** Хрупкие доски поверх уровня — в координатах ПОСЛЕ отражения. */
+  planks?: PlankDef[];
+  /** Куры поверх уровня — в координатах ПОСЛЕ отражения (обе клетки уже отражённые). */
+  chickens?: ChickenDef[];
+  /**
+   * Переключает существующую кнопку ворот источника на held-режим (ворота
+   * открыты, только пока кнопка физически занята). Применим только если у
+   * источника уже есть `gateSwitch` — новую кнопку ремикс не добавляет.
+   */
+  holdType?: 'held';
   /** Название ремикса (русское; переводы — через тот же словарь имён уровней). */
   name: string;
   /** Оптимум решателя. Сверяется тестом, как `par` уровня кампании. */
@@ -120,9 +130,10 @@ export function buildRemix(source: LevelDef, spec: RemixSpec, id: number): Level
     walls: source.walls?.map((w) => (axis ? flipCell(w, width, height, axis) : { ...w })),
     star: source.star ? (axis ? flipCell(source.star, width, height, axis) : { ...source.star }) : undefined,
     gateSwitch: source.gateSwitch
-      ? axis
-        ? flipCell(source.gateSwitch, width, height, axis)
-        : { ...source.gateSwitch }
+      ? {
+          ...(axis ? flipCell(source.gateSwitch, width, height, axis) : { ...source.gateSwitch }),
+          ...(spec.holdType ? { holdType: spec.holdType } : {})
+        }
       : undefined,
     ice: source.ice?.map((c) => (axis ? flipCell(c, width, height, axis) : { ...c })),
     mechanics: [...source.mechanics]
@@ -140,6 +151,15 @@ export function buildRemix(source: LevelDef, spec: RemixSpec, id: number): Level
     level.ice = [...(level.ice ?? []), ...spec.ice.map((c) => ({ ...c }))];
     if (!level.mechanics.includes('ice')) level.mechanics.push('ice');
   }
+  if (spec.planks?.length) {
+    level.planks = [...(level.planks ?? []), ...spec.planks.map((p) => ({ ...p }))];
+    if (!level.mechanics.includes('plank')) level.mechanics.push('plank');
+  }
+  if (spec.chickens?.length) {
+    level.chickens = [...(level.chickens ?? []), ...spec.chickens.map((c) => ({ a: { ...c.a }, b: { ...c.b } }))];
+    if (!level.mechanics.includes('chicken')) level.mechanics.push('chicken');
+  }
+  if (spec.holdType && !level.mechanics.includes('gate-held')) level.mechanics.push('gate-held');
   if (!level.walls?.length) delete level.walls;
   if (!level.ice?.length) delete level.ice;
   return level;
@@ -147,5 +167,7 @@ export function buildRemix(source: LevelDef, spec: RemixSpec, id: number): Level
 
 /** Ремикс меняет задачу, а не только систему координат. */
 export function remixChangesRules(spec: RemixSpec): boolean {
-  return Boolean(spec.ice?.length || spec.walls?.length || spec.shift?.length);
+  return Boolean(
+    spec.ice?.length || spec.walls?.length || spec.shift?.length || spec.planks?.length || spec.chickens?.length || spec.holdType
+  );
 }

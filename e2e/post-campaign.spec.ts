@@ -13,8 +13,8 @@ type SaveData = {
 // Испытания, где кнопка скрыта. Комбинированный модификатор noUndoNoHints
 // попадает в оба набора — именно он раньше молча ломал проверки на равенство
 // строке 'noUndo' / 'noHints'.
-const NO_UNDO = new Set([2, 5, 7, 8, 9, 11, 13, 15, 16, 17, 18, 19, 22, 23, 24]);
-const NO_HINTS = new Set([10, 11, 12, 14, 16, 17, 19, 20, 21, 23, 24]);
+const NO_UNDO = new Set([2, 5, 7, 8, 9, 11, 13, 15, 16, 17, 18, 19, 22, 23, 24, 26, 28]);
+const NO_HINTS = new Set([10, 11, 12, 14, 16, 17, 19, 20, 21, 23, 24, 27, 28]);
 
 async function seedSave(page: Page, overrides: SaveData = {}): Promise<void> {
   await page.addInitScript((data) => {
@@ -148,20 +148,21 @@ test.describe('Post-campaign', () => {
     await expect(page.getByTestId('menu-endless')).toBeVisible();
   });
 
-  test('all 25 Elite challenges open and enforce their configured modifiers', async ({ page }) => {
+  test('all 28 Elite challenges open and enforce their configured modifiers', async ({ page }) => {
     test.setTimeout(120_000);
-    // По три медали в каждом из первых четырёх дивизионов — иначе следующий
-    // блок закрыт и его карточки нельзя открыть кликом.
+    // По три медали в каждом из первых пяти дивизионов — иначе следующий
+    // блок закрыт и его карточки нельзя открыть кликом (дивизион 6 — новые
+    // механики движка — открывается только по трём медалям дивизиона 5).
     const unlockAll = Object.fromEntries(
-      [1, 2, 3, 6, 7, 8, 11, 12, 13, 16, 17, 18].map((id) => [String(id), 1])
+      [1, 2, 3, 6, 7, 8, 11, 12, 13, 16, 17, 18, 21, 22, 23].map((id) => [String(id), 1])
     );
     await seedSave(page, { eliteMedals: unlockAll });
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await openElite(page);
-    await expect(page.locator('.elite-card')).toHaveCount(25);
+    await expect(page.locator('.elite-card')).toHaveCount(28);
     await expect(page.locator('.elite-card.locked')).toHaveCount(0);
 
-    for (let id = 1; id <= 25; id++) {
+    for (let id = 1; id <= 28; id++) {
       await page.getByTestId(`elite-card-${id}`).click();
       await expect(page.getByTestId('screen-game')).toContainText(`Испытание ${id}`);
       await expect(page.getByTestId('board')).toBeVisible();

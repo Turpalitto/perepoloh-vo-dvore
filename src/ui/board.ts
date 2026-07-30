@@ -12,6 +12,7 @@ import {
   exitVector,
   gateOpen,
   maxSteps,
+  pieceCells,
   targetIndex
 } from '../core/game';
 import type { SolveMove } from '../core/solver';
@@ -46,6 +47,8 @@ export interface BoardEvents {
   onPlankBroken(): void;
   /** Курица перелетела на другую клетку своего цикла. */
   onChickenHop(): void;
+  /** Игрок тапнул по объекту и получил пояснение правила. */
+  onExplain(): void;
   /** Анимация выезда закончилась. */
   onExitDone(): void;
 }
@@ -90,6 +93,15 @@ interface TVMoveInfo {
   exitK: number;
 }
 
+/**
+ * Экранирование для текста, вставляемого в SVG-разметку через innerHTML.
+ * Тексты правил приходят из словаря локализации, то есть свои, — но амперсанд
+ * или угловая скобка в переводе сломали бы разметку молча.
+ */
+function escapeXML(value: string): string {
+  return value.replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]!);
+}
+
 function mulberry32(a: number) {
   return () => {
     a |= 0;
@@ -113,6 +125,8 @@ export class BoardView {
   private tracksLayer!: SVGGElement;
   private rangeLayer!: SVGGElement;
   private hintLayer!: SVGGElement;
+  private ruleLayer!: SVGGElement;
+  private ruleTimer: number | null = null;
   private chickenEls: SVGGElement[] = [];
   private plankEls: SVGGElement[] = [];
   private fieldChickenEls: { current: SVGGElement; next: SVGGElement }[] = [];
@@ -186,6 +200,7 @@ export class BoardView {
       window.removeEventListener('mouseup', this.onMouseUp);
     }
     if (this.exitTimer !== null) clearTimeout(this.exitTimer);
+    if (this.ruleTimer !== null) clearTimeout(this.ruleTimer);
     this.svg.removeEventListener('keydown', this.onTVKeyDown);
     this.svg.removeEventListener('focus', this.onTVFocus);
     this.svg.remove();
@@ -433,6 +448,11 @@ export class BoardView {
     this.hintLayer = make('');
     this.hintLayer.classList.add('layer-hint');
 
+    // Слой пояснений по тапу — последний, то есть поверх всего: это прямой
+    // ответ на действие игрока, он не должен уезжать под фигуру или подсказку.
+    this.ruleLayer = make('');
+    this.ruleLayer.classList.add('layer-rule');
+
     this.syncPieces(false);
     this.refreshCrateBadges();
     this.updatePlanks();
@@ -603,6 +623,7 @@ export class BoardView {
     }
     this.tvMove = null;
     this.rangeLayer.innerHTML = '';
+    this.clearRuleTip();
     this.pieceEls.forEach((el) => el.classList.remove('tv-active'));
     this.pieceEls.forEach((el) => el.classList.remove('exiting'));
     this.state = s;
@@ -727,6 +748,139 @@ export class BoardView {
   clearHint(): void {
     this.hintLayer.innerHTML = '';
     this.pieceEls.forEach((el) => el.classList.remove('hinted'));
+  }
+
+  // ---------- пояснение правила по тапу ----------
+
+  /**
+   * Что лежит в клетке и по какому правилу живёт. Порядок проверок — от
+   * «верхнего» объекта к «нижнему»: на одной клетке могут совпасть фигура и
+   * напольный объект (машина стоит на кнопке ворот), и игрок тапает по тому,
+   * что видит сверху.
+   */
+  private ruleAt(cx: number, cy: number): string | null {
+    const { level } = this;
+    if (cx < 0 || cx >= level.width || cy < 0 || cy >= level.height) return null;
+
+    const pieceIndex = level.pieces.findIndex((def, i) =>
+      pieceCells(def, this.state.pieces[i]).some((c) => c.x === cx && c.y === cy)
+    );
+    if (pieceIndex >= 0) {
+      const def = level.pieces[pieceIndex];
+      if (def.kind === 'crate') {
+        const left = (def.maxMoves ?? 0) - this.state.pieces[pieceIndex].used;
+        return left > 0 ? t('rule.crate', { n: left }) : t('rule.crateSpent');
+      }
+      return t(`rule.${def.kind}`);
+    }
+
+    const wall = level.walls?.find((w) => w.x === cx && w.y === cy);
+    if (wall) return t(`rule.${wall.kind}`);
+
+    const plank = level.planks?.find((p) => p.x === cx && p.y === cy);
+    if (plank) {
+      return this.state.brokenPlanks.includes(`${cx},${cy}`) ? t('rule.plankBroken') : t('rule.plank');
+    }
+
+    const chickenIndex = (level.chickens ?? []).findIndex(
+      (c) => (c.a.x === cx && c.a.y === cy) || (c.b.x === cx && c.b.y === cy)
+    );
+    if (chickenIndex >= 0) {
+      const chicken = level.chickens![chickenIndex];
+      const here = this.state.chickenAt[chickenIndex] === 'a' ? chicken.a : chicken.b;
+      return here.x === cx && here.y === cy ? t('rule.chicken') : t('rule.chickenNext');
+    }
+
+    const gate = level.gateSwitch;
+    if (gate && gate.x === cx && gate.y === cy) {
+      return t(gate.holdType === 'held' ? 'rule.gateSwitchHeld' : 'rule.gateSwitchOnce');
+    }
+
+    if (level.star && level.star.x === cx && level.star.y === cy && !this.state.starCollected) {
+      return t('rule.star');
+    }
+    return null;
+  }
+
+  /** Разбивает строку по словам на строки не длиннее `limit` символов. */
+  private wrapRule(text: string, limit = 26): string[] {
+    const lines: string[] = [];
+    let current = '';
+    for (const word of text.split(' ')) {
+      if (current.length === 0) current = word;
+      else if (current.length + 1 + word.length <= limit) current += ` ${word}`;
+      else {
+        lines.push(current);
+        current = word;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  }
+
+  /**
+   * Баллон с правилом над клеткой. Если клетка у верхнего края, баллон
+   * переезжает под неё — иначе он ушёл бы за поле и обрезался.
+   */
+  private showRuleTip(cx: number, cy: number, text: string): void {
+    this.clearRuleTip();
+    const lines = this.wrapRule(text);
+    const lineH = 26;
+    const padX = 18;
+    const padY = 14;
+    const charW = 10.4; // ширина символа при font-size 18 в этом начертании
+    const width = Math.max(...lines.map((l) => l.length)) * charW + padX * 2;
+    const height = lines.length * lineH + padY * 2 - 6;
+    const cellCx = cx * CELL + CELL / 2;
+    const below = cy === 0;
+    const top = below ? (cy + 1) * CELL + 16 : cy * CELL - height - 16;
+    // Держим баллон в пределах поля по горизонтали: у краевых клеток он иначе
+    // наполовину висит над забором.
+    const half = width / 2;
+    const minX = -M / 2;
+    const maxX = this.level.width * CELL + M / 2;
+    const left = Math.max(minX, Math.min(maxX - width, cellCx - half));
+    const tailX = Math.max(left + 20, Math.min(left + width - 20, cellCx));
+    const tail = below
+      ? `M${tailX - 11} ${top} L${tailX} ${top - 13} L${tailX + 11} ${top} Z`
+      : `M${tailX - 11} ${top + height} L${tailX} ${top + height + 13} L${tailX + 11} ${top + height} Z`;
+    const rows = lines
+      .map(
+        (line, i) =>
+          `<text x="${left + width / 2}" y="${top + padY + 18 + i * lineH}" text-anchor="middle" class="rule-tip-text">${escapeXML(line)}</text>`
+      )
+      .join('');
+    this.ruleLayer.innerHTML = `<g class="rule-tip">
+      <path d="${tail}" class="rule-tip-body"/>
+      <rect x="${left}" y="${top}" width="${width}" height="${height}" rx="16" class="rule-tip-body"/>
+      ${rows}
+    </g>`;
+    this.ruleTimer = window.setTimeout(() => this.clearRuleTip(), 3600);
+  }
+
+  clearRuleTip(): void {
+    if (this.ruleTimer !== null) {
+      clearTimeout(this.ruleTimer);
+      this.ruleTimer = null;
+    }
+    this.ruleLayer.innerHTML = '';
+  }
+
+  /**
+   * Тап по объекту без перетаскивания: показываем правило этого объекта.
+   * Возвращает true, если объяснение показано.
+   */
+  private explainAt(point: { x: number; y: number }): boolean {
+    const cx = Math.floor(point.x / CELL);
+    const cy = Math.floor(point.y / CELL);
+    const rule = this.ruleAt(cx, cy);
+    if (!rule) {
+      this.clearRuleTip();
+      return false;
+    }
+    this.showRuleTip(cx, cy, rule);
+    this.events.onExplain();
+    return true;
   }
 
   // ---------- ввод ----------
@@ -1007,10 +1161,16 @@ export class BoardView {
     if (!this.interactive || this.animLock || this.state.won || this.drag) return;
     const target = e.target as Element;
     const g = target.closest<SVGGElement>('g[data-idx]');
-    if (!g) return;
+    if (!g) {
+      // Тап мимо фигуры: напольные объекты (стены, лёд, доски, куры, кнопка,
+      // звезда) не ловят события сами — по клетке под пальцем объясняем правило.
+      this.explainAt(this.toSvg(e));
+      return;
+    }
     const idx = Number(g.dataset.idx);
     this.endTVMove(true);
     this.selectPiece(idx);
+    this.clearRuleTip();
     const def = this.level.pieces[idx];
     const grid = buildGrid(this.level, this.state);
     const neg = {
@@ -1022,9 +1182,11 @@ export class BoardView {
       y: maxSteps(this.level, this.state, idx, 0, 1, grid)
     };
     if (neg.x + neg.y + pos.x + pos.y === 0) {
-      // двигаться некуда: лёгкий бамп как отклик
+      // Двигаться некуда: лёгкий бамп как отклик — и заодно правило фигуры.
+      // Именно в этот момент вопрос «почему не едет» и возникает.
       this.bumpPiece(idx, def.dir === 'v' ? 'y' : 'x');
       this.events.onBump();
+      this.explainAt(this.toSvg(e));
       return;
     }
     const v = exitVector(this.level.exit);
@@ -1174,6 +1336,10 @@ export class BoardView {
       }
       // легальной остановки в эту сторону нет вовсе — отдача, как при упоре
       this.refuseMove(d.idx, axis);
+    } else if (!d.moved) {
+      // Фигуру тронули, но не повезли: это тап, а не жест. Отвечаем правилом
+      // этой фигуры — «почему она так ездит» спрашивают именно так.
+      this.explainAt(this.toSvg(e));
     }
     // снап назад
     el.style.transform = this.pieceTransform(d.idx);
@@ -1183,6 +1349,7 @@ export class BoardView {
     const before = this.state.pieces[idx];
     this.state = res.state;
     this.clearHint();
+    this.clearRuleTip();
     this.addTracks(idx, before.x, before.y, dx, dy, steps, exit);
     const el = this.pieceEls[idx];
     this.animLock = true;

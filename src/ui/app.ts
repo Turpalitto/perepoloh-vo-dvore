@@ -1745,6 +1745,7 @@ export class App {
         this.vibrate([14, 28, 18]);
       },
       onChickenHop: () => this.audio.play('cluck'),
+      onExplain: () => this.audio.play('click'),
       onCommit: (res, piece) => {
         undoStack.push(cur);
         redoStack.length = 0; // новый ход открывает новую ветку истории

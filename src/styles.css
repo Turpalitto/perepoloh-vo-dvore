@@ -972,6 +972,37 @@ html.high-contrast .levels-grid {
     opacity: 1;
   }
 }
+/*
+ * Баллон с правилом объекта — ответ на тап по клетке. Тёмная плашка того же
+ * тона, что и обучающий hint-toast: игрок уже знает этот «голос игры».
+ */
+.layer-rule {
+  pointer-events: none;
+}
+.rule-tip {
+  animation: rule-tip-in 0.16s ease-out;
+}
+.rule-tip-body {
+  fill: rgba(61, 44, 30, 0.94);
+}
+.rule-tip-text {
+  fill: #fff7e6;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: inherit;
+}
+@keyframes rule-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rule-tip {
+    animation-duration: 0.01ms;
+  }
+}
+
 /* Хрупкая доска: целая ждёт проезда, сломанная — уже стена. */
 .plank-cell {
   transform-box: view-box;

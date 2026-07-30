@@ -811,6 +811,11 @@ html.high-contrast .levels-grid {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.hud-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .hud-right {
   display: flex;
   align-items: center;

@@ -128,6 +128,7 @@ function eliteGoalRows(challenge: EliteChallenge): Array<{ medal: Medal; text: s
 const soundOnIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 9 h4 l5 -4 v14 l-5 -4 H4 Z" fill="currentColor"/><path d="M16 8 q3 4 0 8 M18.5 5.5 q5 6.5 0 13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
 const soundOffIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 9 h4 l5 -4 v14 l-5 -4 H4 Z" fill="currentColor"/><path d="M16 9 l6 6 M22 9 l-6 6" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>`;
 const pauseIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="currentColor"/></svg>`;
+const backIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M14 5 L7 12 L14 19 M7.5 12 H20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const musicOnIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M9 17.5 V6.5 l9 -2 v11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="2.6" fill="currentColor"/><circle cx="16" cy="15.5" r="2.6" fill="currentColor"/></svg>`;
 const musicOffIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M9 17.5 V6.5 l9 -2 v11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" opacity="0.45"/><circle cx="7" cy="17.5" r="2.6" fill="currentColor" opacity="0.45"/><circle cx="16" cy="15.5" r="2.6" fill="currentColor" opacity="0.45"/><line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 const vibrateOnIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><rect x="8" y="4" width="8" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M4 9 v6 M2 11 v2 M20 9 v6 M22 11 v2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`;
@@ -1632,7 +1633,10 @@ export class App {
         boss ? ` data-boss-id="${boss.def.id}" data-boss-phase="${boss.run.phaseIndex + 1}"` : ''
       }>
         <div class="hud hud-top">
-          <button class="icon-btn" data-testid="btn-pause" aria-label="${t('pause.title')}">${pauseIcon}</button>
+          <div class="hud-left">
+            <button class="icon-btn" data-testid="btn-game-back" aria-label="${t('ingame.back')}" title="${t('ingame.back')}">${backIcon}</button>
+            <button class="icon-btn" data-testid="btn-pause" aria-label="${t('pause.title')}">${pauseIcon}</button>
+          </div>
           <div class="hud-level">${title}${
             bossProg ? ` <span class="boss-phase-chip" data-testid="boss-phase">${t('boss.phase', { n: bossProg.phase, m: bossProg.total })}</span>` : ''
           }</div>
@@ -1928,6 +1932,11 @@ export class App {
       if (finished || cur.won) return;
       this.audio.play('click');
       this.showPause(level, bv, daily);
+    });
+    this.q('[data-testid=btn-game-back]').addEventListener('click', () => {
+      if (finished || cur.won) return;
+      this.audio.play('click');
+      this.showMenu();
     });
     const hintBtn = this.q<HTMLButtonElement>('[data-testid=btn-hint]');
     hintBtn.addEventListener('click', async () => {

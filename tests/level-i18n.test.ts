@@ -51,5 +51,17 @@ describe('локализация текстов уровней', () => {
         .map((level) => `${level.id}: ${level.name}`);
       expect(missing).toEqual([]);
     });
+
+    // Подсказки ремиксов появились вместе с новыми механиками движка: именно
+    // они объясняют правило, которого в кампании нет. Непереведённая строка
+    // здесь хуже, чем непереведённое название: игрок не поймёт саму механику.
+    it(`каждая подсказка ремикса лиги переведена на ${lang}`, () => {
+      setLang(lang);
+      const missing = ELITE_CHALLENGES.filter((c) => c.remixed)
+        .map(sourceLevel)
+        .filter((level) => level.hint !== undefined && levelText('hint', level.hint) === level.hint)
+        .map((level) => `${level.id}: ${level.hint}`);
+      expect(missing).toEqual([]);
+    });
   }
 });

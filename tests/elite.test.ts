@@ -364,6 +364,27 @@ describe('Высшая лига — ремиксы', () => {
     }
   });
 
+  it('каждое испытание на новой механике объясняет её подсказкой', () => {
+    // Доски, куры и held-кнопка в кампании не встречаются, а дивизион 6 ещё и
+    // отбирает подсказку решателя модификаторами. Испытание без строки-правила
+    // выглядело бы поломанным: машина не встаёт на пустую клетку, ворота
+    // закрываются сами. Проверяется по данным расклада, а не по номеру
+    // дивизиона — новая механика может появиться где угодно.
+    const withNewMechanics = ELITE_CHALLENGES.filter((c) => {
+      const level = sourceLevel(c);
+      return (
+        (level.planks?.length ?? 0) > 0 ||
+        (level.chickens?.length ?? 0) > 0 ||
+        level.gateSwitch?.holdType === 'held'
+      );
+    });
+    expect(withNewMechanics.length).toBeGreaterThan(0);
+    for (const c of withNewMechanics) {
+      const level = sourceLevel(c);
+      expect(level.hint, `испытание ${c.id} «${level.name}» без подсказки о механике`).toBeTruthy();
+    }
+  });
+
   it('difficulty ремикса пересчитан по его par, а не унаследован', () => {
     for (const c of remixes) {
       const level = sourceLevel(c);
@@ -381,8 +402,11 @@ describe('Высшая лига — ремиксы', () => {
     for (const c of remixes) {
       expect(sourceLevel(c).id).not.toBe(c.sourceLevelId);
       expect(sourceLevel(c).id).toBeGreaterThan(500);
-      // Обучающая подсказка источника после преобразования врала бы.
-      expect(sourceLevel(c).hint).toBeUndefined();
+      // Подсказка источника после преобразования врала бы, поэтому она никогда
+      // не наследуется. Своя подсказка у ремикса разрешена и для новых механик
+      // обязательна — проверяется отдельным тестом ниже.
+      const origin = originLevel(c);
+      if (origin.hint !== undefined) expect(sourceLevel(c).hint).not.toBe(origin.hint);
     }
     // Id раскладов уникальны: иначе два ремикса делили бы реплики и аналитику.
     expect(new Set(remixes.map((c) => sourceLevel(c).id)).size).toBe(remixes.length);

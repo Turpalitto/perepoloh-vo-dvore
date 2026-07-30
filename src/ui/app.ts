@@ -2008,6 +2008,7 @@ export class App {
 
     // Мастер-испытание навязывает модификатор молча: до этого игрок узнавал о
     // запрете только по пропавшей кнопке. Баннер тот же, что у ежедневного.
+    let modifierShown = false;
     if ((daily || challenge) && modifier !== 'none') {
       const banner = document.createElement('div');
       banner.className = 'hint-toast modifier-toast';
@@ -2016,13 +2017,18 @@ export class App {
       this.q('.overlay-slot').appendChild(banner);
       window.setTimeout(() => banner.classList.add('gone'), 5200);
       window.setTimeout(() => banner.remove(), 5800);
+      modifierShown = true;
     }
 
     // обучение: короткая подсказка + стрелка на первом уровне
     const hintText = levelText('hint', level.hint);
     if (hintText) {
       const toast = document.createElement('div');
-      toast.className = 'hint-toast';
+      // Оба тоста абсолютно позиционированы по одному `top`, и до появления
+      // подсказок у испытаний лиги они не могли встретиться: у ремиксов hint не
+      // было вообще. Испытания на новых механиках показывают и правило, и
+      // модификатор — второй тост уезжает под первый.
+      toast.className = modifierShown ? 'hint-toast stacked' : 'hint-toast';
       toast.setAttribute('data-testid', 'hint-toast');
       toast.textContent = hintText;
       this.q('.overlay-slot').appendChild(toast);

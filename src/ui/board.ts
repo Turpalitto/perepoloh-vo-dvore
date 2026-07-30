@@ -218,9 +218,19 @@ export class BoardView {
       return g;
     };
 
-    // земля: трава вокруг, утоптанный двор внутри
+    // Земля: трава вокруг, утоптанный двор внутри.
+    //
+    // Трава уходит далеко за viewBox намеренно. Элемент <svg> растянут на всю
+    // доступную область, а viewBox квадратный, поэтому при любом соотношении
+    // сторон окна остаётся запас по одной из осей — на широком экране слева и
+    // справа, на узком сверху и снизу. Раньше в этом запасе был виден плоский
+    // фон .game-screen, и двор выглядел вырезанным посреди пустоты. Внешний
+    // <svg> обрезает содержимое по своему viewport, а не по viewBox, поэтому
+    // достаточно нарисовать окружение шире — оно заполнит запас на любом экране.
+    const OUT = M * 8;
     let ground = `
-      <rect x="${-M}" y="${-M}" width="${W + 2 * M}" height="${H + 2 * M}" fill="#79b34c"/>
+      <rect x="${-OUT}" y="${-OUT}" width="${W + 2 * OUT}" height="${H + 2 * OUT}" fill="#79b34c"/>
+      <rect x="${-M}" y="${-M}" width="${W + 2 * M}" height="${H + 2 * M}" fill="#7cb84e"/>
       <rect x="-14" y="-14" width="${W + 28}" height="${H + 28}" rx="18" fill="#c9a45e"/>
       <rect x="0" y="0" width="${W}" height="${H}" rx="8" fill="#dbb271"/>`;
     // травяные кочки на газоне
@@ -231,6 +241,31 @@ export class BoardView {
       const [cx, cy] =
         side === 0 ? [along, -depth - 14] : side === 1 ? [along, H + depth + 14] : side === 2 ? [-depth - 14, along] : [W + depth + 14, along];
       ground += `<path d="M${cx - 7} ${cy + 4} q3 -10 7 0 q3 -10 7 0" fill="none" stroke="#5f9c3c" stroke-width="3" stroke-linecap="round"/>`;
+    }
+    // Дальний луг за забором: кочки, кустики и редкие деревца. Плотность низкая
+    // и убывает от двора — это фон, он не должен спорить с полем за внимание.
+    // Всё детерминировано тем же rng (уровень выглядит одинаково при каждом
+    // открытии) и рисуется несколькими десятками путей, а не тысячами точек.
+    const inYardZone = (x: number, y: number) =>
+      x > -M * 1.6 && x < W + M * 1.6 && y > -M * 1.6 && y < H + M * 1.6;
+    for (let i = 0; i < 54; i++) {
+      const x = -OUT + rng() * (W + 2 * OUT);
+      const y = -OUT + rng() * (H + 2 * OUT);
+      if (inYardZone(x, y)) continue; // ближнюю зону оставляем прежнему декору
+      const roll = rng();
+      if (roll < 0.52) {
+        ground += `<path d="M${x - 7} ${y + 4} q3 -10 7 0 q3 -10 7 0" fill="none" stroke="#69a641" stroke-width="3" stroke-linecap="round" opacity="0.75"/>`;
+      } else if (roll < 0.86) {
+        const r = 16 + rng() * 12;
+        ground += `<ellipse cx="${x}" cy="${y}" rx="${r.toFixed(0)}" ry="${(r * 0.72).toFixed(0)}" fill="#63a03d" opacity="0.6"/>`;
+      } else {
+        const h = 46 + rng() * 26;
+        ground += `<ellipse cx="${x}" cy="${y + 6}" rx="26" ry="7" fill="rgba(43,29,10,0.14)"/>
+          <rect x="${x - 5}" y="${y - h * 0.34}" width="10" height="${(h * 0.4).toFixed(0)}" rx="4" fill="#8a5a30"/>
+          <circle cx="${x}" cy="${y - h * 0.52}" r="${(h * 0.36).toFixed(0)}" fill="#5f9c3c"/>
+          <circle cx="${(x - h * 0.2).toFixed(0)}" cy="${y - h * 0.38}" r="${(h * 0.24).toFixed(0)}" fill="#69a641"/>
+          <circle cx="${(x + h * 0.2).toFixed(0)}" cy="${y - h * 0.4}" r="${(h * 0.22).toFixed(0)}" fill="#69a641"/>`;
+      }
     }
     // сетка двора
     for (let x = 1; x < level.width; x++) ground += `<line x1="${x * CELL}" y1="4" x2="${x * CELL}" y2="${H - 4}" stroke="rgba(93,64,25,0.16)" stroke-width="3" stroke-dasharray="10 12"/>`;
@@ -279,23 +314,6 @@ export class BoardView {
       g.style.transform = `translate(${plank.x * CELL}px, ${plank.y * CELL}px)`;
       this.svg.appendChild(g);
       this.plankEls.push(g);
-    });
-
-    // куры-игровой объект: видны сразу в обеих позициях цикла — «где сейчас» /
-    // «куда переместится» (актуальная непрозрачная, следующая полупрозрачная).
-    // testid индексирован по номеру курицы: у нескольких кур на поле пары
-    // клеток иначе неразличимы.
-    (level.chickens ?? []).forEach((c, i) => {
-      const mk = (cell: { x: number; y: number }, side: 'a' | 'b') => {
-        const g = document.createElementNS(ns, 'g');
-        g.classList.add('field-chicken');
-        g.setAttribute('data-testid', `field-chicken-${i}-${side}`);
-        g.setAttribute('aria-hidden', 'true');
-        g.style.transform = `translate(${cell.x * CELL}px, ${cell.y * CELL}px)`;
-        this.svg.appendChild(g);
-        return g;
-      };
-      this.fieldChickenEls.push({ current: mk(c.a, 'a'), next: mk(c.b, 'b') });
     });
 
     // следы колёс
@@ -365,6 +383,30 @@ export class BoardView {
       this.svg.appendChild(g);
       this.pieceEls.push(g);
     }
+
+    // Куры-игровой объект: видны сразу в обеих позициях цикла — «где сейчас» /
+    // «куда переместится» (актуальная непрозрачная, следующая полупрозрачная).
+    //
+    // Слой идёт ПОСЛЕ фигур намеренно. Клетка B в начале уровня может быть
+    // занята машиной, и под ней метка «куда перелетит» просто не видна — а это
+    // единственная подсказка о цикле. Перекрытия активной метки при этом не
+    // возникает: занятую курицей клетку фигура занять не может по правилам.
+    // Клики не перехватываются — `.field-chicken` имеет pointer-events: none.
+    //
+    // testid индексирован по номеру курицы: у нескольких кур на поле пары
+    // клеток иначе неразличимы.
+    (level.chickens ?? []).forEach((c, i) => {
+      const mk = (cell: { x: number; y: number }, side: 'a' | 'b') => {
+        const g = document.createElementNS(ns, 'g');
+        g.classList.add('field-chicken');
+        g.setAttribute('data-testid', `field-chicken-${i}-${side}`);
+        g.setAttribute('aria-hidden', 'true');
+        g.style.transform = `translate(${cell.x * CELL}px, ${cell.y * CELL}px)`;
+        this.svg.appendChild(g);
+        return g;
+      };
+      this.fieldChickenEls.push({ current: mk(c.a, 'a'), next: mk(c.b, 'b') });
+    });
 
     // куры на газоне
     const spots: [number, number][] = [

@@ -1129,6 +1129,17 @@ const EN_NAMES: Dict = {
 };
 
 const EN_HINTS: Dict = {
+  // Механики Высшей лиги: правило встречается впервые, подсказка обязательна.
+  'Кнопка держит ворота: съехал с неё — створки захлопнулись':
+    'The button only holds the gate while occupied — drive off and it slams shut',
+  'По доскам можно проехать, но не встать — и после проезда они проламываются':
+    'You may cross planks but not stop on them — and crossing breaks them',
+  'Курица перелетает после каждого хода — бледный курятник показывает куда':
+    'The hen hops after every move — the pale pen shows where',
+  'Доска выдержит один проезд: сломается — проход закрыт навсегда':
+    'A plank takes one crossing: once broken, that cell is shut for good',
+  'Курица занимает клетку по очереди — считай ходы, чтобы поймать её на нужной':
+    'The hen alternates cells — count moves to catch it on the right one',
   'Потяни синюю машину вправо — к воротам!': 'Drag the blue car right — to the gate!',
   'Машины ездят только вдоль своей оси': 'Vehicles slide only along their axis',
   'Грузовик длинный — освободи ему место': 'The truck is long — clear some room',
@@ -1314,6 +1325,17 @@ const TR_NAMES: Dict = {
 };
 
 const TR_HINTS: Dict = {
+  // Yüksek Lig mekanikleri: kural ilk kez karşılaşılıyor, ipucu zorunlu.
+  'Кнопка держит ворота: съехал с неё — створки захлопнулись':
+    'Düğme kapıyı sadece üstünde biri varken tutar — çekilirsen kapı çarparak kapanır',
+  'По доскам можно проехать, но не встать — и после проезда они проламываются':
+    'Tahtaların üstünden geçilir ama durulamaz — geçince de kırılırlar',
+  'Курица перелетает после каждого хода — бледный курятник показывает куда':
+    'Tavuk her hamleden sonra yer değiştirir — soluk kümes nereye gideceğini gösterir',
+  'Доска выдержит один проезд: сломается — проход закрыт навсегда':
+    'Tahta bir geçiş dayanır: kırılınca o kare kalıcı olarak kapanır',
+  'Курица занимает клетку по очереди — считай ходы, чтобы поймать её на нужной':
+    'Tavuk kareleri sırayla tutar — doğru karede yakalamak için hamleleri say',
   'Потяни синюю машину вправо — к воротам!': 'Mavi arabayı sağa, kapıya sürükle!',
   'Машины ездят только вдоль своей оси': 'Araçlar yalnız kendi ekseninde kayar',
   'Грузовик длинный — освободи ему место': 'Kamyon uzun — yer aç',

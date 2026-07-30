@@ -13,8 +13,8 @@ type SaveData = {
 // Испытания, где кнопка скрыта. Комбинированный модификатор noUndoNoHints
 // попадает в оба набора — именно он раньше молча ломал проверки на равенство
 // строке 'noUndo' / 'noHints'.
-const NO_UNDO = new Set([2, 5, 7, 8, 9, 11, 13, 15, 16, 17, 18, 19, 22, 23, 24, 26, 28]);
-const NO_HINTS = new Set([10, 11, 12, 14, 16, 17, 19, 20, 21, 23, 24, 27, 28]);
+const NO_UNDO = new Set([2, 5, 7, 8, 9, 11, 13, 15, 16, 17, 18, 19, 22, 23, 24, 26, 28, 30]);
+const NO_HINTS = new Set([10, 11, 12, 14, 16, 17, 19, 20, 21, 23, 24, 27, 28, 29, 30]);
 
 async function seedSave(page: Page, overrides: SaveData = {}): Promise<void> {
   await page.addInitScript((data) => {
@@ -148,7 +148,7 @@ test.describe('Post-campaign', () => {
     await expect(page.getByTestId('menu-endless')).toBeVisible();
   });
 
-  test('all 28 Elite challenges open and enforce their configured modifiers', async ({ page }) => {
+  test('all 30 Elite challenges open and enforce their configured modifiers', async ({ page }) => {
     test.setTimeout(120_000);
     // По три медали в каждом из первых пяти дивизионов — иначе следующий
     // блок закрыт и его карточки нельзя открыть кликом (дивизион 6 — новые
@@ -159,10 +159,10 @@ test.describe('Post-campaign', () => {
     await seedSave(page, { eliteMedals: unlockAll });
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await openElite(page);
-    await expect(page.locator('.elite-card')).toHaveCount(28);
+    await expect(page.locator('.elite-card')).toHaveCount(30);
     await expect(page.locator('.elite-card.locked')).toHaveCount(0);
 
-    for (let id = 1; id <= 28; id++) {
+    for (let id = 1; id <= 30; id++) {
       await page.getByTestId(`elite-card-${id}`).click();
       await expect(page.getByTestId('screen-game')).toContainText(`Испытание ${id}`);
       await expect(page.getByTestId('board')).toBeVisible();
@@ -248,19 +248,19 @@ test.describe('Post-campaign', () => {
   });
 
   test('Elite medals improve once, rank up, retry, next and persist', async ({ page }) => {
-    // 14 золотых = 700 очков, плюс 25 за серебро, засчитанное по трём звёздам
-    // финального уровня кампании (испытание 25 — без модификатора) = 725.
-    // Это ещё серебряный ранг; золото за испытание 15 переводит через порог 750.
-    const firstFourteenGold = Object.fromEntries(
-      Array.from({ length: 14 }, (_, index) => [String(index + 1), 3])
+    // 16 золотых = 800 очков, плюс 25 за серебро, засчитанное по трём звёздам
+    // финального уровня кампании (испытание 25 — без модификатора) = 825.
+    // Это ещё серебряный ранг; золото за испытание 17 переводит через порог 875.
+    const firstSixteenGold = Object.fromEntries(
+      Array.from({ length: 16 }, (_, index) => [String(index + 1), 3])
     );
-    await seedSave(page, { eliteMedals: firstFourteenGold });
+    await seedSave(page, { eliteMedals: firstSixteenGold });
     await page.goto('/?mock=1&lang=ru&daytime=day');
     await openElite(page);
     await expect(page.getByTestId('elite-rank')).toHaveText('Серебряный мастер');
-    await expect(page.getByTestId('elite-points')).toContainText('725');
+    await expect(page.getByTestId('elite-points')).toContainText('825');
 
-    await page.getByTestId('elite-card-15').click();
+    await page.getByTestId('elite-card-17').click();
     await page.evaluate(() =>
       (window as unknown as { __e2eWinLevel: (opts: { starCollected: boolean }) => void }).__e2eWinLevel({
         starCollected: true
@@ -279,7 +279,7 @@ test.describe('Post-campaign', () => {
     await expect(page.getByTestId('elite-rankup')).toHaveCount(0);
 
     await page.getByTestId('elite-next').click();
-    await expect(page.getByTestId('screen-game')).toContainText('Испытание 16');
+    await expect(page.getByTestId('screen-game')).toContainText('Испытание 18');
     await page.evaluate(() =>
       (window as unknown as { __e2eWinLevel: (opts: { starCollected: boolean }) => void }).__e2eWinLevel({
         starCollected: true
@@ -287,14 +287,14 @@ test.describe('Post-campaign', () => {
     );
     await page.getByTestId('elite-back').click();
     await expect(page.getByTestId('elite-rank')).toHaveText('Золотой мастер');
-    await expect(page.getByTestId('elite-points')).toContainText('825');
+    await expect(page.getByTestId('elite-points')).toContainText('925');
 
     await page.reload();
     await openElite(page);
     await expect(page.getByTestId('elite-rank')).toHaveText('Золотой мастер');
     const save = await readSave(page);
-    expect(save.eliteMedals?.['15']).toBe(3);
-    expect(save.eliteMedals?.['16']).toBe(3);
+    expect(save.eliteMedals?.['17']).toBe(3);
+    expect(save.eliteMedals?.['18']).toBe(3);
     // Серебро за испытание 25 записано в сейв, а не нарисовано на экране.
     expect(save.eliteMedals?.['25']).toBe(2);
   });

@@ -310,9 +310,24 @@ export function plankArt(broken: boolean): string {
     <line x1="14" y1="62" x2="86" y2="62" stroke="#8f6a35" stroke-width="2" opacity="0.6"/>`;
 }
 
-/** Курица на поле (игровой объект, не декорация двора): полупрозрачная — «куда переместится». */
+/**
+ * Курица на поле — ИГРОВОЙ объект, а не декорация двора из `chickenArt()`.
+ *
+ * Отличать обязательно: декоративные куры бегают по газону и ни на что не
+ * влияют, а эта занимает клетку и блокирует проезд. Одного увеличенного
+ * масштаба не хватало — на одном экране оказывались и те, и эти, в одинаковом
+ * виде. Поэтому у игровой курицы своя подложка: круг-загон с пунктирной
+ * каймой (как у льда — узнаваемая «служебная» клетка), а призрачная позиция
+ * («куда перелетит») дополнительно помечена стрелкой цикла.
+ */
 export function fieldChickenArt(ghost: boolean): string {
-  return `<g class="field-chicken-art" opacity="${ghost ? 0.38 : 1}" transform="translate(50,58) scale(2.1)">${chickenArt()}</g>`;
+  const pen = ghost
+    ? `<circle cx="50" cy="52" r="38" fill="rgba(226,87,76,0.10)" stroke="#e2574c" stroke-width="3.5" stroke-dasharray="9 8" opacity="0.75"/>
+       <path d="M38 22 q12 -8 24 0" fill="none" stroke="#e2574c" stroke-width="3.5" stroke-linecap="round" opacity="0.85"/>
+       <path d="M58 17 l6 5 l-7 4" fill="none" stroke="#e2574c" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>`
+    : `<circle cx="50" cy="52" r="38" fill="rgba(226,87,76,0.16)" stroke="#e2574c" stroke-width="4.5"/>
+       <circle cx="50" cy="52" r="30" fill="none" stroke="#fff1c9" stroke-width="2.5" opacity="0.7"/>`;
+  return `${pen}<g class="field-chicken-art" opacity="${ghost ? 0.45 : 1}" transform="translate(50,58) scale(2.1)">${chickenArt()}</g>`;
 }
 
 export function chickenArt(): string {

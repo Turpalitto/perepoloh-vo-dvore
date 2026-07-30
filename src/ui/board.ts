@@ -35,6 +35,17 @@ export interface BoardEvents {
   onIceBlocked(): void;
   onGateSwitch(): void;
   onGateOpen(): void;
+  /**
+   * Ворота захлопнулись. Возможно только в режиме `holdType: 'held'` — в режиме
+   * `once` открытые ворота уже не закрываются никогда. Отдельное событие,
+   * потому что закрытие поверх ещё не выехавшей машины это ключевой момент
+   * механики, а раньше он проходил вообще без звука.
+   */
+  onGateClose(): void;
+  /** Хрупкая доска сломалась этим ходом (клетка стала стеной навсегда). */
+  onPlankBroken(): void;
+  /** Курица перелетела на другую клетку своего цикла. */
+  onChickenHop(): void;
   /** Анимация выезда закончилась. */
   onExitDone(): void;
 }
@@ -256,29 +267,35 @@ export class BoardView {
     }
     if (iceHtml) make(iceHtml).classList.add('layer-ice');
 
-    // хрупкие доски: цела/сломана обновляется в updatePlanks()
-    for (const plank of level.planks ?? []) {
+    // хрупкие доски: цела/сломана обновляется в updatePlanks().
+    // testid индексирован: на уровне с несколькими досками общий testid ловил бы
+    // произвольную из них, и локатор молча проверял бы не то, что имелось в виду.
+    (level.planks ?? []).forEach((plank, i) => {
       const g = document.createElementNS(ns, 'g');
       g.classList.add('plank-cell');
-      g.setAttribute('data-testid', 'plank');
+      g.setAttribute('data-testid', `plank-${i}`);
+      g.setAttribute('aria-hidden', 'true');
       g.innerHTML = plankArt(false);
       g.style.transform = `translate(${plank.x * CELL}px, ${plank.y * CELL}px)`;
       this.svg.appendChild(g);
       this.plankEls.push(g);
-    }
+    });
 
     // куры-игровой объект: видны сразу в обеих позициях цикла — «где сейчас» /
     // «куда переместится» (актуальная непрозрачная, следующая полупрозрачная).
-    (level.chickens ?? []).forEach((c) => {
-      const mk = (cell: { x: number; y: number }, testid: string) => {
+    // testid индексирован по номеру курицы: у нескольких кур на поле пары
+    // клеток иначе неразличимы.
+    (level.chickens ?? []).forEach((c, i) => {
+      const mk = (cell: { x: number; y: number }, side: 'a' | 'b') => {
         const g = document.createElementNS(ns, 'g');
         g.classList.add('field-chicken');
-        g.setAttribute('data-testid', testid);
+        g.setAttribute('data-testid', `field-chicken-${i}-${side}`);
+        g.setAttribute('aria-hidden', 'true');
         g.style.transform = `translate(${cell.x * CELL}px, ${cell.y * CELL}px)`;
         this.svg.appendChild(g);
         return g;
       };
-      this.fieldChickenEls.push({ current: mk(c.a, 'field-chicken-a'), next: mk(c.b, 'field-chicken-b') });
+      this.fieldChickenEls.push({ current: mk(c.a, 'a'), next: mk(c.b, 'b') });
     });
 
     // следы колёс
@@ -616,12 +633,19 @@ export class BoardView {
     this.svg.querySelector<SVGGElement>('.gate-lock')?.classList.toggle('unlocked', unlocked);
     const open = exitSteps(this.level, this.state) >= 0 || this.state.won;
     if (open === this.gateOpen) return;
+    const wasOpen = this.gateOpen;
     this.gateOpen = open;
     this.svg.querySelectorAll<SVGGElement>('.gate-panel').forEach((p) => {
       const angle = open ? Number(p.dataset.open) : 0;
       p.style.transform = `rotate(${angle}deg)`;
     });
-    if (open && sound) this.events.onGateOpen();
+    if (sound) {
+      if (open) this.events.onGateOpen();
+      // Захлопывание озвучивается только если ворота действительно были
+      // открыты: на старте `gateOpen` уже false, и без этой проверки каждый
+      // первый вызов трактовался бы как закрытие.
+      else if (wasOpen) this.events.onGateClose();
+    }
   }
 
   flutterChickens(): void {
@@ -1154,6 +1178,16 @@ export class BoardView {
     this.updateGate(true);
     this.updatePlanks();
     this.updateFieldChickens();
+    if (res.planksBroken.length > 0) {
+      this.events.onPlankBroken();
+      // Пыль-щепки в месте пролома: без неё разрушение видно только по смене
+      // спрайта, а оно происходит под уехавшей фигурой и легко пропускается.
+      for (const key of res.planksBroken) {
+        const [px, py] = key.split(',').map(Number);
+        this.spawnDust(px * CELL + CELL / 2, py * CELL + CELL / 2);
+      }
+    }
+    if (res.chickensHopped) this.events.onChickenHop();
     this.flutterChickens();
     this.events.onCommit(res, idx);
   }

@@ -1734,6 +1734,17 @@ export class App {
         this.vibrate([18, 35, 24]);
       },
       onGateOpen: () => this.audio.play('gate'),
+      onGateClose: () => {
+        // Держащаяся кнопка: ворота захлопнулись, потому что фигура съехала с
+        // кнопки. Вибрация короче, чем у нажатия, — это потеря, а не успех.
+        this.audio.play('gateClose');
+        this.vibrate(22);
+      },
+      onPlankBroken: () => {
+        this.audio.play('plankBreak');
+        this.vibrate([14, 28, 18]);
+      },
+      onChickenHop: () => this.audio.play('cluck'),
       onCommit: (res, piece) => {
         undoStack.push(cur);
         redoStack.length = 0; // новый ход открывает новую ветку истории
@@ -1754,7 +1765,11 @@ export class App {
           this.audio.play('honk');
           this.audio.play('exitRev');
         }
-        if (Math.random() < 0.25) this.audio.play('cluck');
+        // Случайное кудахтанье декоративных кур у забора — только там, где куры
+        // НЕ игровой объект. На уровне с курами-блокираторами тот же звук уже
+        // означает конкретное событие (`onChickenHop`), и случайный дубль
+        // сделал бы обратную связь механики неотличимой от фонового шума.
+        if (!level.chickens?.length && Math.random() < 0.25) this.audio.play('cluck');
         // Живой двор: дед комментирует самое заметное событие хода.
         if (res.starCollected) this.yardDirector?.react('star');
         else if (res.gateActivated) this.yardDirector?.react('gate');

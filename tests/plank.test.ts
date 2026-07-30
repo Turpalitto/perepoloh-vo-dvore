@@ -99,3 +99,54 @@ describe('хрупкая доска — семантика applyMove/buildGrid',
     expect(validateLevel(onWall).join()).toContain('занятой клетке');
   });
 });
+
+describe('несколько досок на одном уровне', () => {
+  // Типы разрешают массив досок, а покрыт был только случай одной. Ход,
+  // прометающий сразу две доски, ломает обе — и `planksBroken` обязан
+  // перечислить именно их, иначе UI отыграет одну поломку вместо двух.
+  const TWO: LevelDef = {
+    id: 0,
+    name: 'plank-two',
+    width: 6,
+    height: 6,
+    exit: { side: 'right', index: 2 },
+    pieces: [{ id: 'T', kind: 'target', x: 0, y: 2, len: 2, dir: 'h' }],
+    planks: [
+      { x: 2, y: 2 },
+      { x: 3, y: 2 }
+    ],
+    par: 1,
+    par2: 1,
+    difficulty: 'easy',
+    mechanics: ['plank']
+  };
+
+  it('один ход через две доски ломает обе и сообщает обе в planksBroken', () => {
+    const s = createState(TWO);
+    const r = applyMove(TWO, s, 0, 1, 0, 6); // полный выезд прометает (2,2) и (3,2)
+    expect(r).not.toBeNull();
+    expect(r!.planksBroken.sort()).toEqual(['2,2', '3,2']);
+    expect(r!.state.brokenPlanks.sort()).toEqual(['2,2', '3,2']);
+  });
+
+  it('уже сломанная доска не попадает в planksBroken второй раз', () => {
+    const s = { ...createState(TWO), brokenPlanks: ['2,2'] };
+    // (2,2) уже стена — фигура упирается в неё и дальше не едет.
+    expect(maxSteps(TWO, s, 0, 1, 0)).toBe(0);
+    // Ставим фигуру так, чтобы прометался только (3,2): целая доска ломается,
+    // а уже сломанная в отчёт не попадает.
+    const moved = { ...s, pieces: [{ x: 3, y: 2, used: 0, gone: false }] };
+    const r = applyMove(TWO, moved, 0, 1, 0, 3);
+    expect(r).not.toBeNull();
+    expect(r!.planksBroken).toEqual(['3,2']);
+  });
+
+  it('каждая доска проверяется на значимость независимо', () => {
+    const impact = analyzePlankImpact(TWO, { stateLimit: 50_000 });
+    expect(impact.cells).toHaveLength(2);
+    // Обе клетки перечислены и разобраны по отдельности — общий вердикт по
+    // уровню не должен подменять поклеточный (поздняя доска способна сделать
+    // раннюю избыточной, ровно как со льдом).
+    expect(impact.cells.map((c) => `${c.cell.x},${c.cell.y}`)).toEqual(['2,2', '3,2']);
+  });
+});

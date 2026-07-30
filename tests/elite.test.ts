@@ -141,10 +141,10 @@ describe('Высшая лига — медали за попытку', () => {
   });
 });
 
-describe('Высшая лига — 28 мастер-испытаний валидны', () => {
-  it('ровно 28 испытаний с уникальными id и существующими уровнями', () => {
-    expect(ELITE_CHALLENGES).toHaveLength(28);
-    expect(new Set(ELITE_CHALLENGES.map((c) => c.id)).size).toBe(28);
+describe('Высшая лига — 30 мастер-испытаний валидны', () => {
+  it('ровно 30 испытаний с уникальными id и существующими уровнями', () => {
+    expect(ELITE_CHALLENGES).toHaveLength(30);
+    expect(new Set(ELITE_CHALLENGES.map((c) => c.id)).size).toBe(30);
     for (const c of ELITE_CHALLENGES) expect(sourceLevel(c)).toBeDefined();
   });
 
@@ -173,7 +173,7 @@ describe('Высшая лига — 28 мастер-испытаний вали�
         await yieldToEventLoop();
       }
     },
-    // solve() гоняется по 28 уровням — ~40с локально, CI-раннер медленнее дефолтных 60с
+    // solve() гоняется по 30 уровням — ~40с локально, CI-раннер медленнее дефолтных 60с
     120_000
   );
 
@@ -208,10 +208,10 @@ describe('Высшая лига — 28 мастер-испытаний вали�
     const byModifier = (m: string): number => ELITE_CHALLENGES.filter((c) => c.modifier === m).length;
     expect(byModifier('none')).toBe(5);
     expect(byModifier('noUndo')).toBe(10);
-    expect(byModifier('noHints')).toBe(6);
-    expect(byModifier('noUndoNoHints')).toBe(7);
+    expect(byModifier('noHints')).toBe(7);
+    expect(byModifier('noUndoNoHints')).toBe(8);
     expect(byModifier('none')).toBeLessThan(ELITE_CHALLENGES.length / 2);
-    // источники не повторяются: 28 разных уровней
+    // источники не повторяются: 30 разных уровней
     expect(new Set(sources).size).toBe(ELITE_CHALLENGES.length);
   });
 
@@ -263,7 +263,7 @@ describe('Высшая лига — медали, заслуженные в ка
     const allThree: Record<string, number> = {};
     for (const c of ELITE_CHALLENGES) allThree[String(c.sourceLevelId)] = 3;
     const save: SaveData = { ...defaultSave(), eliteMedals: campaignImpliedMedals(allThree) };
-    // все 28 серебром — потолок «переноса» — тоже ниже золотого ранга
+    // все 30 серебром — потолок «переноса» — тоже ниже золотого ранга
     const allSilver: SaveData = {
       ...defaultSave(),
       eliteMedals: Object.fromEntries(ELITE_CHALLENGES.map((c) => [String(c.id), 2]))

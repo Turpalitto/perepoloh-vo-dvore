@@ -15,6 +15,8 @@ export type SoundName =
   | 'star'
   | 'switch'
   | 'gate'
+  | 'gateClose'
+  | 'plankBreak'
   | 'win'
   | 'honk'
   | 'cluck'
@@ -403,6 +405,25 @@ export class GameAudio {
           this.tone(200, 0.34, 'sawtooth', 0.055, 0, 300);
           this.noise(0.32, 0.07, 900, 0, 260);
         });
+        break;
+      case 'gateClose':
+        // Зеркало 'gate': тот же скрип, но свип тона ВНИЗ (300→180) и глухой
+        // стук створок в конце. Держащаяся кнопка закрывает ворота посреди
+        // маршрута, и игрок обязан услышать это, не глядя на створки.
+        this.playSample('gate_creak', 0.26, () => {
+          this.tone(300, 0.3, 'sawtooth', 0.05, 0, 180);
+          this.noise(0.28, 0.06, 700, 0, 220);
+        });
+        this.tone(vary(88), 0.11, 'sine', 0.3, 0.26, 58);
+        break;
+      case 'plankBreak':
+        // Хруст ломающейся доски: сухой треск (шум с высоким срезом) плюс
+        // низкий «провал» — клетка стала непроходимой навсегда.
+        this.playSample('wood_hit', 0.34, () => {
+          this.noise(0.14, 0.16, 2600, 0, 900);
+          this.tone(vary(150), 0.13, 'square', 0.14, 0.02, 70);
+        });
+        this.tone(vary(70), 0.22, 'sine', 0.22, 0.1, 42);
         break;
       case 'honk':
         this.tone(392, 0.14, 'square', 0.16);

@@ -30,6 +30,10 @@ export interface MoveResult {
   exited: boolean;
   /** Нажимная кнопка ворот впервые сработала этим ходом. */
   gateActivated: boolean;
+  /** Доски, сломанные именно этим ходом (ключи `"x,y"`). */
+  planksBroken: string[];
+  /** Хотя бы одна курица реально перелетела на другую клетку этим ходом. */
+  chickensHopped: boolean;
 }
 
 export const EMPTY = -1;
@@ -258,6 +262,7 @@ export function applyMove(
 
   // Доски, прометённые фигурой за ход (включая старт и конец), ломаются —
   // тем же приёмом, что сбор звезды и кнопка ворот ниже.
+  const planksBroken: string[] = [];
   if (level.planks?.length) {
     for (const plank of level.planks) {
       const key = `${plank.x},${plank.y}`;
@@ -268,6 +273,7 @@ export function applyMove(
         );
         if (hit) {
           ns.brokenPlanks.push(key);
+          planksBroken.push(key);
           break;
         }
       }
@@ -320,6 +326,7 @@ export function applyMove(
   // фигура (не должно случаться при разумной расстановке уровня), курица
   // пропускает переключение и ждёт следующего хода — так двум объектам
   // никогда не оказаться на одной клетке.
+  let chickensHopped = false;
   if (level.chickens?.length) {
     const occupied = new Set<string>();
     level.pieces.forEach((pd, idx) => {
@@ -327,10 +334,12 @@ export function applyMove(
     });
     ns.chickenAt = ns.chickenAt.map((side, idx) => {
       const other = side === 'a' ? level.chickens![idx].b : level.chickens![idx].a;
-      return occupied.has(`${other.x},${other.y}`) ? side : side === 'a' ? 'b' : 'a';
+      if (occupied.has(`${other.x},${other.y}`)) return side;
+      chickensHopped = true;
+      return side === 'a' ? 'b' : 'a';
     });
   }
-  return { state: ns, starCollected: starHit, exited, gateActivated };
+  return { state: ns, starCollected: starHit, exited, gateActivated, planksBroken, chickensHopped };
 }
 
 /** Подсчёт звёзд за результат уровня. */

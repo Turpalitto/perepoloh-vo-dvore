@@ -972,6 +972,45 @@ html.high-contrast .levels-grid {
     opacity: 1;
   }
 }
+/* Хрупкая доска: целая ждёт проезда, сломанная — уже стена. */
+.plank-cell {
+  transform-box: view-box;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.plank-cell.broken {
+  animation: plank-crack 0.34s ease-out;
+}
+@keyframes plank-crack {
+  0% {
+    opacity: 0.2;
+    transform: scale(1.12);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+/*
+ * Куры-игровой объект. Пульсирует ТОЛЬКО активная (та, что реально занимает
+ * клетку) — призрачная позиция «куда перелетит» остаётся статичной, иначе оба
+ * маркера одинаково просят внимания и подсказка перестаёт читаться.
+ */
+.field-chicken {
+  transform-box: view-box;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+.field-chicken.chicken-active circle:first-of-type {
+  animation: chicken-pen-pulse 1.9s ease-in-out infinite;
+}
+@keyframes chicken-pen-pulse {
+  50% {
+    opacity: 0.62;
+  }
+}
 .star-sprite {
   transform-box: view-box;
   animation: star-pulse 1.6s ease-in-out infinite;
@@ -1135,6 +1174,16 @@ html.high-contrast .levels-grid {
 }
 @media (prefers-reduced-motion: reduce) {
   .sparkle {
+    animation-duration: 0.01ms;
+  }
+  /*
+   * Механики поля остаются различимыми без движения: у активной курицы гасится
+   * только пульсация загона (сам загон и разница в прозрачности с призрачной
+   * позицией никуда не деваются), у доски — вспышка при проломе (спрайт всё
+   * равно меняется на сломанный).
+   */
+  .field-chicken.chicken-active circle:first-of-type,
+  .plank-cell.broken {
     animation-duration: 0.01ms;
   }
 }

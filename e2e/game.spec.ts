@@ -254,7 +254,7 @@ test.describe('Переполох во дворе', () => {
     await page.getByTestId('btn-win-menu').click();
     await expect(page.getByTestId('stars-total')).toContainText(`★ 3 / ${CAMPAIGN_MAX_STARS}`);
     await page.reload();
-    await expect(page.getByTestId('menu-play')).toHaveText('Продолжить');
+    await expect(page.getByTestId('menu-play')).toContainText('Продолжить');
     await expect(page.getByTestId('stars-total')).toContainText(`★ 3 / ${CAMPAIGN_MAX_STARS}`);
     await page.getByTestId('menu-levels').click();
     await expect(page.getByTestId('level-card-1')).toContainText('★★★');
@@ -342,24 +342,24 @@ test.describe('Переполох во дворе', () => {
   test('язык платформы по умолчанию, ручной переключатель сохраняется', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/?mock=1');
-    await expect(page.getByTestId('menu-play')).toHaveText('Play');
+    await expect(page.getByTestId('menu-play')).toContainText('Play');
     await page.getByTestId('menu-settings').click();
     await page.getByTestId('lang-toggle').click();
-    await expect(page.getByTestId('menu-play')).toHaveText('Oyna');
+    await expect(page.getByTestId('menu-play')).toContainText('Oyna');
     await page.reload();
-    await expect(page.getByTestId('menu-play')).toHaveText('Oyna');
+    await expect(page.getByTestId('menu-play')).toContainText('Oyna');
     await page.getByTestId('menu-settings').click();
     await page.getByTestId('lang-toggle').click();
-    await expect(page.getByTestId('menu-play')).toHaveText('Играть');
+    await expect(page.getByTestId('menu-play')).toContainText('Играть');
     await page.getByTestId('menu-settings').click();
     await page.getByTestId('lang-toggle').click();
-    await expect(page.getByTestId('menu-play')).toHaveText('Play');
+    await expect(page.getByTestId('menu-play')).toContainText('Play');
     expect(errors).toEqual([]);
   });
 
   test('неподдерживаемый язык платформы получает английский fallback', async ({ page }) => {
     await page.goto('/?mock=1&lang=de');
-    await expect(page.getByTestId('menu-play')).toHaveText('Play');
+    await expect(page.getByTestId('menu-play')).toContainText('Play');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   });
 

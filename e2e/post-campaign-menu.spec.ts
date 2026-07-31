@@ -105,7 +105,7 @@ test.describe('Посткампанийное меню: граничные мо�
         '[data-testid="mode-switch"]',
         '[data-testid="menu-daily"]',
         '.menu-meta-row',
-        '.menu-progress'
+        '.menu-progress-block'
       ];
       for (let i = 0; i < blocks.length; i++) {
         for (let j = i + 1; j < blocks.length; j++) {
@@ -137,7 +137,7 @@ test.describe('Посткампанийное меню: граничные мо�
   test('до конца кампании CTA продолжает кампанию, после — открывает Высшую лигу', async ({ page }) => {
     await seedMidCampaign(page);
     await page.goto('/?mock=1&lang=ru&daytime=day');
-    await expect(page.getByTestId('menu-play')).toHaveText('Продолжить');
+    await expect(page.getByTestId('menu-play')).toContainText('Продолжить');
     await page.getByTestId('menu-play').click();
     await expect(page.getByTestId('screen-game')).toBeVisible();
     await expect(page.getByTestId('board')).toBeVisible();

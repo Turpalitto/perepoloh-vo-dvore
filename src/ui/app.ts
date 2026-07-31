@@ -6,6 +6,7 @@ import type { LevelDef } from '../core/types';
 import {
   CAMPAIGN_LAST_ID,
   LEVELS,
+  campaignPositionOf,
   chapterLevels,
   chapterOfPosition,
   isChapterEnd,
@@ -805,15 +806,54 @@ export class App {
       const claimed = isWeeklyQuestClaimed(this.store.data.weekly, week, quest.key);
       return { quest, progress, done, claimed };
     });
+    // Строка «Глава N · Название» и номер уровня в CTA: игрок видит, куда
+    // именно ведёт кнопка, не открывая карту уровней. После кампании кнопка
+    // ведёт в лигу, и номер уровня там смысла не имеет.
+    const nextLevel = nextLevelToPlay(LEVELS, this.store.data);
+    const nextPosition = campaignPositionOf(nextLevel.id);
+    const chapterIndex = chapterOfPosition(nextPosition);
+    const campaignPercent = Math.round((completed / LEVELS.length) * 100);
     this.root.innerHTML = `
       <div class="screen menu-screen" data-testid="screen-menu">
         <div class="yard-bg">${yardSVG(unlockedUpgrades(total), trophies, season?.id, yardStage)}</div>
+        <div class="menu-hud">
+          <span class="hud-chip stars-total" data-testid="stars-total">★ ${total} / ${max}</span>
+          <span class="hud-chip hud-hints" data-testid="menu-hint-tokens">💡 ${this.store.data.hintTokens ?? 0}</span>
+        </div>
         <div class="menu-ui">
-          ${season ? `<div class="season-banner" data-testid="season-banner">${t(`season.${season.id}`)}</div>` : ''}
-          <h1 class="game-title"><span>${t('game.titleTop')}</span><span>${t('game.titleBottom')}</span></h1>
+          <div class="menu-hero">
+            ${season ? `<div class="season-banner" data-testid="season-banner">${t(`season.${season.id}`)}</div>` : ''}
+            ${
+              campaignDone
+                ? ''
+                  // `chapter.N` уже содержит и номер, и название («Глава 4 ·
+                  // Сенокос») — оборачивать его ещё раз значит получить
+                  // «Глава 4 · Глава 4 · Сенокос».
+                : `<div class="menu-chapter" data-testid="menu-chapter">${t(`chapter.${chapterIndex}`)}</div>`
+            }
+            <h1 class="game-title"><span>${t('game.titleTop')}</span><span>${t('game.titleBottom')}</span></h1>
+          </div>
+          <div class="menu-panel">
+          <div class="menu-progress-block">
+            <div class="menu-progress-line">
+              <span data-testid="menu-campaign-line">${
+                campaignDone
+                  ? t('menu.campaignDone')
+                  : t('menu.levelOf', { n: nextPosition, m: LEVELS.length })
+              }</span>
+              <span class="next-upgrade">${
+                next ? t('menu.nextUpgrade', { n: next.stars }) : campaignDone ? t('menu.fullYard') : t('menu.allUpgrades')
+              }</span>
+            </div>
+            <div class="menu-progress-bar" role="presentation">
+              <i style="width:${campaignDone ? 100 : campaignPercent}%"></i>
+            </div>
+          </div>
           <div class="menu-buttons">
             <button class="btn btn-primary btn-big" data-testid="menu-play">${
-              campaignDone ? `🏅 ${t('elite.continue')}` : hasProgress ? t('menu.continue') : t('menu.play')
+              campaignDone
+                ? `🏅 ${t('elite.continue')}`
+                : `${hasProgress ? t('menu.continue') : t('menu.play')} <small>· ${nextPosition}</small>`
             }</button>
             <div class="mode-switch" data-testid="mode-switch" role="group" aria-label="${t('menu.events')}">
               <button class="mode-tab${campaignDone ? '' : ' active'}" data-testid="menu-levels">${t('mode.campaign')}</button>
@@ -837,24 +877,29 @@ export class App {
               }
             </div>
             <div class="menu-events" data-testid="menu-events" aria-label="${t('menu.events')}">
-              <button class="btn btn-daily" data-testid="menu-daily">🔥 ${t('daily.button')}${
-                dailyModifier(dailyKey) !== 'none' ? ' 🎯' : ''
-              }${
-                isDoneToday(this.store.data.daily, new Date(`${dailyKey}T12:00:00`))
-                  ? ` · ${t('daily.done')}`
-                  : currentStreak(this.store.data.daily) > 0
-                    ? ` · ${t('daily.streak', { n: currentStreak(this.store.data.daily) })}`
-                    : ''
-              }</button>
-              <div class="retention-row">
-                <div class="weekly-progress" data-testid="weekly-progress">${t('daily.week', {
-                  n: weekDone
-                })}${trophies > 0 ? ` · 🏆 ${trophies}` : ''}</div>
-                <button class="btn gift-btn" data-testid="menu-gift" ${giftClaimed ? 'disabled' : ''}>${
-                  giftClaimed
-                    ? `💡 ${this.store.data.hintTokens ?? 0}`
-                    : `🎁 ${t('gift.claim', { n: giftAmount })}`
-                }</button>
+              <div class="event-cards">
+                <button class="event-card btn-daily" data-testid="menu-daily">
+                  <span class="event-card-title">🔥 ${t('daily.button')}${
+                    dailyModifier(dailyKey) !== 'none' ? ' 🎯' : ''
+                  }</span>
+                  <small class="event-card-sub" data-testid="weekly-progress">${
+                    isDoneToday(this.store.data.daily, new Date(`${dailyKey}T12:00:00`))
+                      ? `${t('daily.done')} · `
+                      : currentStreak(this.store.data.daily) > 0
+                        ? `${t('daily.streak', { n: currentStreak(this.store.data.daily) })} · `
+                        : ''
+                  }${t('daily.week', { n: weekDone })}${trophies > 0 ? ` · 🏆 ${trophies}` : ''}</small>
+                </button>
+                <button class="event-card gift-btn" data-testid="menu-gift" ${giftClaimed ? 'disabled' : ''}>
+                  <span class="event-card-title">${
+                    giftClaimed ? `💡 ${t('gift.tokens')}` : `🎁 ${t('gift.claim', { n: giftAmount })}`
+                  }</span>
+                  <small class="event-card-sub">${
+                    giftClaimed
+                      ? `${t('gift.hintsLeft', { n: this.store.data.hintTokens ?? 0 })}`
+                      : t('gift.hintsAdd', { n: giftAmount })
+                  }</small>
+                </button>
               </div>
               <div class="menu-meta-row">
                 <button class="btn" data-testid="menu-leaderboard" aria-label="${t(
@@ -872,11 +917,6 @@ export class App {
               </div>
             </div>
           </div>
-          <div class="menu-progress">
-            <span class="stars-total" data-testid="stars-total">★ ${total} / ${max}</span>
-            <span class="next-upgrade">${
-              next ? t('menu.nextUpgrade', { n: next.stars }) : campaignDone ? t('menu.fullYard') : t('menu.allUpgrades')
-            }</span>
           </div>
         </div>
         <div class="menu-settings">

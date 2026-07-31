@@ -22,9 +22,9 @@ test.describe('UI boundaries', () => {
     for (const lang of ['ru', 'en', 'tr'] as const) {
       await page.goto(`/?mock=1&lang=${lang}&daytime=day`);
       await expect(page.getByTestId('mock-banner')).toBeVisible();
-      await expect(page.locator('.menu-progress')).toBeInViewport();
+      await expect(page.locator('.menu-progress-block')).toBeInViewport();
       expect(
-        await overlapArea(page, '.menu-progress', '[data-testid="mock-banner"]'),
+        await overlapArea(page, '.menu-progress-block', '[data-testid="mock-banner"]'),
         `${lang}: progress line overlaps the sticky banner`
       ).toBe(0);
     }

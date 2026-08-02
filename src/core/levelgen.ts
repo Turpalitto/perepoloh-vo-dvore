@@ -26,6 +26,16 @@ export interface GenOptions {
   pieceMax: number;
   /** Вероятность добавить нажимную кнопку ворот (0..1). По умолчанию 0. */
   gateChance?: number;
+  /**
+   * Разрешённые типы фигур (кроме целевой). По умолчанию — все, с прежними
+   * вероятностями. Нужен обучающим мини-главам: там набор механик задан, и
+   * отбраковывать лишние типы уже после генерации — это 98% выброшенной работы.
+   *
+   * Ограничение НЕ меняет число обращений к `rng()`: бросок делается всегда, а
+   * список лишь отображает его результат. Иначе поехала бы вся последовательность,
+   * а на ней держится детерминизм «уровня дня».
+   */
+  kinds?: Array<PieceDef['kind']>;
 }
 
 export const GEN_6X6: GenOptions = { width: 6, height: 6, exitRow: 2, pieceMin: 6, pieceMax: 9 };
@@ -52,7 +62,11 @@ export function genCandidate(rng: () => number, o: GenOptions): LevelDef | null 
   for (let i = 0; i < pieceCount; i++) {
     const roll = rng();
     let kind: PieceDef['kind'];
-    if (roll < 0.5) kind = 'car';
+    if (o.kinds && o.kinds.length > 0) {
+      // Тот же бросок, только отображённый на разрешённый список: длина
+      // последовательности rng() обязана совпадать с безограничительной веткой.
+      kind = o.kinds[Math.min(o.kinds.length - 1, Math.floor(roll * o.kinds.length))];
+    } else if (roll < 0.5) kind = 'car';
     else if (roll < 0.65) kind = 'truck';
     else if (roll < 0.8) kind = 'tractor';
     else kind = 'crate';

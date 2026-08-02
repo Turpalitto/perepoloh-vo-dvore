@@ -6925,6 +6925,445 @@
     ]
   },
   {
+    "id": 109,
+    "name": "Куриный дозор",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 0,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "car",
+        "x": 3,
+        "y": 0,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 4,
+        "y": 0,
+        "len": 2,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "C",
+        "kind": "car",
+        "x": 4,
+        "y": 1,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 2,
+        "y": 4,
+        "len": 2,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 2,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 1,
+        "y": 3,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "G",
+        "kind": "car",
+        "x": 0,
+        "y": 5,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      }
+    ],
+    "walls": [
+      {
+        "x": 2,
+        "y": 1,
+        "kind": "barrel"
+      },
+      {
+        "x": 1,
+        "y": 1,
+        "kind": "hay"
+      }
+    ],
+    "chickens": [
+      {
+        "a": {
+          "x": 5,
+          "y": 1
+        },
+        "b": {
+          "x": 5,
+          "y": 2
+        }
+      }
+    ],
+    "par": 7,
+    "par2": 9,
+    "difficulty": "medium",
+    "role": "tutorial",
+    "mechanics": [
+      "chickens"
+    ],
+    "hint": "Курица перелетает после каждого хода — бледный курятник показывает, куда"
+  },
+  {
+    "id": 110,
+    "name": "Курица не ждёт",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 0,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "car",
+        "x": 3,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 1,
+        "y": 1,
+        "len": 2,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "C",
+        "kind": "car",
+        "x": 1,
+        "y": 4,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 5,
+        "y": 1,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 2,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 3,
+        "y": 0,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "G",
+        "kind": "car",
+        "x": 0,
+        "y": 3,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "H",
+        "kind": "car",
+        "x": 0,
+        "y": 0,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      }
+    ],
+    "walls": [
+      {
+        "x": 2,
+        "y": 4,
+        "kind": "barrel"
+      }
+    ],
+    "chickens": [
+      {
+        "a": {
+          "x": 4,
+          "y": 0
+        },
+        "b": {
+          "x": 4,
+          "y": 1
+        }
+      }
+    ],
+    "par": 8,
+    "par2": 10,
+    "difficulty": "medium",
+    "role": "tutorial",
+    "mechanics": [
+      "chickens"
+    ],
+    "hint": "Считай ходы: клетка освободится ровно через ход"
+  },
+  {
+    "id": 111,
+    "name": "Тесно с наседкой",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 1,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "car",
+        "x": 1,
+        "y": 5,
+        "len": 2,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 5,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "C",
+        "kind": "car",
+        "x": 5,
+        "y": 4,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 1,
+        "y": 4,
+        "len": 2,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 1,
+        "y": 3,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 1,
+        "y": 0,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "G",
+        "kind": "car",
+        "x": 0,
+        "y": 1,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "H",
+        "kind": "car",
+        "x": 4,
+        "y": 1,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      }
+    ],
+    "chickens": [
+      {
+        "a": {
+          "x": 3,
+          "y": 1
+        },
+        "b": {
+          "x": 3,
+          "y": 2
+        }
+      }
+    ],
+    "par": 9,
+    "par2": 11,
+    "difficulty": "medium",
+    "role": "tutorial",
+    "mechanics": [
+      "chickens"
+    ],
+    "hint": "Курица занимает то одну клетку, то другую — планируй проезд под её такт"
+  },
+  {
+    "id": 112,
+    "name": "Куриный час пик",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 0,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "truck",
+        "x": 2,
+        "y": 0,
+        "len": 3,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 3,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "C",
+        "kind": "truck",
+        "x": 4,
+        "y": 1,
+        "len": 3,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 1,
+        "y": 0,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 1,
+        "y": 3,
+        "len": 2,
+        "dir": "h",
+        "skin": 0
+      }
+    ],
+    "walls": [
+      {
+        "x": 2,
+        "y": 4,
+        "kind": "barrel"
+      }
+    ],
+    "chickens": [
+      {
+        "a": {
+          "x": 3,
+          "y": 4
+        },
+        "b": {
+          "x": 4,
+          "y": 4
+        }
+      }
+    ],
+    "par": 11,
+    "par2": 13,
+    "difficulty": "hard",
+    "role": "tutorial",
+    "mechanics": [
+      "truck",
+      "chickens"
+    ],
+    "hint": "Грузовику труднее разминуться с курицей: ему нужен свободный ряд целиком"
+  },
+  {
     "id": 63,
     "name": "Утро во дворе",
     "width": 6,
@@ -9408,6 +9847,418 @@
       "crate",
       "star"
     ]
+  },
+  {
+    "id": 113,
+    "name": "Кнопка под колесом",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 0,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "car",
+        "x": 3,
+        "y": 3,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 5,
+        "y": 1,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "C",
+        "kind": "car",
+        "x": 1,
+        "y": 0,
+        "len": 2,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 5,
+        "y": 4,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 0,
+        "y": 4,
+        "len": 2,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 2,
+        "y": 1,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "G",
+        "kind": "car",
+        "x": 3,
+        "y": 0,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      }
+    ],
+    "walls": [
+      {
+        "x": 2,
+        "y": 4,
+        "kind": "log"
+      }
+    ],
+    "gateSwitch": {
+      "x": 4,
+      "y": 0,
+      "holdType": "held"
+    },
+    "par": 8,
+    "par2": 10,
+    "difficulty": "medium",
+    "role": "tutorial",
+    "mechanics": [
+      "gate-switch"
+    ],
+    "hint": "Кнопка держит ворота, только пока на ней кто-то стоит: съехал — створки захлопнулись"
+  },
+  {
+    "id": 114,
+    "name": "Держи ворота",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 0,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "tractor",
+        "x": 2,
+        "y": 3,
+        "len": 3,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "B",
+        "kind": "truck",
+        "x": 1,
+        "y": 5,
+        "len": 3,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "C",
+        "kind": "car",
+        "x": 5,
+        "y": 3,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "D",
+        "kind": "truck",
+        "x": 1,
+        "y": 4,
+        "len": 3,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "E",
+        "kind": "tractor",
+        "x": 3,
+        "y": 0,
+        "len": 3,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "F",
+        "kind": "tractor",
+        "x": 0,
+        "y": 3,
+        "len": 3,
+        "dir": "v",
+        "skin": 1
+      }
+    ],
+    "star": {
+      "x": 5,
+      "y": 1
+    },
+    "gateSwitch": {
+      "x": 4,
+      "y": 4,
+      "holdType": "held"
+    },
+    "par": 10,
+    "par2": 12,
+    "difficulty": "medium",
+    "role": "tutorial",
+    "mechanics": [
+      "tractor",
+      "truck",
+      "star",
+      "gate-switch"
+    ],
+    "hint": "Нужен тот, кто останется на кнопке, пока целевая машина едет к воротам"
+  },
+  {
+    "id": 115,
+    "name": "Некому подержать",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 0,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "car",
+        "x": 4,
+        "y": 4,
+        "len": 2,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "B",
+        "kind": "truck",
+        "x": 3,
+        "y": 3,
+        "len": 3,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "C",
+        "kind": "truck",
+        "x": 0,
+        "y": 3,
+        "len": 3,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 2,
+        "y": 1,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 4,
+        "y": 0,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 2,
+        "y": 4,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "G",
+        "kind": "car",
+        "x": 4,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "H",
+        "kind": "car",
+        "x": 0,
+        "y": 5,
+        "len": 2,
+        "dir": "h",
+        "skin": 1
+      }
+    ],
+    "gateSwitch": {
+      "x": 5,
+      "y": 1,
+      "holdType": "held"
+    },
+    "par": 12,
+    "par2": 14,
+    "difficulty": "hard",
+    "role": "tutorial",
+    "mechanics": [
+      "truck",
+      "gate-switch"
+    ],
+    "hint": "Свободных помощников мало — выбирай, кого оставить на кнопке"
+  },
+  {
+    "id": 116,
+    "name": "Последний нажим",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 1,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "car",
+        "x": 2,
+        "y": 4,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 3,
+        "y": 4,
+        "len": 2,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "C",
+        "kind": "truck",
+        "x": 1,
+        "y": 3,
+        "len": 3,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 0,
+        "y": 4,
+        "len": 2,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "E",
+        "kind": "car",
+        "x": 4,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 1,
+        "y": 1,
+        "len": 2,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "G",
+        "kind": "car",
+        "x": 5,
+        "y": 0,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      }
+    ],
+    "walls": [
+      {
+        "x": 0,
+        "y": 3,
+        "kind": "log"
+      },
+      {
+        "x": 4,
+        "y": 0,
+        "kind": "hay"
+      }
+    ],
+    "gateSwitch": {
+      "x": 3,
+      "y": 1,
+      "holdType": "held"
+    },
+    "par": 13,
+    "par2": 15,
+    "difficulty": "hard",
+    "role": "tutorial",
+    "mechanics": [
+      "truck",
+      "gate-switch"
+    ],
+    "hint": "Кнопку держат до самого выезда: посчитай, кто освободится последним"
   },
   {
     "id": 83,

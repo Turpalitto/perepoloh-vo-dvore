@@ -252,6 +252,7 @@ const RU: Dict = {
   'division.3': 'Серебряный дивизион',
   'division.4': 'Золотой дивизион',
   'division.5': 'Легенды двора',
+  'division.6': 'Чемпионы двора',
   'elite.bestEndless': 'Рекорд серии: {n}',
   'elite.challenge': 'Испытание',
   'elite.goalGold': '🥇 Золото: пройти за {n} ходов без подсказки',
@@ -601,6 +602,7 @@ const EN: Dict = {
   'division.3': 'Silver Division',
   'division.4': 'Gold Division',
   'division.5': 'Yard Legends',
+  'division.6': 'Yard Champions',
   'elite.bestEndless': 'Endless best: {n}',
   'elite.challenge': 'Challenge',
   'elite.goalGold': '🥇 Gold: clear in {n} moves, no hint',
@@ -950,6 +952,7 @@ const TR: Dict = {
   'division.3': 'Gümüş Grubu',
   'division.4': 'Altın Grubu',
   'division.5': 'Bahçe Efsaneleri',
+  'division.6': 'Bahçe Şampiyonları',
   'elite.bestEndless': 'Sonsuz rekoru: {n}',
   'elite.challenge': 'Görev',
   'elite.goalGold': '🥇 Altın: {n} hamlede, ipucusuz',
@@ -1079,10 +1082,10 @@ const EN_NAMES: Dict = {
   'Сеновал наоборот': 'Hayloft Reversed',
   'Капкан во льду': 'Trap on Ice',
   'Затор у забора': 'Jam by the Fence',
-  'Заросшая доска': 'Overgrown Plank',
   'Курятник в разгар уборки': 'Henhouse Mid-Cleanup',
-  'Тупик с провалом': 'Dead End with a Hole',
+  'Кузница во льду': 'Smithy on Ice',
   'Чай и курица': 'Tea and a Hen',
+  'Курица на рубеже': 'A Hen at the Line',
   'Первый выезд': 'First Ride',
   'Соседи приехали': 'Neighbours Arrive',
   'Длинный грузовик': 'The Long Truck',
@@ -1107,6 +1110,14 @@ const EN_NAMES: Dict = {
   'Мастерский план': 'Master Plan',
   'Великий побег': 'The Great Escape',
   'Куры и бочки': 'Chickens and Barrels',
+  'Куриный дозор': 'Chicken Watch',
+  'Курица не ждёт': 'The Hen Will Not Wait',
+  'Тесно с наседкой': 'Crowded with a Broody Hen',
+  'Куриный час пик': 'Chicken Rush Hour',
+  'Кнопка под колесом': 'Button Under the Wheel',
+  'Держи ворота': 'Hold the Gate',
+  'Некому подержать': 'No One Left to Hold It',
+  'Последний нажим': 'The Last Press',
   'Утро во дворе': 'Morning in the Yard',
   'Полный переполох': 'Total Frenzy',
   'Сенной сарай': 'Hay Barn',
@@ -1199,14 +1210,28 @@ const EN_HINTS: Dict = {
   // Механики Высшей лиги: правило встречается впервые, подсказка обязательна.
   'Кнопка держит ворота: съехал с неё — створки захлопнулись':
     'The button only holds the gate while occupied — drive off and it slams shut',
-  'По доскам можно проехать, но не встать — и после проезда они проламываются':
-    'You may cross planks but not stop on them — and crossing breaks them',
   'Курица перелетает после каждого хода — бледный курятник показывает куда':
     'The hen hops after every move — the pale pen shows where',
-  'Доска выдержит один проезд: сломается — проход закрыт навсегда':
-    'A plank takes one crossing: once broken, that cell is shut for good',
   'Курица занимает клетку по очереди — считай ходы, чтобы поймать её на нужной':
     'The hen alternates cells — count moves to catch it on the right one',
+  'Курица перелетает после каждого хода — считай, где она окажется к твоему манёвру':
+    'The hen hops after every move — work out where it lands by the time you need the lane',
+  'Курица перелетает после каждого хода — бледный курятник показывает, куда':
+    'The hen hops after every move — the pale pen shows where',
+  'Считай ходы: клетка освободится ровно через ход':
+    'Count the moves: that cell clears in exactly one move',
+  'Курица занимает то одну клетку, то другую — планируй проезд под её такт':
+    'The hen takes one cell, then the other — time your run to its beat',
+  'Грузовику труднее разминуться с курицей: ему нужен свободный ряд целиком':
+    'A truck has a harder time dodging the hen: it needs the whole lane clear',
+  'Кнопка держит ворота, только пока на ней кто-то стоит: съехал — створки захлопнулись':
+    'The button holds the gate only while someone stands on it — drive off and it slams shut',
+  'Нужен тот, кто останется на кнопке, пока целевая машина едет к воротам':
+    'You need someone to stay on the button while the target car drives to the gate',
+  'Свободных помощников мало — выбирай, кого оставить на кнопке':
+    'Spare helpers are few — choose who stays on the button',
+  'Кнопку держат до самого выезда: посчитай, кто освободится последним':
+    'The button must be held until the very exit: work out who frees up last',
   'Потяни синюю машину вправо — к воротам!': 'Drag the blue car right — to the gate!',
   'Машины ездят только вдоль своей оси': 'Vehicles slide only along their axis',
   'Грузовик длинный — освободи ему место': 'The truck is long — clear some room',
@@ -1275,10 +1300,10 @@ const TR_NAMES: Dict = {
   'Сеновал наоборот': 'Ters Samanlık',
   'Капкан во льду': 'Buzda Kapan',
   'Затор у забора': 'Çit Kenarında Tıkanıklık',
-  'Заросшая доска': 'Yosunlu Tahta',
   'Курятник в разгар уборки': 'Temizlik Ortasında Kümes',
-  'Тупик с провалом': 'Çöküklü Çıkmaz',
+  'Кузница во льду': 'Buzda Demirhane',
   'Чай и курица': 'Çay ve Tavuk',
+  'Курица на рубеже': 'Sınırdaki Tavuk',
   'Первый выезд': 'İlk Sürüş',
   'Соседи приехали': 'Komşular Geldi',
   'Длинный грузовик': 'Uzun Kamyon',
@@ -1303,6 +1328,14 @@ const TR_NAMES: Dict = {
   'Мастерский план': 'Usta Planı',
   'Великий побег': 'Büyük Kaçış',
   'Куры и бочки': 'Tavuklar ve Variller',
+  'Куриный дозор': 'Tavuk Nöbeti',
+  'Курица не ждёт': 'Tavuk Beklemez',
+  'Тесно с наседкой': 'Kuluçkayla Dar Alan',
+  'Куриный час пик': 'Tavuk Yoğun Saati',
+  'Кнопка под колесом': 'Tekerlek Altındaki Düğme',
+  'Держи ворота': 'Kapıyı Tut',
+  'Некому подержать': 'Tutacak Kimse Yok',
+  'Последний нажим': 'Son Basış',
   'Утро во дворе': 'Bahçede Sabah',
   'Полный переполох': 'Tam Karmaşa',
   'Сенной сарай': 'Saman Ahır',
@@ -1395,14 +1428,28 @@ const TR_HINTS: Dict = {
   // Yüksek Lig mekanikleri: kural ilk kez karşılaşılıyor, ipucu zorunlu.
   'Кнопка держит ворота: съехал с неё — створки захлопнулись':
     'Düğme kapıyı sadece üstünde biri varken tutar — çekilirsen kapı çarparak kapanır',
-  'По доскам можно проехать, но не встать — и после проезда они проламываются':
-    'Tahtaların üstünden geçilir ama durulamaz — geçince de kırılırlar',
   'Курица перелетает после каждого хода — бледный курятник показывает куда':
     'Tavuk her hamleden sonra yer değiştirir — soluk kümes nereye gideceğini gösterir',
-  'Доска выдержит один проезд: сломается — проход закрыт навсегда':
-    'Tahta bir geçiş dayanır: kırılınca o kare kalıcı olarak kapanır',
   'Курица занимает клетку по очереди — считай ходы, чтобы поймать её на нужной':
     'Tavuk kareleri sırayla tutar — doğru karede yakalamak için hamleleri say',
+  'Курица перелетает после каждого хода — считай, где она окажется к твоему манёвру':
+    'Tavuk her hamleden sonra yer değiştirir — şerit gerektiğinde nerede olacağını hesapla',
+  'Курица перелетает после каждого хода — бледный курятник показывает, куда':
+    'Tavuk her hamleden sonra yer değiştirir — soluk kümes nereye gideceğini gösterir',
+  'Считай ходы: клетка освободится ровно через ход':
+    'Hamleleri say: o kare tam bir hamle sonra boşalır',
+  'Курица занимает то одну клетку, то другую — планируй проезд под её такт':
+    'Tavuk sırayla iki kareyi tutar — geçişini onun ritmine göre planla',
+  'Грузовику труднее разминуться с курицей: ему нужен свободный ряд целиком':
+    'Kamyonun tavuktan kaçınması daha zor: tüm şeridin boş olması gerekir',
+  'Кнопка держит ворота, только пока на ней кто-то стоит: съехал — створки захлопнулись':
+    'Düğme kapıyı yalnız üstünde biri dururken tutar — çekilirsen kapı çarparak kapanır',
+  'Нужен тот, кто останется на кнопке, пока целевая машина едет к воротам':
+    'Hedef araç kapıya giderken düğmede kalacak birine ihtiyacın var',
+  'Свободных помощников мало — выбирай, кого оставить на кнопке':
+    'Yedek yardımcı az — düğmede kimin kalacağını seç',
+  'Кнопку держат до самого выезда: посчитай, кто освободится последним':
+    'Düğme çıkışa dek tutulur: en son kimin serbest kalacağını hesapla',
   'Потяни синюю машину вправо — к воротам!': 'Mavi arabayı sağa, kapıya sürükle!',
   'Машины ездят только вдоль своей оси': 'Araçlar yalnız kendi ekseninde kayar',
   'Грузовик длинный — освободи ему место': 'Kamyon uzun — yer aç',

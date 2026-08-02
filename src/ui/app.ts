@@ -856,23 +856,23 @@ export class App {
                 : `${hasProgress ? t('menu.continue') : t('menu.play')} <small>· ${nextPosition}</small>`
             }</button>
             <div class="mode-switch" data-testid="mode-switch" role="group" aria-label="${t('menu.events')}">
-              <button class="mode-tab${campaignDone ? '' : ' active'}" data-testid="menu-levels">${t('mode.campaign')}</button>
+              <button class="mode-tab${campaignDone ? '' : ' active'}" data-testid="menu-levels"><span>${t('mode.campaign')}</span></button>
               ${
                 campaignDone
-                  ? `<button class="mode-tab active mode-tab-elite" data-testid="menu-elite">🏅 ${t('mode.elite')}</button>`
+                  ? `<button class="mode-tab active mode-tab-elite" data-testid="menu-elite"><span>🏅 ${t('mode.elite')}</span></button>`
                   : ''
               }
               ${
                 endless === 'open'
-                  ? `<button class="mode-tab" data-testid="menu-endless">🌀 ${t('mode.endless')}${
+                  ? `<button class="mode-tab" data-testid="menu-endless"><span>🌀 ${t('mode.endless')}</span>${
                       (this.store.data.endlessBest ?? 0) > 0
                         ? `<small>${t('endless.best', { n: this.store.data.endlessBest ?? 0 })}</small>`
                         : ''
                     }</button>`
                   : endless === 'teaser'
-                    ? `<button class="mode-tab mode-tab-locked" data-testid="menu-endless-locked" disabled aria-disabled="true">🔒 ${t(
+                    ? `<button class="mode-tab mode-tab-locked" data-testid="menu-endless-locked" disabled aria-disabled="true"><span>🔒 ${t(
                         'mode.endless'
-                      )}<small>${t('endless.teaser', { n: ENDLESS_UNLOCK_AT })}</small></button>`
+                      )}</span><small>${t('endless.teaser', { n: ENDLESS_UNLOCK_AT })}</small></button>`
                     : ''
               }
             </div>
@@ -1658,9 +1658,14 @@ export class App {
     // звездой это сбор канистры, на остальных более жёсткий лимит ходов.
     // В мастер-испытании тиры звёзд не действуют (там медали), поэтому у него
     // остаётся прежняя одиночная цель.
+    // \n вместо пробела перед вторым условием: `.hud-par` рендерит его как
+    // разрыв строки (white-space: pre-line) — на 320px «★★ ≤ 7 · ★★★ +★» в
+    // одну строку не помещалось и переносилось посреди слова. Playwright
+    // toHaveText схлопывает \n обратно в пробел при сравнении, так что текст
+    // для тестов не меняется.
     const goalText = challenge
       ? t('hud.goal', { n: level.par2 })
-      : `${t('hud.goal2', { n: level.par2 })} · ${
+      : `${t('hud.goal2', { n: level.par2 })}\n· ${
           level.star ? t('hud.goal3star') : t('hud.goal3moves', { n: level.par })
         }`;
     const goalAria = challenge
@@ -1677,12 +1682,15 @@ export class App {
             <button class="icon-btn" data-testid="btn-game-back" aria-label="${t('ingame.back')}" title="${t('ingame.back')}">${backIcon}</button>
             <button class="icon-btn" data-testid="btn-pause" aria-label="${t('pause.title')}">${pauseIcon}</button>
           </div>
-          <div class="hud-level">${title}${
-            bossProg ? ` <span class="boss-phase-chip" data-testid="boss-phase">${t('boss.phase', { n: bossProg.phase, m: bossProg.total })}</span>` : ''
-          }</div>
+          <div class="hud-level${bossProg ? ' hud-level-boss' : ''}">${title}</div>
+          ${
+            bossProg
+              ? `<span class="boss-phase-chip" data-testid="boss-phase">${t('boss.phase', { n: bossProg.phase, m: bossProg.total })}</span>`
+              : ''
+          }
           <div class="hud-right">
             ${starHud}
-            <div class="hud-moves">${t('hud.moves')} <b data-testid="hud-moves">0</b><span class="hud-par" data-testid="hud-goal" title="${escapeHTML(goalAria)}" aria-label="${escapeHTML(goalAria)}">${goalText}</span></div>
+            <div class="hud-moves"><span class="hud-moves-label">${t('hud.moves')}</span> <b data-testid="hud-moves">0</b><span class="hud-par" data-testid="hud-goal" title="${escapeHTML(goalAria)}" aria-label="${escapeHTML(goalAria)}">${goalText}</span></div>
           </div>
         </div>
         <div class="board-host" data-testid="board-host"></div>

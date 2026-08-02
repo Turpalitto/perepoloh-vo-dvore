@@ -100,26 +100,13 @@ export function installQaTools(active: boolean, hooks?: QaHooks): void {
     }
 
     const menu = root.querySelector<HTMLElement>('[data-testid=screen-menu]');
-    if (active && menu && !menu.querySelector('[data-testid=qa-mode-notice]')) {
+    const menuPanel = menu?.querySelector<HTMLElement>('.menu-panel');
+    if (active && menuPanel && !menuPanel.querySelector('[data-testid=qa-mode-notice]')) {
       const notice = document.createElement('div');
       notice.setAttribute('data-testid', 'qa-mode-notice');
+      notice.className = 'qa-mode-notice';
       notice.textContent = LABELS[getLang()].notice;
-      Object.assign(notice.style, {
-        position: 'absolute',
-        left: '50%',
-        bottom: 'calc(max(10px, env(safe-area-inset-bottom)) + var(--sticky-banner-height))',
-        zIndex: '3',
-        width: 'min(92vw, 440px)',
-        transform: 'translateX(-50%)',
-        padding: '8px 12px',
-        borderRadius: '8px',
-        background: 'rgba(61, 44, 30, 0.92)',
-        color: '#fff7e6',
-        fontSize: '13px',
-        fontWeight: '800',
-        textAlign: 'center'
-      });
-      menu.appendChild(notice);
+      menuPanel.appendChild(notice);
     }
   };
 

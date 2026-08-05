@@ -8468,8 +8468,8 @@
     }
   },
   {
-    "id": 72,
-    "name": "Задний двор",
+    "id": 76,
+    "name": "Сенной сарай",
     "width": 6,
     "height": 6,
     "exit": {
@@ -8487,204 +8487,86 @@
       },
       {
         "id": "A",
-        "kind": "crate",
-        "x": 1,
-        "y": 0,
-        "len": 1,
-        "dir": "any",
-        "maxMoves": 2
-      },
-      {
-        "id": "B",
         "kind": "car",
         "x": 3,
-        "y": 2,
+        "y": 1,
         "len": 2,
-        "dir": "v",
-        "skin": 0
-      },
-      {
-        "id": "C",
-        "kind": "tractor",
-        "x": 5,
-        "y": 2,
-        "len": 3,
-        "dir": "v",
-        "skin": 2
-      },
-      {
-        "id": "D",
-        "kind": "tractor",
-        "x": 1,
-        "y": 4,
-        "len": 3,
         "dir": "h",
         "skin": 1
       },
       {
-        "id": "E",
-        "kind": "crate",
-        "x": 1,
-        "y": 1,
-        "len": 1,
-        "dir": "any",
-        "maxMoves": 1
-      },
-      {
-        "id": "F",
-        "kind": "tractor",
+        "id": "B",
+        "kind": "car",
         "x": 2,
-        "y": 0,
-        "len": 3,
+        "y": 2,
+        "len": 2,
         "dir": "v",
         "skin": 2
       },
       {
-        "id": "H",
+        "id": "C",
         "kind": "car",
         "x": 0,
+        "y": 0,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 3,
         "y": 3,
         "len": 2,
         "dir": "v",
         "skin": 0
+      },
+      {
+        "id": "E",
+        "kind": "tractor",
+        "x": 0,
+        "y": 4,
+        "len": 3,
+        "dir": "h",
+        "skin": 2
+      },
+      {
+        "id": "F",
+        "kind": "car",
+        "x": 4,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "G",
+        "kind": "car",
+        "x": 4,
+        "y": 4,
+        "len": 2,
+        "dir": "v",
+        "skin": 2
       }
     ],
     "walls": [
       {
-        "x": 4,
-        "y": 1,
-        "kind": "hay"
+        "x": 1,
+        "y": 3,
+        "kind": "log"
       }
     ],
     "star": {
       "x": 2,
-      "y": 3
+      "y": 1
     },
     "par": 12,
     "par2": 14,
     "difficulty": "hard",
     "mechanics": [
       "tractor",
-      "crate",
-      "star",
-      "gate-switch"
-    ],
-    "gateSwitch": {
-      "x": 4,
-      "y": 3
-    }
-  },
-  {
-    "id": 73,
-    "name": "Дворовый узел",
-    "width": 6,
-    "height": 6,
-    "exit": {
-      "side": "right",
-      "index": 2
-    },
-    "pieces": [
-      {
-        "id": "T",
-        "kind": "target",
-        "x": 0,
-        "y": 2,
-        "len": 2,
-        "dir": "h"
-      },
-      {
-        "id": "A",
-        "kind": "truck",
-        "x": 0,
-        "y": 1,
-        "len": 3,
-        "dir": "h",
-        "skin": 0
-      },
-      {
-        "id": "B",
-        "kind": "car",
-        "x": 2,
-        "y": 2,
-        "len": 2,
-        "dir": "v",
-        "skin": 1
-      },
-      {
-        "id": "C",
-        "kind": "crate",
-        "x": 0,
-        "y": 4,
-        "len": 1,
-        "dir": "any",
-        "maxMoves": 2
-      },
-      {
-        "id": "D",
-        "kind": "car",
-        "x": 5,
-        "y": 1,
-        "len": 2,
-        "dir": "v",
-        "skin": 0
-      },
-      {
-        "id": "E",
-        "kind": "truck",
-        "x": 1,
-        "y": 4,
-        "len": 3,
-        "dir": "h",
-        "skin": 1
-      },
-      {
-        "id": "G",
-        "kind": "car",
-        "x": 1,
-        "y": 0,
-        "len": 2,
-        "dir": "h",
-        "skin": 0
-      },
-      {
-        "id": "H",
-        "kind": "crate",
-        "x": 3,
-        "y": 2,
-        "len": 1,
-        "dir": "any",
-        "maxMoves": 1
-      }
-    ],
-    "walls": [
-      {
-        "x": 5,
-        "y": 4,
-        "kind": "log"
-      },
-      {
-        "x": 3,
-        "y": 0,
-        "kind": "log"
-      }
-    ],
-    "star": {
-      "x": 4,
-      "y": 4
-    },
-    "par": 12,
-    "par2": 14,
-    "difficulty": "hard",
-    "mechanics": [
-      "truck",
-      "crate",
-      "star",
-      "gate-switch"
-    ],
-    "gateSwitch": {
-      "x": 1,
-      "y": 3
-    }
+      "star"
+    ]
   },
   {
     "id": 74,
@@ -8803,6 +8685,118 @@
     "mechanics": [
       "truck",
       "tractor",
+      "crate",
+      "star",
+      "gate-switch"
+    ],
+    "gateSwitch": {
+      "x": 1,
+      "y": 3
+    }
+  },
+  {
+    "id": 73,
+    "name": "Дворовый узел",
+    "width": 6,
+    "height": 6,
+    "exit": {
+      "side": "right",
+      "index": 2
+    },
+    "pieces": [
+      {
+        "id": "T",
+        "kind": "target",
+        "x": 0,
+        "y": 2,
+        "len": 2,
+        "dir": "h"
+      },
+      {
+        "id": "A",
+        "kind": "truck",
+        "x": 0,
+        "y": 1,
+        "len": 3,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "B",
+        "kind": "car",
+        "x": 2,
+        "y": 2,
+        "len": 2,
+        "dir": "v",
+        "skin": 1
+      },
+      {
+        "id": "C",
+        "kind": "crate",
+        "x": 0,
+        "y": 4,
+        "len": 1,
+        "dir": "any",
+        "maxMoves": 2
+      },
+      {
+        "id": "D",
+        "kind": "car",
+        "x": 5,
+        "y": 1,
+        "len": 2,
+        "dir": "v",
+        "skin": 0
+      },
+      {
+        "id": "E",
+        "kind": "truck",
+        "x": 1,
+        "y": 4,
+        "len": 3,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "G",
+        "kind": "car",
+        "x": 1,
+        "y": 0,
+        "len": 2,
+        "dir": "h",
+        "skin": 0
+      },
+      {
+        "id": "H",
+        "kind": "crate",
+        "x": 3,
+        "y": 2,
+        "len": 1,
+        "dir": "any",
+        "maxMoves": 1
+      }
+    ],
+    "walls": [
+      {
+        "x": 5,
+        "y": 4,
+        "kind": "log"
+      },
+      {
+        "x": 3,
+        "y": 0,
+        "kind": "log"
+      }
+    ],
+    "star": {
+      "x": 4,
+      "y": 4
+    },
+    "par": 12,
+    "par2": 14,
+    "difficulty": "hard",
+    "mechanics": [
+      "truck",
       "crate",
       "star",
       "gate-switch"
@@ -8971,8 +8965,8 @@
     }
   },
   {
-    "id": 76,
-    "name": "Сенной сарай",
+    "id": 72,
+    "name": "Задний двор",
     "width": 6,
     "height": 6,
     "exit": {
@@ -8990,86 +8984,92 @@
       },
       {
         "id": "A",
-        "kind": "car",
-        "x": 3,
-        "y": 1,
-        "len": 2,
-        "dir": "h",
-        "skin": 1
+        "kind": "crate",
+        "x": 1,
+        "y": 0,
+        "len": 1,
+        "dir": "any",
+        "maxMoves": 2
       },
       {
         "id": "B",
         "kind": "car",
-        "x": 2,
+        "x": 3,
         "y": 2,
-        "len": 2,
-        "dir": "v",
-        "skin": 2
-      },
-      {
-        "id": "C",
-        "kind": "car",
-        "x": 0,
-        "y": 0,
         "len": 2,
         "dir": "v",
         "skin": 0
       },
       {
+        "id": "C",
+        "kind": "tractor",
+        "x": 5,
+        "y": 2,
+        "len": 3,
+        "dir": "v",
+        "skin": 2
+      },
+      {
         "id": "D",
+        "kind": "tractor",
+        "x": 1,
+        "y": 4,
+        "len": 3,
+        "dir": "h",
+        "skin": 1
+      },
+      {
+        "id": "E",
+        "kind": "crate",
+        "x": 1,
+        "y": 1,
+        "len": 1,
+        "dir": "any",
+        "maxMoves": 1
+      },
+      {
+        "id": "F",
+        "kind": "tractor",
+        "x": 2,
+        "y": 0,
+        "len": 3,
+        "dir": "v",
+        "skin": 2
+      },
+      {
+        "id": "H",
         "kind": "car",
-        "x": 3,
+        "x": 0,
         "y": 3,
         "len": 2,
         "dir": "v",
         "skin": 0
-      },
-      {
-        "id": "E",
-        "kind": "tractor",
-        "x": 0,
-        "y": 4,
-        "len": 3,
-        "dir": "h",
-        "skin": 2
-      },
-      {
-        "id": "F",
-        "kind": "car",
-        "x": 4,
-        "y": 2,
-        "len": 2,
-        "dir": "v",
-        "skin": 1
-      },
-      {
-        "id": "G",
-        "kind": "car",
-        "x": 4,
-        "y": 4,
-        "len": 2,
-        "dir": "v",
-        "skin": 2
       }
     ],
     "walls": [
       {
-        "x": 1,
-        "y": 3,
-        "kind": "log"
+        "x": 4,
+        "y": 1,
+        "kind": "hay"
       }
     ],
     "star": {
       "x": 2,
-      "y": 1
+      "y": 3
     },
     "par": 12,
     "par2": 14,
     "difficulty": "hard",
     "mechanics": [
       "tractor",
-      "star"
-    ]
+      "crate",
+      "star",
+      "gate-switch"
+    ],
+    "gateSwitch": {
+      "x": 4,
+      "y": 3
+    }
   },
   {
     "id": 77,

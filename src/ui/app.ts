@@ -99,6 +99,17 @@ import { TARGET_SKINS, setTargetSkin } from './sprites';
 import { levelThumbnail } from './thumbnail';
 import { yardSVG } from './yard';
 
+/**
+ * Уровни, где подсказка бесплатна и не жжёт платный токен — не только
+ * первые три онбординговых, но и вступление в каждую новую механику по всей
+ * кампании. Раньше страховка снималась разом после уровня 3, и игрок, только
+ * что впервые увидевший лёд/кур/held-кнопку на уровне 17/105/109/113, платил
+ * токеном за подсказку по правилу, которому игра ещё не успела научить.
+ * Список — id уровней с `role: 'tutorial'` плюс 17 (кнопка ворот, единственная
+ * механика без выделенной мини-главы).
+ */
+const FREE_HINT_LEVEL_IDS = new Set([1, 2, 3, 17, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116]);
+
 const MEDAL_ICON: Record<Medal, string> = { 0: '', 1: '🥉', 2: '🥈', 3: '🥇' };
 const MEDAL_KEY: Record<Medal, string> = { 0: 'medal.none', 1: 'medal.bronze', 2: 'medal.silver', 3: 'medal.gold' };
 
@@ -1413,6 +1424,7 @@ export class App {
       const starsAfter = totalStars(this.store.data);
       const unlocked = newlyUnlocked(starsBefore, starsAfter);
       for (const upgrade of unlocked) track({ type: 'upgrade_unlocked', key: upgrade.key, stars: starsAfter });
+      const newSkins = TARGET_SKINS.filter((s) => !s.elite && s.unlockStars > starsBefore && s.unlockStars <= starsAfter);
       const yardStageAfter = yardMilestone(completedCampaignLevels(LEVELS, this.store.data));
       if (improved) {
         void this.platform.submitScore('yardstars', starsAfter);
@@ -1434,12 +1446,14 @@ export class App {
         finalStars,
         unlocked,
         newAchievements,
-        yardStageAfter > yardStageBefore ? yardStageAfter : 0
+        yardStageAfter > yardStageBefore ? yardStageAfter : 0,
+        newSkins
       );
       return;
     }
     // Короткий переход между фазами — без перезагрузки страницы.
     const nextRun = advancePhase(run, def);
+    this.audio.play('bossPhase');
     this.yardDirector?.react('boss-phase');
     const overlay = document.createElement('div');
     overlay.className = 'overlay boss-transition';
@@ -1492,7 +1506,8 @@ export class App {
     stars: number,
     unlocked: ReturnType<typeof newlyUnlocked>,
     newAchievements: (typeof ACHIEVEMENTS)[number][],
-    newYardStage: number
+    newYardStage: number,
+    newSkins: (typeof TARGET_SKINS)[number][] = []
   ): void {
     this.audio.play('win');
     this.vibrate([28, 45, 28, 45, 70]);
@@ -1520,6 +1535,12 @@ export class App {
           )}: ${t(`achievement.${achievement.key}.title`)}</div>`
       )
       .join('');
+    const skinNote = newSkins
+      .map(
+        (skin) =>
+          `<div class="win-upgrade" data-testid="win-skin">${t('win.skinUnlocked', { name: t(skin.nameKey) })}</div>`
+      )
+      .join('');
     const overlay = document.createElement('div');
     overlay.className = 'overlay boss-victory';
     overlay.setAttribute('data-testid', 'boss-victory');
@@ -1531,7 +1552,7 @@ export class App {
          <div class="win-stars" data-testid="win-stars" data-stars="${stars}">${starIcons(stars)}</div>
          <p class="boss-victory-text" data-testid="boss-victory-text">${t(def.victoryKey)}</p>
          ${(() => {
-           const rewardNotes = [yardStageNote, upgradeNote, achievementNote].join('');
+           const rewardNotes = [yardStageNote, upgradeNote, skinNote, achievementNote].join('');
            return rewardNotes ? `<div class="win-rewards" data-testid="win-rewards">${rewardNotes}</div>` : '';
          })()}
         ${next ? `<button class="btn btn-primary btn-big" data-testid="btn-next">${t('win.next')}</button>` : ''}
@@ -1762,8 +1783,9 @@ export class App {
     };
 
     const bv = new BoardView(host, level, cur, {
-      onPick: () => {
+      onPick: (piece) => {
         this.audio.play('pick');
+        if (level.pieces[piece]?.kind === 'tractor') this.audio.play('tractorStart');
         this.audio.engineStart();
         this.hideOnboardingHand();
       },
@@ -1802,7 +1824,7 @@ export class App {
           firstMoveTracked = true;
           track({ type: 'first_move', levelId: level.id, timeMs: Math.round(performance.now() - levelStartedAt) });
         }
-        this.audio.play('move');
+        this.audio.play(level.pieces[piece]?.kind === 'crate' ? 'crateSlide' : 'move');
         this.hideOnboardingHand();
         this.store.markTutorialSeen();
         if (res.starCollected) {
@@ -1813,6 +1835,7 @@ export class App {
         if (res.exited) {
           this.audio.play('honk');
           this.audio.play('exitRev');
+          this.audio.play('victoryDrive');
         }
         // Случайное кудахтанье декоративных кур у забора — только там, где куры
         // НЕ игровой объект. На уровне с курами-блокираторами тот же звук уже
@@ -2013,7 +2036,7 @@ export class App {
         let hintSource: 'free' | 'token' | 'rewarded' = 'free';
         // Обучающие уровни кампании: подсказка бесплатна и не жжёт платный токен —
         // это часть онбординга, не рекламной/платной экономики подсказок.
-        const isTutorialLevel = !daily && !challenge && level.id >= 1 && level.id <= 3;
+        const isTutorialLevel = !daily && !challenge && FREE_HINT_LEVEL_IDS.has(level.id);
         if (isTutorialLevel) {
           hintBtn.textContent = t('btn.hintFree');
         } else if (this.store.spendHintToken()) {
@@ -2215,6 +2238,7 @@ export class App {
     const endlessBefore = endlessAccess(LEVELS, this.store.data);
     const yardStageBefore = yardMilestone(completedCampaignLevels(LEVELS, this.store.data));
     let unlocked: ReturnType<typeof newlyUnlocked> = [];
+    let newSkins: (typeof TARGET_SKINS)[number][] = [];
     let justMastered = false;
     let newYardStage = 0;
     let dailyStreak = 0;
@@ -2244,6 +2268,7 @@ export class App {
       // Пороги считаются по звёздам «до/после», поэтому повторное прохождение
       // уже открытого улучшения событие не повторяет.
       for (const upgrade of unlocked) track({ type: 'upgrade_unlocked', key: upgrade.key, stars: after });
+      newSkins = TARGET_SKINS.filter((s) => !s.elite && s.unlockStars > before && s.unlockStars <= after);
       const yardStageAfter = yardMilestone(completedCampaignLevels(LEVELS, this.store.data));
       if (yardStageAfter > yardStageBefore) newYardStage = yardStageAfter;
       if (improved) {
@@ -2315,6 +2340,12 @@ export class App {
           )}: ${t(`achievement.${achievement.key}.title`)}</div>`
       )
       .join('');
+    const skinNote = newSkins
+      .map(
+        (skin) =>
+          `<div class="win-upgrade" data-testid="win-skin">${t('win.skinUnlocked', { name: t(skin.nameKey) })}</div>`
+      )
+      .join('');
     const confettiColors = ['#e2574c', '#f6c445', '#45968f', '#3f7fd1', '#e88fb6'];
     const confetti = Array.from({ length: justMastered ? 44 : level.width > 6 ? 34 : 20 }, () => {
       const c = confettiColors[Math.floor(Math.random() * confettiColors.length)];
@@ -2334,7 +2365,7 @@ export class App {
           endState.moves <= level.par ? t('win.perfect') : ''
         }</div>
         ${(() => {
-          const rewardNotes = [starNote, masterNote, yardStageNote, chapterNote, eliteReplayNote, dailyNote, upgradeNote, achievementNote].join('');
+          const rewardNotes = [starNote, masterNote, yardStageNote, chapterNote, eliteReplayNote, dailyNote, upgradeNote, skinNote, achievementNote].join('');
           return rewardNotes ? `<div class="win-rewards" data-testid="win-rewards">${rewardNotes}</div>` : '';
         })()}
         <button class="btn share-btn" data-testid="btn-share">↗ ${t('daily.share')}</button>

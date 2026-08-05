@@ -11,6 +11,7 @@ export type SoundName =
   | 'click'
   | 'pick'
   | 'move'
+  | 'crateSlide'
   | 'thud'
   | 'star'
   | 'switch'
@@ -24,7 +25,10 @@ export type SoundName =
   | 'meow'
   | 'undo'
   | 'exitRev'
-  | 'grandpa';
+  | 'grandpa'
+  | 'bossPhase'
+  | 'tractorStart'
+  | 'victoryDrive';
 
 /** Лёгкая рандомизация высоты, чтобы звуки не были «из калькулятора». */
 const vary = (f: number) => f * (0.95 + Math.random() * 0.1);
@@ -37,6 +41,7 @@ export class GameAudio {
   private hidden = false;
   private ambientStarted = false;
   private engine: { osc: OscillatorNode; lfo: OscillatorNode; gain: GainNode } | null = null;
+  private engineSample: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
   private musicGain: GainNode | null = null;
   private musicTimer: number | null = null;
   private musicBar = 0;
@@ -230,9 +235,30 @@ export class GameAudio {
     osc.stop(t0 + 0.85);
   }
 
-  /** Урчание мотора, пока игрок тянет машину. */
+  /**
+   * Урчание мотора, пока игрок тянет машину. Длится произвольно долго (пока
+   * держат палец/курсор), поэтому `playSample()` (одноразовый выстрел под
+   * длину буфера) не подходит — здесь свой зацикленный источник с явным
+   * стартом/стопом, тот же приём, что и у синтез-фолбэка (`this.engine`).
+   */
   engineStart(): void {
-    if (!this.enabled || this.suspended() || !this.ctx || !this.master || this.engine) return;
+    if (!this.enabled || this.suspended() || !this.ctx || !this.master || this.engine || this.engineSample) return;
+    const buffer = this.sampleLoader?.get('engine_idle');
+    if (buffer) {
+      const src = this.ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0, this.ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.16, this.ctx.currentTime + 0.12);
+      src.connect(gain).connect(this.master);
+      src.start();
+      this.engineSample = { src, gain };
+      return;
+    }
+    if (this.sampleLoader && !this.sampleLoader.hasFailed('engine_idle')) {
+      void this.sampleLoader.load('engine_idle', SOUND_FILE_URLS.engine_idle);
+    }
     const osc = this.ctx.createOscillator();
     osc.type = 'sawtooth';
     osc.frequency.value = 52 + Math.random() * 8;
@@ -254,6 +280,13 @@ export class GameAudio {
   }
 
   engineStop(): void {
+    if (this.engineSample && this.ctx) {
+      const { src, gain } = this.engineSample;
+      this.engineSample = null;
+      gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.15);
+      src.stop(this.ctx.currentTime + 0.2);
+      return;
+    }
     if (!this.engine || !this.ctx) return;
     const { osc, lfo, gain } = this.engine;
     this.engine = null;
@@ -374,6 +407,13 @@ export class GameAudio {
       case 'move':
         this.gravelRoll(vary(0.34), 0.17);
         break;
+      case 'crateSlide':
+        // Короче и суше «move»: ящик скребёт по земле, а не катится на
+        // колёсах — тот же шум-скрежет, но без долгого низкочастотного хвоста.
+        this.playSample('crate_slide', 0.25, () => {
+          this.noise(vary(0.16), 0.18, 900, 0, 500);
+        });
+        break;
       case 'undo':
         this.tone(440, 0.08, 'triangle', 0.16, 0, 300);
         break;
@@ -453,6 +493,28 @@ export class GameAudio {
         });
         break;
       }
+      case 'tractorStart':
+        // Чихание мотора при подхвате трактора — короче и грубее гула drag'а
+        // (engineStart), тот отдельно наложится следом, пока фигуру держат.
+        this.playSample('tractor_start', 0.32, () => {
+          this.noise(0.1, 0.14, 500, 0, 200);
+          this.tone(vary(70), 0.14, 'sawtooth', 0.16, 0.06, 55);
+          this.noise(0.08, 0.12, 450, 0.14, 180);
+        });
+        break;
+      case 'victoryDrive':
+        // Наслаивается на honk/exitRev при выезде — сэмпл длиннее и веселее
+        // синтеза, фолбэк короткий, чтобы не дублировать уже играющий exitRev.
+        this.playSample('victory_drive', 0.3, () => {
+          this.tone(659, 0.1, 'triangle', 0.14, 0.05);
+        });
+        break;
+      case 'bossPhase':
+        this.playSample('boss_phase', 0.4, () => {
+          this.tone(523, 0.1, 'triangle', 0.18);
+          this.tone(784, 0.16, 'triangle', 0.18, 0.09);
+        });
+        break;
       case 'cluck': {
         const base = 700 + Math.random() * 200;
         this.tone(base, 0.045, 'square', 0.05, 0, base * 0.8);

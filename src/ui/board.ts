@@ -22,7 +22,7 @@ import { CELL, chickenArt, fieldChickenArt, iceArt, kindBadge, pieceArt, plankAr
 const M = 90; // поля вокруг двора: забор, куры
 
 export interface BoardEvents {
-  onPick(): void;
+  onPick(piece: number): void;
   /** Палец/мышь отпущены (независимо от того, был ли ход). */
   onRelease(): void;
   /** Ход применён; state уже обновлён внутри BoardView. */
@@ -1233,7 +1233,7 @@ export class BoardView {
     } catch {
       // синтетические события (тесты) не имеют активного указателя
     }
-    this.events.onPick();
+    this.events.onPick(idx);
     e.preventDefault();
   }
 

@@ -161,13 +161,19 @@ describe('уровни игры', () => {
     expect(intro?.star).toBeUndefined();
     expect(intro?.gateSwitch).toBeUndefined();
 
-    // Мини-глава идёт подряд и усложняется: механики только добавляются.
-    const chapter = LEVELS.filter((level) => level.mechanics.includes('ice'));
-    const positions = chapter.map((level) => LEVELS.indexOf(level));
-    for (let i = 1; i < positions.length; i++) expect(positions[i]).toBe(positions[i - 1] + 1);
-    for (let i = 1; i < chapter.length; i++) {
-      for (const mechanic of chapter[i - 1].mechanics) {
-        expect(chapter[i].mechanics, `уровень ${chapter[i].id}: механика ${mechanic} пропала`).toContain(mechanic);
+    // Вводная мини-глава идёт подряд и усложняется: механики только добавляются.
+    // Проверяем только ведущий непрерывный блок от intro — лёд намеренно
+    // возвращается позже (глава 10, позиции 117–128), уже вперемешку с курами
+    // и held-кнопкой: там знакомство пройдено, и правило «ничего разом»
+    // относится только к первому появлению механики.
+    const introStart = LEVELS.indexOf(intro!);
+    let introEnd = introStart;
+    while (introEnd + 1 < LEVELS.length && LEVELS[introEnd + 1].mechanics.includes('ice')) introEnd++;
+    for (let k = introStart; k < introEnd; k++) {
+      for (const mechanic of LEVELS[k].mechanics) {
+        expect(LEVELS[k + 1].mechanics, `уровень ${LEVELS[k + 1].id}: механика ${mechanic} пропала`).toContain(
+          mechanic
+        );
       }
     }
   });

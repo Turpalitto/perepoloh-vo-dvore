@@ -1,0 +1,12 @@
+  … итерация 0/8000, drop={"gen":0,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":0,"noIce":0,"noChicken":0,"held":0,"finalFail":0,"range":0,"star":0}
+  … итерация 200/8000, drop={"gen":0,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":88,"noIce":108,"noChicken":0,"held":0,"finalFail":0,"range":4,"star":0}
+  … итерация 400/8000, drop={"gen":0,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":173,"noIce":220,"noChicken":0,"held":0,"finalFail":0,"range":7,"star":0}
+  … итерация 600/8000, drop={"gen":0,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":262,"noIce":327,"noChicken":0,"held":0,"finalFail":0,"range":11,"star":0}
+  … итерация 800/8000, drop={"gen":0,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":335,"noIce":452,"noChicken":0,"held":0,"finalFail":0,"range":13,"star":0}
+  … итерация 1000/8000, drop={"gen":1,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":416,"noIce":567,"noChicken":0,"held":0,"finalFail":0,"range":16,"star":0}
+  … итерация 1200/8000, drop={"gen":1,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":503,"noIce":677,"noChicken":0,"held":0,"finalFail":0,"range":19,"star":0}
+  … итерация 1400/8000, drop={"gen":1,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":584,"noIce":795,"noChicken":0,"held":0,"finalFail":0,"range":20,"star":0}
+  … итерация 1600/8000, drop={"gen":1,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":684,"noIce":892,"noChicken":0,"held":0,"finalFail":0,"range":23,"star":0}
+  … итерация 1800/8000, drop={"gen":1,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":760,"noIce":1013,"noChicken":0,"held":0,"finalFail":0,"range":26,"star":0}
+  … итерация 2000/8000, drop={"gen":2,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":848,"noIce":1122,"noChicken":0,"held":0,"finalFail":0,"range":28,"star":0}
+  … итерация 2200/8000, drop={"gen":2,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":923,"noIce":1245,"noChicken":0,"held":0,"finalFail":0,"range":30,"star":0}

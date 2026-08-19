@@ -1,0 +1,122 @@
+preset=l122 found=true drop={"gen":20,"gate":49,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":2980,"noIce":0,"noChicken":0,"held":0,"finalFail":1,"range":1497,"star":0}
+{
+ "id": 0,
+ "name": "gen",
+ "width": 6,
+ "height": 6,
+ "exit": {
+  "side": "right",
+  "index": 2
+ },
+ "pieces": [
+  {
+   "id": "T",
+   "kind": "target",
+   "x": 0,
+   "y": 2,
+   "len": 2,
+   "dir": "h"
+  },
+  {
+   "id": "A",
+   "kind": "truck",
+   "x": 3,
+   "y": 1,
+   "len": 3,
+   "dir": "v",
+   "skin": 2
+  },
+  {
+   "id": "B",
+   "kind": "tractor",
+   "x": 1,
+   "y": 5,
+   "len": 3,
+   "dir": "h",
+   "skin": 1
+  },
+  {
+   "id": "C",
+   "kind": "car",
+   "x": 4,
+   "y": 1,
+   "len": 2,
+   "dir": "h",
+   "skin": 1
+  },
+  {
+   "id": "D",
+   "kind": "car",
+   "x": 1,
+   "y": 3,
+   "len": 2,
+   "dir": "h",
+   "skin": 2
+  },
+  {
+   "id": "E",
+   "kind": "car",
+   "x": 1,
+   "y": 0,
+   "len": 2,
+   "dir": "h",
+   "skin": 1
+  },
+  {
+   "id": "F",
+   "kind": "car",
+   "x": 0,
+   "y": 0,
+   "len": 2,
+   "dir": "v",
+   "skin": 0
+  },
+  {
+   "id": "G",
+   "kind": "tractor",
+   "x": 3,
+   "y": 4,
+   "len": 3,
+   "dir": "h",
+   "skin": 1
+  },
+  {
+   "id": "H",
+   "kind": "car",
+   "x": 2,
+   "y": 1,
+   "len": 2,
+   "dir": "v",
+   "skin": 1
+  },
+  {
+   "id": "J",
+   "kind": "tractor",
+   "x": 3,
+   "y": 0,
+   "len": 3,
+   "dir": "h",
+   "skin": 0
+  }
+ ],
+ "walls": [],
+ "star": {
+  "x": 5,
+  "y": 5
+ },
+ "gateSwitch": {
+  "x": 4,
+  "y": 5,
+  "holdType": "held"
+ },
+ "par": 20,
+ "par2": 22,
+ "difficulty": "hard",
+ "mechanics": [
+  "truck",
+  "tractor",
+  "star",
+  "gate-switch"
+ ],
+ "role": "tutorial"
+}

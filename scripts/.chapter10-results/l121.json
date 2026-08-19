@@ -1,0 +1,162 @@
+{
+ "id": 121,
+ "name": "Куры и звёзды",
+ "width": 7,
+ "height": 7,
+ "exit": {
+  "side": "right",
+  "index": 3
+ },
+ "pieces": [
+  {
+   "id": "T",
+   "kind": "target",
+   "x": 0,
+   "y": 3,
+   "len": 2,
+   "dir": "h"
+  },
+  {
+   "id": "A",
+   "kind": "tractor",
+   "x": 0,
+   "y": 4,
+   "len": 3,
+   "dir": "h",
+   "skin": 1
+  },
+  {
+   "id": "B",
+   "kind": "car",
+   "x": 4,
+   "y": 3,
+   "len": 2,
+   "dir": "v",
+   "skin": 1
+  },
+  {
+   "id": "C",
+   "kind": "tractor",
+   "x": 2,
+   "y": 1,
+   "len": 3,
+   "dir": "v",
+   "skin": 1
+  },
+  {
+   "id": "D",
+   "kind": "truck",
+   "x": 2,
+   "y": 0,
+   "len": 3,
+   "dir": "h",
+   "skin": 1
+  },
+  {
+   "id": "F",
+   "kind": "crate",
+   "x": 0,
+   "y": 0,
+   "len": 1,
+   "dir": "any",
+   "maxMoves": 1
+  },
+  {
+   "id": "G",
+   "kind": "tractor",
+   "x": 5,
+   "y": 3,
+   "len": 3,
+   "dir": "v",
+   "skin": 1
+  },
+  {
+   "id": "H",
+   "kind": "tractor",
+   "x": 6,
+   "y": 2,
+   "len": 3,
+   "dir": "v",
+   "skin": 1
+  },
+  {
+   "id": "I",
+   "kind": "crate",
+   "x": 1,
+   "y": 6,
+   "len": 1,
+   "dir": "any",
+   "maxMoves": 1
+  },
+  {
+   "id": "J",
+   "kind": "car",
+   "x": 5,
+   "y": 0,
+   "len": 2,
+   "dir": "h",
+   "skin": 2
+  },
+  {
+   "id": "L",
+   "kind": "tractor",
+   "x": 4,
+   "y": 6,
+   "len": 3,
+   "dir": "h",
+   "skin": 2
+  },
+  {
+   "id": "M",
+   "kind": "car",
+   "x": 4,
+   "y": 2,
+   "len": 2,
+   "dir": "h",
+   "skin": 1
+  },
+  {
+   "id": "N",
+   "kind": "car",
+   "x": 3,
+   "y": 1,
+   "len": 2,
+   "dir": "h",
+   "skin": 2
+  }
+ ],
+ "walls": [
+  {
+   "x": 0,
+   "y": 2,
+   "kind": "barrel"
+  }
+ ],
+ "star": {
+  "x": 3,
+  "y": 6
+ },
+ "par": 30,
+ "par2": 32,
+ "difficulty": "hard",
+ "mechanics": [
+  "tractor",
+  "truck",
+  "crate",
+  "star",
+  "chickens"
+ ],
+ "hint": "Финал! Веди дедов жигулёнок через весь двор — шаг за шагом",
+ "chickens": [
+  {
+   "a": {
+    "x": 3,
+    "y": 3
+   },
+   "b": {
+    "x": 3,
+    "y": 4
+   }
+  }
+ ]
+}

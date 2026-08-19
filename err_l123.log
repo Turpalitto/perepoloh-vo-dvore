@@ -1,0 +1,4 @@
+  … итерация 0/8000, drop={"gen":0,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":0,"noIce":0,"noChicken":0,"held":0,"finalFail":0,"range":0,"star":0}
+  … итерация 200/8000, drop={"gen":0,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":86,"noIce":95,"noChicken":19,"held":0,"finalFail":0,"range":0,"star":0}
+  … итерация 400/8000, drop={"gen":0,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":176,"noIce":190,"noChicken":34,"held":0,"finalFail":0,"range":0,"star":0}
+  … итерация 600/8000, drop={"gen":0,"gate":0,"kinds":0,"walls":0,"valid":0,"dup":0,"unsolvable":260,"noIce":286,"noChicken":54,"held":0,"finalFail":0,"range":0,"star":0}

@@ -28,7 +28,8 @@ export type SoundName =
   | 'grandpa'
   | 'bossPhase'
   | 'tractorStart'
-  | 'victoryDrive';
+  | 'victoryDrive'
+  | 'chickenScatter';
 
 /** Лёгкая рандомизация высоты, чтобы звуки не были «из калькулятора». */
 const vary = (f: number) => f * (0.95 + Math.random() * 0.1);
@@ -418,12 +419,18 @@ export class GameAudio {
         this.tone(440, 0.08, 'triangle', 0.16, 0, 300);
         break;
       case 'thud':
-        this.tone(vary(95), 0.1, 'sine', 0.35, 0, 60);
-        this.noise(0.07, 0.12, 400);
+        // Упор в препятствие. Сэмпл металлического удара (чаще всего упираются
+        // в технику) поверх прежнего глухого синтеза — тот остаётся фолбэком.
+        this.playSample('metal_hit', 0.3, () => {
+          this.tone(vary(95), 0.1, 'sine', 0.35, 0, 60);
+          this.noise(0.07, 0.12, 400);
+        });
         break;
       case 'bark':
-        this.tone(150, 0.08, 'square', 0.22, 0, 95);
-        this.tone(140, 0.09, 'square', 0.22, 0.13, 88);
+        this.playSample('dog_bark', 0.3, () => {
+          this.tone(150, 0.08, 'square', 0.22, 0, 95);
+          this.tone(140, 0.09, 'square', 0.22, 0.13, 88);
+        });
         break;
       case 'meow':
         this.tone(620, 0.28, 'sine', 0.12, 0, 330);
@@ -522,6 +529,17 @@ export class GameAudio {
         this.tone(base * 1.35, 0.065, 'square', 0.06, 0.16, base * 1.1);
         break;
       }
+      case 'chickenScatter':
+        // Курица-объект перескочила на другую клетку: вспархивание стаи —
+        // шум крыльев вместо одиночного «ко-ко» одиночной декоративной курицы.
+        this.playSample('chickens_scatter', 0.28, () => {
+          for (let i = 0; i < 3; i++) {
+            const base = 640 + Math.random() * 260;
+            this.tone(base, 0.05, 'square', 0.055, i * 0.06, base * 1.2);
+            this.noise(0.05, 0.05, 2400, i * 0.06 + 0.01);
+          }
+        });
+        break;
     }
   }
 }

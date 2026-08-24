@@ -98,6 +98,30 @@ describe('сохранения', () => {
     expect(store.data.endlessBest).toBe(9);
   });
 
+  it('точка восстановления заезда пишется и снимается', () => {
+    const platform = { saveData: async () => undefined } as unknown as Platform;
+    const store = new SaveStore(platform, defaultSave());
+    store.setEndlessResume(5);
+    expect(store.data.endlessResume).toBe(5);
+    // Явное «Закончить забег» — поле исчезает, а не остаётся нулём.
+    store.setEndlessResume(undefined);
+    expect(store.data.endlessResume).toBeUndefined();
+  });
+
+  it('endlessResume: санитизация мусора и максимум при слиянии', () => {
+    const clean = sanitizeSave({ ...defaultSave(), endlessResume: 7 });
+    expect(clean?.endlessResume).toBe(7);
+    // Отрицательные и нецелые значения отбрасываются, огромные клэмпятся.
+    expect(sanitizeSave({ ...defaultSave(), endlessResume: -2 })?.endlessResume).toBeUndefined();
+    expect(sanitizeSave({ ...defaultSave(), endlessResume: 1.5 })?.endlessResume).toBeUndefined();
+    expect(sanitizeSave({ ...defaultSave(), endlessResume: 99_999 })?.endlessResume).toBe(9999);
+    const merged = mergeSave(
+      { ...defaultSave(), endlessResume: 3 },
+      { ...defaultSave(), endlessResume: 6 }
+    );
+    expect(merged.endlessResume).toBe(6);
+  });
+
   it('при слиянии не дублирует подарочные подсказки между устройствами', () => {
     const a = { ...defaultSave(), hintTokens: 3, lastGift: '2026-07-19' };
     const b = { ...defaultSave(), hintTokens: 2, lastGift: '2026-07-20' };

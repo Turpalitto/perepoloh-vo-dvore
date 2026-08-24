@@ -29,7 +29,6 @@ import {
 } from '../game/daily';
 import { DailyLevelService } from '../game/daily-client';
 import { generateEndless } from '../game/endless';
-import { requestReminderPermission } from '../game/reminder';
 import { SessionStats } from '../game/session-stats';
 import { currentSeason } from '../game/season';
 import {
@@ -98,6 +97,9 @@ import { showCampaignEnding } from './campaign-ending';
 import { TARGET_SKINS, setTargetSkin } from './sprites';
 import { levelThumbnail } from './thumbnail';
 import { yardSVG } from './yard';
+import { confettiHtml } from './confetti';
+import { SettingsToggles } from './toggles';
+import { TVNavigator } from './tv-navigation';
 
 /**
  * Уровни, где подсказка бесплатна и не жжёт платный токен — не только
@@ -109,6 +111,14 @@ import { yardSVG } from './yard';
  * механика без выделенной мини-главы).
  */
 const FREE_HINT_LEVEL_IDS = new Set([1, 2, 3, 17, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116]);
+
+/**
+ * Жёсткий потолок interstitial за сессию. README обещает «не более 11 за
+ * полную кампанию»; без этой константы лимит существовал только арифметикой
+ * дефолтов каденса, а ошибка в Remote Config (например `interstitial_every=2`)
+ * давала десятки показов за сессию.
+ */
+const MAX_INTERSTITIALS_PER_SESSION = 11;
 
 const MEDAL_ICON: Record<Medal, string> = { 0: '', 1: '🥉', 2: '🥈', 3: '🥇' };
 const MEDAL_KEY: Record<Medal, string> = { 0: 'medal.none', 1: 'medal.bronze', 2: 'medal.silver', 3: 'medal.gold' };
@@ -137,17 +147,9 @@ function eliteGoalRows(challenge: EliteChallenge): Array<{ medal: Medal; text: s
   ];
 }
 
-const soundOnIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 9 h4 l5 -4 v14 l-5 -4 H4 Z" fill="currentColor"/><path d="M16 8 q3 4 0 8 M18.5 5.5 q5 6.5 0 13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
-const soundOffIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 9 h4 l5 -4 v14 l-5 -4 H4 Z" fill="currentColor"/><path d="M16 9 l6 6 M22 9 l-6 6" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>`;
 const pauseIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="currentColor"/></svg>`;
 const backIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M14 5 L7 12 L14 19 M7.5 12 H20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const musicOnIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M9 17.5 V6.5 l9 -2 v11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="2.6" fill="currentColor"/><circle cx="16" cy="15.5" r="2.6" fill="currentColor"/></svg>`;
-const musicOffIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M9 17.5 V6.5 l9 -2 v11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" opacity="0.45"/><circle cx="7" cy="17.5" r="2.6" fill="currentColor" opacity="0.45"/><circle cx="16" cy="15.5" r="2.6" fill="currentColor" opacity="0.45"/><line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
-const vibrateOnIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><rect x="8" y="4" width="8" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M4 9 v6 M2 11 v2 M20 9 v6 M22 11 v2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`;
-const vibrateOffIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><rect x="8" y="4" width="8" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2.2" opacity="0.45"/><line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 const contrastIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 3 a9 9 0 0 1 0 18 Z" fill="currentColor"/></svg>`;
-const bellOnIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 3.5a5.5 5.5 0 0 0-5.5 5.5v3l-2 3.5h15l-2-3.5V9A5.5 5.5 0 0 0 12 3.5Z" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M9.5 18.5a2.5 2.5 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>`;
-const bellOffIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 3.5a5.5 5.5 0 0 0-5.5 5.5v3l-2 3.5h15l-2-3.5V9A5.5 5.5 0 0 0 12 3.5Z" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round" opacity="0.45"/><path d="M9.5 18.5a2.5 2.5 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" opacity="0.45"/><line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 const settingsIcon = `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5 7 7M17 17l1.5 1.5M18.5 5.5 17 7M7 17l-1.5 1.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="7.1" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
 
 function starIcons(n: number, of = 3): string {
@@ -162,7 +164,10 @@ function escapeHTML(value: string): string {
 
 export class App {
   private root: HTMLElement;
+  private toggles: SettingsToggles;
+  private tv: TVNavigator;
   private winsSinceAd = 0;
+  private interstitialsShown = 0;
   private inGameplay = false;
   private platformPaused = false;
   private userPaused = false;
@@ -172,9 +177,6 @@ export class App {
   private freeHintsLeft: number;
   private readonly dailyLevels = new DailyLevelService();
   private dailyLoading = false;
-  private tvFullscreenRequested = false;
-  private tvFocusTimer = 0;
-  private tvFocusObserver: MutationObserver | null = null;
   private activeBoard: BoardView | null = null;
   private yardDirector: YardDirector | null = null;
   /** Момент показа интро текущего босса — для аналитики `boss_complete.timeMs`. */
@@ -204,8 +206,16 @@ export class App {
     private readonly store: SaveStore,
     private readonly audio: GameAudio
   ) {
+    this.toggles = new SettingsToggles({ audio, store, vibrate: (pattern) => this.vibrate(pattern) });
     this.leaderboardCache = createLeaderboardCache((board) => this.platform.getLeaderboardSnapshot(board));
     this.root = document.getElementById('app')!;
+    this.tv = new TVNavigator({
+      root: this.root,
+      overlaySlot: () => this.q('.overlay-slot'),
+      isTV: () => platform.isTV,
+      requestFullscreen: () => void platform.requestFullscreen(),
+      exit: () => void platform.exit()
+    });
     this.root.classList.toggle('tv-mode', platform.isTV);
     this.root.addEventListener('contextmenu', (event) => event.preventDefault());
     this.freeHintsLeft = platform.config.freeHintsPerSession;
@@ -231,12 +241,8 @@ export class App {
         }
       }
     });
-    this.platform.setBackHandler(this.handleTVBack);
-    if (this.platform.isTV) {
-      document.addEventListener('keydown', this.onTVKeyDown);
-      this.tvFocusObserver = new MutationObserver(() => this.scheduleTVFocus());
-      this.tvFocusObserver.observe(this.root, { childList: true, subtree: true });
-    }
+    this.platform.setBackHandler(() => this.tv.handleBack());
+    this.tv.attach();
     document.addEventListener('visibilitychange', () => {
       this.audio.setHidden(document.hidden);
       if (document.hidden) this.yardDirector?.setPaused(true);
@@ -252,180 +258,6 @@ export class App {
     document.addEventListener('mousedown', unlockAudio, { capture: true });
     // Генерация идёт в Worker: можно прогреть daily без заморозки первого уровня.
     this.dailyLevels.prewarm(this.dailyKey());
-  }
-
-  private visibleTVControls(): HTMLElement[] {
-    const overlays = this.root.querySelectorAll<HTMLElement>('.overlay');
-    const scope = overlays.length > 0 ? overlays[overlays.length - 1] : this.root;
-    return Array.from(scope.querySelectorAll<HTMLElement>('button:not([disabled]), .board[tabindex]')).filter((element) => {
-      const style = getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
-    });
-  }
-
-  private scheduleTVFocus(): void {
-    window.clearTimeout(this.tvFocusTimer);
-    this.tvFocusTimer = window.setTimeout(() => this.focusTVDefault(), 0);
-  }
-
-  private focusTVDefault(force = false): void {
-    if (!this.platform.isTV) return;
-    const active = document.activeElement as HTMLElement | null;
-    if (!force && active && this.root.contains(active) && this.visibleTVControls().includes(active)) return;
-    const overlay = this.root.querySelector<HTMLElement>('.overlay:last-of-type');
-    const target =
-      overlay?.querySelector<HTMLElement>('[data-tv-default], button:not([disabled])') ??
-      this.root.querySelector<HTMLElement>(
-        '[data-tv-default], .level-card.current:not([disabled]), .board[tabindex], button:not([disabled])'
-      );
-    target?.focus({ preventScroll: true });
-    target?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }
-
-  private moveTVFocus(dx: number, dy: number): void {
-    const controls = this.visibleTVControls();
-    if (controls.length === 0) return;
-    const active = document.activeElement as HTMLElement | null;
-    if (!active || !controls.includes(active)) {
-      this.focusTVDefault(true);
-      return;
-    }
-    const from = active.getBoundingClientRect();
-    const fromX = from.left + from.width / 2;
-    const fromY = from.top + from.height / 2;
-    let best: HTMLElement | null = null;
-    let bestScore = Number.POSITIVE_INFINITY;
-    for (const candidate of controls) {
-      if (candidate === active) continue;
-      const rect = candidate.getBoundingClientRect();
-      const deltaX = rect.left + rect.width / 2 - fromX;
-      const deltaY = rect.top + rect.height / 2 - fromY;
-      const primary = deltaX * dx + deltaY * dy;
-      if (primary <= 0) continue;
-      const lateral = Math.abs(deltaX * dy - deltaY * dx);
-      const score = primary + lateral * 3;
-      if (score < bestScore) {
-        best = candidate;
-        bestScore = score;
-      }
-    }
-    if (!best) {
-      const ordered = [...controls].sort((a, b) => {
-        const ar = a.getBoundingClientRect();
-        const br = b.getBoundingClientRect();
-        return dx + dy > 0 ? ar.top + ar.left - (br.top + br.left) : br.top + br.left - (ar.top + ar.left);
-      });
-      best = ordered.find((candidate) => candidate !== active) ?? null;
-    }
-    best?.focus({ preventScroll: true });
-    best?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }
-
-  private requestTVFullscreen(): void {
-    if (this.tvFullscreenRequested) return;
-    this.tvFullscreenRequested = true;
-    void this.platform.requestFullscreen();
-  }
-
-  private onTVKeyDown = (event: KeyboardEvent): void => {
-    if (!this.platform.isTV) return;
-    const isBack = event.key === 'Escape' || event.key === 'BrowserBack' || event.key === 'GoBack';
-    if (isBack) {
-      if (event.repeat) return;
-      event.preventDefault();
-      this.handleTVBack();
-      return;
-    }
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter'].includes(event.key)) return;
-    this.requestTVFullscreen();
-    if (event.defaultPrevented) return;
-    if (event.key === 'Enter') {
-      if (event.repeat) return;
-      const active = document.activeElement as HTMLElement | null;
-      if (active?.matches('button:not([disabled])')) {
-        event.preventDefault();
-        active.click();
-      } else {
-        this.focusTVDefault(true);
-      }
-      return;
-    }
-    event.preventDefault();
-    const direction =
-      event.key === 'ArrowLeft'
-        ? { dx: -1, dy: 0 }
-        : event.key === 'ArrowRight'
-          ? { dx: 1, dy: 0 }
-          : event.key === 'ArrowUp'
-            ? { dx: 0, dy: -1 }
-            : { dx: 0, dy: 1 };
-    this.moveTVFocus(direction.dx, direction.dy);
-  };
-
-  private handleTVBack = (): void => {
-    if (!this.platform.isTV) return;
-    const settingsPanel = this.root.querySelector<HTMLElement>('[data-testid=menu-settings-panel]:not([hidden])');
-    if (settingsPanel) {
-      settingsPanel.hidden = true;
-      const settingsToggle = this.root.querySelector<HTMLElement>('[data-testid=menu-settings]');
-      settingsToggle?.classList.remove('active');
-      settingsToggle?.setAttribute('aria-expanded', 'false');
-      this.root.querySelector<HTMLElement>('[data-testid=menu-play]')?.focus({ preventScroll: true });
-      return;
-    }
-    const exitOverlay = this.root.querySelector<HTMLElement>('[data-testid=tv-exit-overlay]');
-    if (exitOverlay) {
-      exitOverlay.remove();
-      this.scheduleTVFocus();
-      return;
-    }
-    const pauseOverlay = this.root.querySelector('[data-testid=pause-overlay]');
-    if (pauseOverlay) {
-      this.showTVExitDialog();
-      return;
-    }
-    const dismiss = this.root.querySelector<HTMLElement>(
-      '[data-testid=gift-close], [data-testid=btn-rules-close], [data-testid=btn-win-menu], [data-testid=btn-final-menu]'
-    );
-    if (dismiss) {
-      dismiss.click();
-      return;
-    }
-    const back = this.root.querySelector<HTMLElement>('[data-testid=btn-back]');
-    if (back) {
-      back.click();
-      return;
-    }
-    const pause = this.root.querySelector<HTMLElement>('[data-testid=btn-pause]');
-    if (pause) {
-      pause.click();
-      return;
-    }
-    this.showTVExitDialog();
-  };
-
-  private showTVExitDialog(): void {
-    if (this.root.querySelector('[data-testid=tv-exit-overlay]')) return;
-    const overlay = document.createElement('div');
-    overlay.className = 'overlay tv-exit-overlay';
-    overlay.setAttribute('data-testid', 'tv-exit-overlay');
-    overlay.innerHTML = `
-      <div class="dialog">
-        <h2>${t('tv.exitTitle')}</h2>
-        <div class="dialog-sub">${t('tv.exitQuestion')}</div>
-        <button class="btn btn-primary btn-big" data-tv-default data-testid="tv-exit-stay">${t('tv.stay')}</button>
-        <button class="btn btn-big" data-testid="tv-exit-confirm">${t('tv.exit')}</button>
-      </div>`;
-    this.q('.overlay-slot').appendChild(overlay);
-    overlay.querySelector('[data-testid=tv-exit-stay]')!.addEventListener('click', () => {
-      overlay.remove();
-      this.focusTVDefault(true);
-    });
-    overlay.querySelector('[data-testid=tv-exit-confirm]')!.addEventListener('click', () => {
-      void this.platform.exit();
-    });
-    overlay.querySelector<HTMLElement>('[data-testid=tv-exit-stay]')!.focus({ preventScroll: true });
   }
 
   private setGameplay(on: boolean): void {
@@ -589,87 +421,37 @@ export class App {
    * рекламу и когда она не показана (слишком частые вызовы, offline, нет SDK),
    * поэтому «вызвали» и «показали» разведены.
    */
-  private async showInterstitialTracked(levelId: number): Promise<void> {
+  private async showInterstitialTracked(levelId: number): Promise<boolean> {
     track({ type: 'interstitial_requested', levelId });
     const shown = await this.platform.showInterstitial(this.adHandlers());
     track({ type: shown ? 'interstitial_shown' : 'interstitial_not_shown', levelId });
+    return shown;
+  }
+
+  /**
+   * Единственная точка решения «показывать ли interstitial». Обе кнопки
+   * «Далее» (кампания и endless) проходят через неё: каденс, пороги сессии
+   * и жёсткий кап сессии применяются одинаково. `minLevelOk` — отдельный
+   * гейт позиции: у endless его нет, у кампании он считается по позиции,
+   * а не по id (см. комментарий в месте вызова).
+   */
+  private async maybeShowInterstitial(levelId: number, minLevelOk: boolean): Promise<void> {
+    this.winsSinceAd++;
+    if (!minLevelOk) return;
+    const adConfig = this.platform.config;
+    if (performance.now() - this.sessionStartedAt < adConfig.interstitialMinSessionMs) return;
+    if (this.winsSinceAd < adConfig.interstitialEvery) return;
+    if (this.interstitialsShown >= MAX_INTERSTITIALS_PER_SESSION) {
+      track({ type: 'interstitial_capped', levelId });
+      return;
+    }
+    this.winsSinceAd = 0;
+    const shown = await this.showInterstitialTracked(levelId);
+    if (shown) this.interstitialsShown++;
   }
 
   private dailyKey(): string {
     return todayKey(new Date(this.platform.serverTime()));
-  }
-
-  private soundToggleHtml(testid: string): string {
-    return `<button class="icon-btn sound-toggle" data-testid="${testid}" aria-label="${t('audio.sound')}">${
-      this.audio.enabled ? soundOnIcon : soundOffIcon
-    }</button>`;
-  }
-
-  private wireSoundToggle(el: HTMLElement): void {
-    el.addEventListener('click', () => {
-      const on = !this.audio.enabled;
-      this.audio.setEnabled(on);
-      this.store.setSound(on);
-      el.innerHTML = on ? soundOnIcon : soundOffIcon;
-      this.audio.play('click');
-    });
-  }
-
-  private musicToggleHtml(testid: string): string {
-    return `<button class="icon-btn" data-testid="${testid}" aria-label="${t('audio.music')}">${
-      this.audio.musicEnabled ? musicOnIcon : musicOffIcon
-    }</button>`;
-  }
-
-  private wireMusicToggle(el: HTMLElement): void {
-    el.addEventListener('click', () => {
-      const on = !this.audio.musicEnabled;
-      this.audio.setMusicEnabled(on);
-      this.store.setMusic(on);
-      el.innerHTML = on ? musicOnIcon : musicOffIcon;
-      this.audio.play('click');
-    });
-  }
-
-  private vibrationToggleHtml(testid: string): string {
-    return `<button class="icon-btn" data-testid="${testid}" aria-label="${t('audio.vibration')}">${
-      this.store.vibrationEnabled() ? vibrateOnIcon : vibrateOffIcon
-    }</button>`;
-  }
-
-  private wireVibrationToggle(el: HTMLElement): void {
-    el.addEventListener('click', () => {
-      const on = !this.store.vibrationEnabled();
-      this.store.setVibration(on);
-      el.innerHTML = on ? vibrateOnIcon : vibrateOffIcon;
-      this.audio.play('click');
-      if (on) this.vibrate(20);
-    });
-  }
-
-  private bellToggleHtml(testid: string): string {
-    const supported = typeof Notification !== 'undefined' && Notification.permission !== 'denied';
-    if (!supported) return '';
-    const on = this.store.data.notifyOptIn === true && Notification.permission === 'granted';
-    return `<button class="icon-btn bell-toggle" data-testid="${testid}" aria-pressed="${on}" aria-label="${t('audio.reminders')}">${
-      on ? bellOnIcon : bellOffIcon
-    }</button>`;
-  }
-
-  private wireBellToggle(el: HTMLElement): void {
-    el.addEventListener('click', async () => {
-      this.audio.play('click');
-      const on = this.store.data.notifyOptIn === true && Notification.permission === 'granted';
-      if (on) {
-        this.store.setNotifyOptIn(false);
-        el.innerHTML = bellOffIcon;
-        el.setAttribute('aria-pressed', 'false');
-      } else {
-        const granted = await requestReminderPermission(this.store);
-        el.innerHTML = granted ? bellOnIcon : bellOffIcon;
-        el.setAttribute('aria-pressed', String(granted));
-      }
-    });
   }
 
   private liveYardToggleHtml(testid: string): string {
@@ -933,12 +715,12 @@ export class App {
         <div class="menu-settings">
           <button class="icon-btn settings-toggle" data-testid="menu-settings" aria-label="${t('menu.settings')}" aria-expanded="false" aria-controls="menu-settings-panel">${settingsIcon}</button>
           <div class="menu-audio" id="menu-settings-panel" data-testid="menu-settings-panel" hidden>
-            ${this.settingsItem(this.soundToggleHtml('sound-toggle'), t('audio.sound'))}
-            ${this.settingsItem(this.musicToggleHtml('music-toggle'), t('audio.music'))}
-            ${this.settingsItem(this.vibrationToggleHtml('vibration-toggle'), t('audio.vibration'))}
+            ${this.settingsItem(this.toggles.soundHtml('sound-toggle'), t('audio.sound'))}
+            ${this.settingsItem(this.toggles.musicHtml('music-toggle'), t('audio.music'))}
+            ${this.settingsItem(this.toggles.vibrationHtml('vibration-toggle'), t('audio.vibration'))}
             ${this.settingsItem(this.liveYardToggleHtml('liveyard-toggle'), t('audio.liveYard'))}
             ${this.settingsItem(this.contrastToggleHtml('contrast-toggle'), t('audio.contrast'))}
-            ${this.settingsItem(this.bellToggleHtml('bell-toggle'), t('audio.reminders'))}
+            ${this.settingsItem(this.toggles.bellHtml('bell-toggle'), t('audio.reminders'))}
             ${this.settingsItem(
               `<button class="icon-btn lang-toggle" data-testid="lang-toggle" aria-label="${t(
                 'settings.language'
@@ -1013,13 +795,13 @@ export class App {
       this.audio.play('click');
       this.showGarage();
     });
-    this.wireSoundToggle(this.q('[data-testid=sound-toggle]'));
-    this.wireMusicToggle(this.q('[data-testid=music-toggle]'));
-    this.wireVibrationToggle(this.q('[data-testid=vibration-toggle]'));
+    this.toggles.wireSound(this.q('[data-testid=sound-toggle]'));
+    this.toggles.wireMusic(this.q('[data-testid=music-toggle]'));
+    this.toggles.wireVibration(this.q('[data-testid=vibration-toggle]'));
     this.wireLiveYardToggle(this.q('[data-testid=liveyard-toggle]'));
     this.wireContrastToggle(this.q('[data-testid=contrast-toggle]'));
     const bellEl = this.root.querySelector<HTMLElement>('[data-testid=bell-toggle]');
-    if (bellEl) this.wireBellToggle(bellEl);
+    if (bellEl) this.toggles.wireBell(bellEl);
     this.q('[data-testid=lang-toggle]').addEventListener('click', () => {
       const order = ['ru', 'en', 'tr'] as const;
       const next = order[(order.indexOf(getLang()) + 1) % order.length];
@@ -1512,11 +1294,6 @@ export class App {
     this.audio.play('win');
     this.vibrate([28, 45, 28, 45, 70]);
     this.yardDirector?.react('boss-win');
-    const confettiColors = ['#e2574c', '#f6c445', '#45968f', '#3f7fd1', '#e88fb6'];
-    const confetti = Array.from({ length: 40 }, () => {
-      const c = confettiColors[Math.floor(Math.random() * confettiColors.length)];
-      return `<span style="--x:${Math.round(Math.random() * 100)}%;--d:${(Math.random() * 0.6).toFixed(2)}s;--r:${Math.round(180 + Math.random() * 420)}deg;background:${c}"></span>`;
-    }).join('');
     const idx = LEVELS.findIndex((l) => l.id === def.id);
     const next = idx >= 0 && idx < LEVELS.length - 1 ? LEVELS[idx + 1] : null;
     const upgradeNote = unlocked
@@ -1545,7 +1322,7 @@ export class App {
     overlay.className = 'overlay boss-victory';
     overlay.setAttribute('data-testid', 'boss-victory');
     overlay.innerHTML = `
-      <div class="confetti">${confetti}</div>
+      ${confettiHtml(40)}
       <div class="dialog boss-dialog win-dialog">
         <div class="boss-badge boss-badge-win">🏆</div>
          <h2>${t(def.nameKey)}</h2>
@@ -1607,9 +1384,57 @@ export class App {
 
   /** «Бесконечный двор»: доступен после первого прохождения уровня 100. */
   startEndless(): void {
-    this.endlessStreak = 0;
+    // Rewarded-восстановление (Stage C): незавершённый заезд можно продолжить
+    // за ролик. Порог отсекает «восстановление» серий из одного-двух уровней —
+    // их проще пройти заново, чем смотреть рекламу.
+    const resume = this.store.data.endlessResume ?? 0;
+    if (resume >= App.ENDLESS_REVIVE_MIN_STREAK) {
+      this.showEndlessResumeDialog(resume);
+      return;
+    }
+    this.beginEndlessRun(0);
+  }
+
+  /** Порог серии, начиная с которой предлагаем восстановление за rewarded. */
+  private static readonly ENDLESS_REVIVE_MIN_STREAK = 3;
+
+  private beginEndlessRun(streak: number): void {
+    this.endlessStreak = streak;
     track({ type: 'endless_started', best: this.store.data.endlessBest ?? 0 });
     void this.playNextEndless();
+  }
+
+  /** Диалог выбора: восстановить прерванную серию за rewarded или начать заново. */
+  private showEndlessResumeDialog(streak: number): void {
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.setAttribute('data-testid', 'endless-resume');
+    overlay.innerHTML = `
+      <div class="dialog win-dialog">
+        <h2>🌀 ${t('endless.resume.title', { n: streak })}</h2>
+        <div class="dialog-sub">${t('endless.resume.text')}</div>
+        <button class="btn btn-primary btn-big" data-tv-default data-testid="endless-resume-yes">${t('endless.resume.yes')}</button>
+        <button class="btn" data-testid="endless-resume-no">${t('endless.resume.no')}</button>
+      </div>`;
+    this.q('.overlay-slot').appendChild(overlay);
+    overlay.querySelector('[data-testid=endless-resume-yes]')!.addEventListener('click', async (event) => {
+      const button = event.currentTarget as HTMLButtonElement;
+      if (button.disabled) return;
+      button.disabled = true;
+      this.audio.play('click');
+      const ok = await this.showRewardedFor('endless-revive', 0);
+      overlay.remove();
+      if (ok) this.beginEndlessRun(streak);
+      else this.beginEndlessRun(0);
+    });
+    overlay.querySelector('[data-testid=endless-resume-no]')!.addEventListener('click', () => {
+      this.audio.play('click');
+      overlay.remove();
+      this.store.setEndlessResume(undefined);
+      this.beginEndlessRun(0);
+    });
+    if (this.platform.isTV)
+      overlay.querySelector<HTMLElement>('[data-testid=endless-resume-yes]')?.focus({ preventScroll: true });
   }
 
   private async playNextEndless(): Promise<void> {
@@ -1814,7 +1639,7 @@ export class App {
         this.audio.play('plankBreak');
         this.vibrate([14, 28, 18]);
       },
-      onChickenHop: () => this.audio.play('cluck'),
+      onChickenHop: () => this.audio.play('chickenScatter'),
       onExplain: () => this.audio.play('click'),
       onCommit: (res, piece) => {
         undoStack.push(cur);
@@ -2185,16 +2010,16 @@ export class App {
         <button class="btn btn-primary btn-big" data-testid="btn-resume">${t('pause.resume')}</button>
         <button class="btn btn-big" data-testid="btn-pause-restart">${t('pause.restart')}</button>
         <div class="dialog-row pause-actions">
-          ${this.soundToggleHtml('pause-sound')}
-          ${this.musicToggleHtml('pause-music')}
-          ${this.vibrationToggleHtml('pause-vibration')}
+          ${this.toggles.soundHtml('pause-sound')}
+          ${this.toggles.musicHtml('pause-music')}
+          ${this.toggles.vibrationHtml('pause-vibration')}
           <button class="btn" data-testid="btn-exit-menu">${t('pause.menu')}</button>
         </div>
       </div>`;
     this.q('.overlay-slot').appendChild(overlay);
-    this.wireSoundToggle(overlay.querySelector('[data-testid=pause-sound]')!);
-    this.wireMusicToggle(overlay.querySelector('[data-testid=pause-music]')!);
-    this.wireVibrationToggle(overlay.querySelector('[data-testid=pause-vibration]')!);
+    this.toggles.wireSound(overlay.querySelector('[data-testid=pause-sound]')!);
+    this.toggles.wireMusic(overlay.querySelector('[data-testid=pause-music]')!);
+    this.toggles.wireVibration(overlay.querySelector('[data-testid=pause-vibration]')!);
     overlay.querySelector('[data-testid=btn-resume]')!.addEventListener('click', () => {
       this.audio.play('click');
       this.userPaused = false;
@@ -2346,18 +2171,12 @@ export class App {
           `<div class="win-upgrade" data-testid="win-skin">${t('win.skinUnlocked', { name: t(skin.nameKey) })}</div>`
       )
       .join('');
-    const confettiColors = ['#e2574c', '#f6c445', '#45968f', '#3f7fd1', '#e88fb6'];
-    const confetti = Array.from({ length: justMastered ? 44 : level.width > 6 ? 34 : 20 }, () => {
-      const c = confettiColors[Math.floor(Math.random() * confettiColors.length)];
-      return `<span style="--x:${Math.round(Math.random() * 100)}%;--d:${(Math.random() * 0.6).toFixed(2)}s;--r:${Math.round(
-        180 + Math.random() * 420
-      )}deg;background:${c}"></span>`;
-    }).join('');
+    const confettiCount = justMastered ? 44 : level.width > 6 ? 34 : 20;
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.setAttribute('data-testid', 'win-overlay');
     overlay.innerHTML = `
-      <div class="confetti">${confetti}</div>
+      ${confettiHtml(confettiCount)}
       <div class="dialog win-dialog">
         <h2>${t('win.title')}</h2>
         <div class="win-stars" data-testid="win-stars" data-stars="${stars}">${starIcons(stars)}</div>
@@ -2393,17 +2212,10 @@ export class App {
       if (button.disabled) return;
       button.disabled = true;
       this.audio.play('click');
-      this.winsSinceAd++;
-      const adConfig = this.platform.config;
       // Порог «не раньше N-го уровня» считается по позиции в кампании: у
       // вставленных уровней id 101+, и сравнение по id обошло бы защиту новичка.
-      const canShowAd =
-        (campaignPos || level.id) >= adConfig.interstitialMinLevel &&
-        performance.now() - this.sessionStartedAt >= adConfig.interstitialMinSessionMs;
-      if (canShowAd && this.winsSinceAd >= adConfig.interstitialEvery) {
-        this.winsSinceAd = 0;
-        await this.showInterstitialTracked(level.id);
-      }
+      const campaignPosOk = (campaignPos || level.id) >= this.platform.config.interstitialMinLevel;
+      await this.maybeShowInterstitial(level.id, campaignPosOk);
       if (next) this.startLevel(next.id);
       else button.disabled = false;
     });
@@ -2447,6 +2259,9 @@ export class App {
     this.audio.engineStop();
     this.vibrate([28, 45, 28]);
     this.endlessStreak++;
+    // Точка восстановления: если игрок уйдёт из режима (пауза → меню, закрытие
+    // вкладки), серию можно будет продолжить за rewarded при следующем входе.
+    this.store.setEndlessResume(this.endlessStreak);
     this.store.recordWeeklyEvent(currentWeekKey(), 'endless', this.endlessStreak);
     const stars = starsFor(level, endState.moves, endState.starCollected);
     const achievementsBefore = unlockedAchievementKeys(this.store.data);
@@ -2467,18 +2282,11 @@ export class App {
           )}: ${t(`achievement.${achievement.key}.title`)}</div>`
       )
       .join('');
-    const confettiColors = ['#e2574c', '#f6c445', '#45968f', '#3f7fd1', '#e88fb6'];
-    const confetti = Array.from({ length: 20 }, () => {
-      const c = confettiColors[Math.floor(Math.random() * confettiColors.length)];
-      return `<span style="--x:${Math.round(Math.random() * 100)}%;--d:${(Math.random() * 0.6).toFixed(2)}s;--r:${Math.round(
-        180 + Math.random() * 420
-      )}deg;background:${c}"></span>`;
-    }).join('');
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.setAttribute('data-testid', 'win-overlay');
     overlay.innerHTML = `
-      <div class="confetti">${confetti}</div>
+      ${confettiHtml(20)}
       <div class="dialog win-dialog">
         <h2>${t('win.title')}</h2>
         <div class="win-stars" data-testid="win-stars" data-stars="${stars}">${starIcons(stars)}</div>
@@ -2504,14 +2312,7 @@ export class App {
       if (button.disabled) return;
       button.disabled = true;
       this.audio.play('click');
-      this.winsSinceAd++;
-      const adConfig = this.platform.config;
-      const canShowAd =
-        performance.now() - this.sessionStartedAt >= adConfig.interstitialMinSessionMs;
-      if (canShowAd && this.winsSinceAd >= adConfig.interstitialEvery) {
-        this.winsSinceAd = 0;
-        await this.showInterstitialTracked(level.id);
-      }
+      await this.maybeShowInterstitial(level.id, true);
       void this.playNextEndless();
     });
     overlay.querySelector<HTMLButtonElement>('[data-testid=btn-share]')?.addEventListener('click', async (event) => {
@@ -2526,6 +2327,8 @@ export class App {
     });
     overlay.querySelector('[data-testid=btn-win-menu]')?.addEventListener('click', () => {
       this.audio.play('click');
+      // Явное «Закончить забег» — осознанный финал: точку восстановления снимаем.
+      this.store.setEndlessResume(undefined);
       this.showMenu();
     });
     if (this.platform.isTV)
@@ -2679,7 +2482,7 @@ export class App {
     overlay.querySelector('[data-testid=elite-intro-close]')!.addEventListener('click', () => {
       this.audio.play('click');
       overlay.remove();
-      if (this.platform.isTV) this.focusTVDefault(true);
+      if (this.platform.isTV) this.tv.focusDefault(true);
     });
     if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=elite-intro-close]')!.focus({ preventScroll: true });
   }

@@ -220,6 +220,11 @@ export function exitSteps(level: LevelDef, s: GameState): number {
  * Применяет ход (скольжение фигуры i на steps клеток в (dx,dy)).
  * Возвращает null, если ход недопустим (в т.ч. частичный выезд за край).
  * Не мутирует исходное состояние.
+ *
+ * `grid` — сетка занятости ДО хода (buildGrid(level, s)). Вычислитель пути
+ * (солвер) уже держит её для текущего состояния; без передачи каждый
+ * кандидат-ход перестраивал бы сетку заново — заметно на сотнях тысяч
+ * вызовов BFS и на подсказке в рантайме.
  */
 export function applyMove(
   level: LevelDef,
@@ -227,10 +232,11 @@ export function applyMove(
   i: number,
   dx: number,
   dy: number,
-  steps: number
+  steps: number,
+  grid: number[][] = buildGrid(level, s)
 ): MoveResult | null {
   if (s.won || steps <= 0) return null;
-  const limit = maxSteps(level, s, i, dx, dy);
+  const limit = maxSteps(level, s, i, dx, dy, grid);
   if (steps > limit) return null;
   const def = level.pieces[i];
   // Ледяная колея: на льду нельзя остановиться вовсе — ни по своей воле, ни

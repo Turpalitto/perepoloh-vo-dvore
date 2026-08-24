@@ -32,6 +32,13 @@ export interface SaveData {
   notifyOptIn?: boolean;
   /** Лучшая серия в «Бесконечном дворе» (доступен после кампании). */
   endlessBest?: number;
+  /**
+   * Незавершённая серия «Бесконечного двора»: точка для rewarded-восстановления
+   * (Stage C). Пишется после каждой победы в заезде; «Закончить забег» снимает.
+   * Отсутствие поля = активного заезда нет. При merge берётся максимум —
+   * лучший из локального и облачного незавершённых заездов.
+   */
+  endlessResume?: number;
   /** Обучающая подсказка-жест на уровне 1 уже показана. */
   tutorialSeen?: boolean;
   /** Прогресс недельных целей. */
@@ -74,20 +81,61 @@ export interface SaveData {
 }
 
 export function defaultSave(): SaveData {
-  return { v: 1, stars: {}, sound: true, music: true, lang: 'ru', lastLevel: 1, targetSkin: 0 };
+  return { v: SAVE_VERSION, stars: {}, sound: true, music: true, lang: 'ru', lastLevel: 1, targetSkin: 0 };
+}
+
+/**
+ * Текущая версия формата сейва. При несовместимой правке формата:
+ * 1. Увеличить SAVE_VERSION на единицу.
+ * 2. Добавить шаг в SAVE_MIGRATIONS под номером прежней версии.
+ * 3. Обновить тесты миграций (`tests/save-migration.test.ts`).
+ * Правило AGENTS.md «не менять формат без миграции» обеспечивается этим
+ * механизмом, а не только дисциплиной.
+ */
+export const SAVE_VERSION = 1;
+
+/**
+ * Шаги миграции: ключ — версия, ИЗ которой переходим. Шаг получает сырой
+ * объект прежней версии и обязан вернуть объект с новой `v`. Применяются
+ * цепочкой до достижения SAVE_VERSION; отсутствие шага оставляет данные как
+ * есть — их отбросит проверка версии ниже (сейв «не узнанной» будущей версии
+ * мигрировать нельзя).
+ */
+export const SAVE_MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string, unknown>> = {};
+
+const MAX_MIGRATION_STEPS = 32;
+
+/**
+ * Поднимает сырой сейв до `targetVersion` цепочкой шагов из SAVE_MIGRATIONS.
+ * Экспортирована для тестов: механизм репетируется на «будущей» целевой
+ * версии до реального bump формата.
+ */
+export function migrateSave(raw: unknown, targetVersion: number): unknown {
+  if (typeof raw !== 'object' || raw === null) return raw;
+  let data = raw as Record<string, unknown>;
+  for (let guard = 0; guard < MAX_MIGRATION_STEPS; guard++) {
+    const v = data.v;
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v >= targetVersion) break;
+    const step = SAVE_MIGRATIONS[v];
+    if (!step) break;
+    const next = step(data);
+    if (typeof next !== 'object' || next === null) break;
+    data = next as Record<string, unknown>;
+  }
+  return data;
 }
 
 export function sanitizeSave(raw: unknown): SaveData | null {
   if (typeof raw !== 'object' || raw === null) return null;
-  const r = raw as Partial<SaveData>;
-  if (r.v !== 1 || typeof r.stars !== 'object' || r.stars === null) return null;
+  const r = migrateSave(raw, SAVE_VERSION) as Partial<SaveData>;
+  if (r.v !== SAVE_VERSION || typeof r.stars !== 'object' || r.stars === null) return null;
   const stars: Record<string, number> = {};
   for (const [k, v] of Object.entries(r.stars)) {
     const n = Number(v);
     if (Number.isInteger(n) && n >= 0 && n <= 3) stars[k] = n;
   }
   return {
-    v: 1,
+    v: SAVE_VERSION,
     stars,
     sound: typeof r.sound === 'boolean' ? r.sound : true,
     music: typeof r.music === 'boolean' ? r.music : true,
@@ -121,6 +169,10 @@ export function sanitizeSave(raw: unknown): SaveData | null {
     notifyOptIn: r.notifyOptIn === true ? true : undefined,
     endlessBest:
       Number.isInteger(r.endlessBest) && (r.endlessBest as number) >= 0 ? (r.endlessBest as number) : undefined,
+    endlessResume:
+      Number.isInteger(r.endlessResume) && (r.endlessResume as number) >= 0
+        ? Math.min(9999, r.endlessResume as number)
+        : undefined,
     tutorialSeen: r.tutorialSeen === true ? true : undefined,
     weekly:
       r.weekly &&
@@ -215,7 +267,7 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
       }
     : undefined;
   return {
-    v: 1,
+    v: SAVE_VERSION,
     stars,
     sound: b.sound,
     music: b.music,
@@ -251,7 +303,8 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
       const set = new Set([...(a.bossDone ?? []), ...(b.bossDone ?? [])]);
       return set.size ? [...set] : undefined;
     })(),
-    achievements: mergeSeen(a.achievements, b.achievements)
+    achievements: mergeSeen(a.achievements, b.achievements),
+    endlessResume: Math.max(a.endlessResume ?? 0, b.endlessResume ?? 0) || undefined
   };
 }
 
@@ -397,6 +450,15 @@ export class SaveStore {
     this.data.endlessBest = streak;
     this.persist();
     return true;
+  }
+
+  /**
+   * Точка восстановления заезда: пишется после каждой победы, снимается
+   * явным «Закончить забег». undefined = активного заезда нет.
+   */
+  setEndlessResume(streak: number | undefined): void {
+    this.data.endlessResume = streak;
+    this.persist();
   }
 
   /** Записывает событие недельной цели (win/perfect — сумма, endless — максимум серии). */

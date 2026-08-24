@@ -69,7 +69,7 @@ export function solve(
         for (const d of allowedDirs(level.pieces[i])) {
           const m = maxSteps(level, node.s, i, d.dx, d.dy, grid);
           for (let steps = 1; steps <= m; steps++) {
-            const res = applyMove(level, node.s, i, d.dx, d.dy, steps);
+            const res = applyMove(level, node.s, i, d.dx, d.dy, steps, grid);
             if (!res) continue; // частичный выезд
             const key = stateKey(res.state);
             if (parents.has(key)) continue;

@@ -387,3 +387,79 @@ test.describe('Post-campaign', () => {
     ).toBe(0);
   });
 });
+
+test.describe('Endless: rewarded-восстановление серии', () => {
+  // Stage C: заезд, прерванный выходом из режима, предлагается продолжить за
+  // rewarded-ролик. «Закончить забег» снимает точку восстановления — после
+  // осознанного финала диалог показываться не должен.
+  async function seedWithResume(page: Page, streak: number): Promise<void> {
+    await page.addInitScript((data) => {
+      if (sessionStorage.getItem('post-campaign-seeded') === '1') return;
+      localStorage.setItem('parkovka.save.v1', JSON.stringify(data));
+      sessionStorage.setItem('post-campaign-seeded', '1');
+    }, {
+      v: 1,
+      stars: { [String(LAST_CAMPAIGN_LEVEL_ID)]: 3 },
+      sound: true,
+      music: true,
+      lang: 'ru',
+      lastLevel: LAST_CAMPAIGN_LEVEL_ID,
+      targetSkin: 0,
+      campaignDone: true,
+      endingSeen: true,
+      endlessBest: 2,
+      endlessResume: streak
+    });
+  }
+
+  test('прерванная серия продолжается за rewarded-ролик', async ({ page }) => {
+    test.setTimeout(60_000);
+    await seedWithResume(page, 5);
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await page.getByTestId('menu-endless').click();
+    await expect(page.getByTestId('endless-resume')).toBeVisible();
+    await expect(page.getByTestId('endless-resume')).toContainText('серия: 5');
+
+    await page.getByTestId('endless-resume-yes').click();
+    const close = page.getByTestId('mock-ad-close');
+    await expect(close).toBeEnabled({ timeout: 5000 });
+    await close.click();
+
+    await expect(page.getByTestId('screen-game')).toContainText('Бесконечный двор', { timeout: 30_000 });
+    await page.evaluate(() =>
+      (window as unknown as { __e2eWinLevel: (opts: { starCollected: boolean }) => void }).__e2eWinLevel({
+        starCollected: true
+      })
+    );
+    // Серия началась не с нуля: победа на восстановленной серии даёт 6.
+    await expect(page.getByTestId('endless-streak')).toContainText('серия: 6');
+  });
+
+  test('«Начать заново» сбрасывает серию и снимает точку восстановления', async ({ page }) => {
+    test.setTimeout(60_000);
+    await seedWithResume(page, 5);
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await page.getByTestId('menu-endless').click();
+    await expect(page.getByTestId('endless-resume')).toBeVisible();
+
+    await page.getByTestId('endless-resume-no').click();
+    await expect(page.getByTestId('screen-game')).toContainText('Бесконечный двор', { timeout: 30_000 });
+    await page.evaluate(() =>
+      (window as unknown as { __e2eWinLevel: (opts: { starCollected: boolean }) => void }).__e2eWinLevel({
+        starCollected: true
+      })
+    );
+    await expect(page.getByTestId('endless-streak')).toContainText('серия: 1');
+    const save = JSON.parse(await page.evaluate(() => localStorage.getItem('parkovka.save.v1') ?? '{}'));
+    expect(save.endlessResume).toBe(1);
+  });
+
+  test('короткая серия (ниже порога) не предлагает восстановление', async ({ page }) => {
+    test.setTimeout(60_000);
+    await seedWithResume(page, 2);
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await page.getByTestId('menu-endless').click();
+    await expect(page.getByTestId('screen-game')).toContainText('Бесконечный двор', { timeout: 30_000 });
+    await expect(page.getByTestId('endless-resume')).toHaveCount(0);
+  });
+});

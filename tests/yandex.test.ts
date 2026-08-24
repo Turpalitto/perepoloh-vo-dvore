@@ -73,6 +73,29 @@ describe('адаптер Яндекс Игр', () => {
     expect(resume).toHaveBeenCalledOnce();
   });
 
+  it('клэмпит агрессивные значения Remote Config: interstitial_every=2 → 3', async () => {
+    // Ошибка в консоли Яндекса не должна превращать игру в «реклама через
+    // каждую победу». Нижняя граница флага — 3 (см. createYandexPlatform).
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        YaGames: {
+          init: async () => ({
+            getFlags: async () => ({
+              interstitial_every: '2',
+              interstitial_min_level: '1',
+              interstitial_min_session_ms: '0',
+              free_hints_per_session: '9'
+            })
+          })
+        }
+      }
+    });
+    const platform = createYandexPlatform();
+    await platform.init();
+    expect(platform.config.interstitialEvery).toBe(3);
+  });
+
   it('определяет TV, обрабатывает HISTORY_BACK, fullscreen и EXIT', async () => {
     const callbacks = new Map<string, () => void>();
     const requestFullscreen = vi.fn(async () => undefined);
@@ -155,9 +178,12 @@ describe('адаптер Яндекс Игр', () => {
       const pause = vi.fn();
       const resume = vi.fn();
       const promise = platform.showRewarded({ onPause: pause, onResume: resume });
+      // Открытый ролик больше не обрубается CALL-таймаутом в 30 c: фаза OPEN
+      // длится 120 c от фактического открытия.
       await vi.advanceTimersByTimeAsync(30_000);
-      await expect(promise).resolves.toBe(false);
       expect(pause).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(90_000);
+      await expect(promise).resolves.toBe(false);
       expect(resume).toHaveBeenCalledOnce();
     } finally {
       vi.useRealTimers();
@@ -215,11 +241,45 @@ describe('адаптер Яндекс Игр', () => {
       const pause = vi.fn();
       const resume = vi.fn();
       const promise = platform.showInterstitial({ onPause: pause, onResume: resume });
+      // Ролик открылся: CALL-таймаут его не обрубает, работает фаза OPEN.
       await vi.advanceTimersByTimeAsync(30_000);
-      // Молчащий SDK не даёт повода считать показ состоявшимся.
+      expect(resume).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(90_000);
+      // Молчащий SDK (onClose потерялся) не даёт повода считать показ состоявшимся.
       await expect(promise).resolves.toBe(false);
       expect(pause).toHaveBeenCalledOnce();
       expect(resume).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('молчащий SDK без onOpen снимает блокировку по CALL-таймауту', async () => {
+    vi.useFakeTimers();
+    try {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: {
+          YaGames: {
+            init: async () => ({
+              adv: {
+                // SDK ничего не ответил: ни onOpen, ни onClose, ни onError.
+                showFullscreenAdv: () => undefined
+              }
+            })
+          }
+        }
+      });
+      const platform = createYandexPlatform();
+      await platform.init();
+      const pause = vi.fn();
+      const resume = vi.fn();
+      const promise = platform.showInterstitial({ onPause: pause, onResume: resume });
+      await vi.advanceTimersByTimeAsync(30_000);
+      await expect(promise).resolves.toBe(false);
+      // Паузы не было — значит и возобновлять нечего.
+      expect(pause).not.toHaveBeenCalled();
+      expect(resume).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

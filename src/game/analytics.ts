@@ -11,7 +11,7 @@
  */
 
 /** Откуда игрок пришёл к rewarded-видео. Расширяется при новых стоках. */
-export type RewardedContext = 'hint' | 'skip';
+export type RewardedContext = 'hint' | 'skip' | 'endless-revive';
 
 export type GameAnalyticsEvent =
   | { type: 'game_start' }
@@ -45,6 +45,8 @@ export type GameAnalyticsEvent =
   | { type: 'interstitial_requested'; levelId: number }
   | { type: 'interstitial_shown'; levelId: number }
   | { type: 'interstitial_not_shown'; levelId: number }
+  /** Показ отменён жёстким капом кампании (см. MAX_INTERSTITIALS в app.ts). */
+  | { type: 'interstitial_capped'; levelId: number }
   // Ежедневный уровень
   | { type: 'daily_started'; modifier: string; streak: number }
   | { type: 'daily_completed'; modifier: string; streak: number; stars: number }

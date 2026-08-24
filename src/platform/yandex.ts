@@ -102,10 +102,43 @@ export function createMetricaTracker(counterId = METRICA_COUNTER_ID): AnalyticsT
  * Предохранитель на «немой» SDK: если реклама открылась, но соответствующий
  * onClose/onError потерялся (свёрнутая вкладка, зависший iframe), промис не
  * должен висеть вечно и держать adActive=true — иначе игра блокирует и подсказки,
- * и следующую рекламу. По таймауту завершаем показ; для rewarded награда при
- * этом НЕ выдаётся (rewarded остаётся false, если onRewarded не пришёл).
+ * и следующую рекламу.
+ *
+ * Таймаутов два, под разные фазы:
+ * - CALL (30 c) — от вызова показа до открытия ролика. Если SDK молчит вовсе,
+ *   снимаем блокировку. Раньше этот же таймаут обслуживал и открытый ролик:
+ *   длинное видео «заканчивалось» раньше onClose — игра уходила в onResume под
+ *   живой рекламой и писала not_shown о показанном ролике, а если таймаут
+ *   истекал до onOpen, пауза зависала без onResume.
+ * - OPEN (120 c) — отсчитывается от фактического открытия ролика (onOpen).
  */
-const AD_SAFETY_TIMEOUT_MS = 30_000;
+const AD_CALL_TIMEOUT_MS = 30_000;
+const AD_OPEN_TIMEOUT_MS = 120_000;
+
+/** Общее для обоих видов рекламы состояние одного показа. */
+interface AdShow {
+  /** Пауза уже отправлена в игру (по onOpen). */
+  paused: boolean;
+  /** Показ завершён (любым исходом). */
+  settled: boolean;
+  timer: number;
+}
+
+function armAdTimer(ad: AdShow, ms: number, finish: () => void): void {
+  if (ad.timer) clearTimeout(ad.timer);
+  ad.timer = setTimeout(finish, ms) as unknown as number;
+}
+
+function openAdPhase(ad: AdShow, onPause: () => void, finish: () => void): void {
+  // Таймаут фазы вызова мог отработать раньше onOpen: тогда показ уже завершён,
+  // и новую паузу начинать нельзя (она осталась бы навсегда).
+  if (ad.settled) return;
+  armAdTimer(ad, AD_OPEN_TIMEOUT_MS, finish);
+  if (!ad.paused) {
+    ad.paused = true;
+    onPause();
+  }
+}
 
 interface YsdkPlayer {
   setData(data: Record<string, unknown>, flush?: boolean): Promise<void>;
@@ -238,6 +271,10 @@ export function createYandexPlatform(): Platform {
       deviceType = ysdk.deviceInfo?.type ?? 'desktop';
       tv = ysdk.deviceInfo?.isTV?.() ?? ysdk.deviceInfo?.type === 'tv';
       console.info('[platform] Яндекс SDK инициализирован');
+      // Имена событий паузы — строковые литералы по официальной документации
+      // (yandex.ru/dev/games/doc/ru/sdk/sdk-events.md, сверено 2026-08): в
+      // ysdk.EVENTS входят только EXIT/HISTORY_BACK/ACCOUNT_SELECTION_DIALOG_*,
+      // для game_api_pause/resume констант в SDK нет.
       ysdk.on?.('game_api_pause', () => {
         lifecyclePaused = true;
         lifecycle?.onPause();
@@ -256,7 +293,9 @@ export function createYandexPlatform(): Platform {
         };
         const flags = (await ysdk.getFlags?.({ defaultFlags: defaults })) ?? defaults;
         config = {
-          interstitialEvery: boundedInt(flags.interstitial_every, config.interstitialEvery, 2, 8),
+          // Нижняя граница 3: «каждую вторую победу» — агрессивный каденс,
+          // который ломает обещание щадящей монетизации из README.
+          interstitialEvery: boundedInt(flags.interstitial_every, config.interstitialEvery, 3, 8),
           interstitialMinLevel: boundedInt(flags.interstitial_min_level, config.interstitialMinLevel, 1, 30),
           interstitialMinSessionMs: boundedInt(
             flags.interstitial_min_session_ms,
@@ -443,27 +482,21 @@ export function createYandexPlatform(): Platform {
           return;
         }
         adActive = true;
-        let paused = false;
-        let settled = false;
-        let timer = 0;
+        const ad: AdShow = { paused: false, settled: false, timer: 0 };
         const finish = (wasShown: boolean) => {
-          if (settled) return;
-          settled = true;
-          if (timer) clearTimeout(timer);
+          if (ad.settled) return;
+          ad.settled = true;
+          if (ad.timer) clearTimeout(ad.timer);
           adActive = false;
-          if (paused) h.onResume();
+          if (ad.paused) h.onResume();
           resolve(wasShown);
         };
         // Молчащий SDK: показ считаем несостоявшимся, домысливать нечего.
-        timer = setTimeout(() => finish(false), AD_SAFETY_TIMEOUT_MS) as unknown as number;
+        armAdTimer(ad, AD_CALL_TIMEOUT_MS, () => finish(false));
         try {
           ysdk.adv.showFullscreenAdv({
             callbacks: {
-              onOpen: () => {
-                if (paused) return;
-                paused = true;
-                h.onPause();
-              },
+              onOpen: () => openAdPhase(ad, () => h.onPause(), () => finish(false)),
               onClose: (wasShown) => finish(wasShown !== false),
               onError: (e) => {
                 console.warn('[platform] interstitial:', e);
@@ -489,27 +522,21 @@ export function createYandexPlatform(): Platform {
         }
         adActive = true;
         let rewarded = false;
-        let paused = false;
-        let settled = false;
-        let timer = 0;
+        const ad: AdShow = { paused: false, settled: false, timer: 0 };
         const finish = () => {
-          if (settled) return;
-          settled = true;
-          if (timer) clearTimeout(timer);
+          if (ad.settled) return;
+          ad.settled = true;
+          if (ad.timer) clearTimeout(ad.timer);
           adActive = false;
-          if (paused) h.onResume();
+          if (ad.paused) h.onResume();
+          // По таймауту награду не выдаём: rewarded станет true только из onRewarded.
           resolve(rewarded);
         };
-        // По таймауту награду не выдаём: rewarded станет true только из onRewarded.
-        timer = setTimeout(finish, AD_SAFETY_TIMEOUT_MS) as unknown as number;
+        armAdTimer(ad, AD_CALL_TIMEOUT_MS, finish);
         try {
           ysdk.adv.showRewardedVideo({
             callbacks: {
-              onOpen: () => {
-                if (paused) return;
-                paused = true;
-                h.onPause();
-              },
+              onOpen: () => openAdPhase(ad, () => h.onPause(), finish),
               onRewarded: () => {
                 rewarded = true;
               },

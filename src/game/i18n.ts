@@ -209,6 +209,10 @@ const RU: Dict = {
   'endless.continue': 'Дальше по кругу',
   'endless.stop': 'Закончить забег',
   'endless.newBest': '🏆 Новый рекорд серии!',
+  'endless.resume.title': 'Прерванная серия: {n}',
+  'endless.resume.text': 'Посмотри ролик — продолжишь с того же места.',
+  'endless.resume.yes': '▶ Продолжить серию',
+  'endless.resume.no': 'Начать заново',
   'season.newyear': '❄️ Новогодний двор — подарок дня увеличен!',
   'boss.chip': 'Босс',
   'skins.title': 'Цвет машины',
@@ -561,6 +565,10 @@ const EN: Dict = {
   'endless.continue': 'Next in the run',
   'endless.stop': 'End the run',
   'endless.newBest': '🏆 New streak record!',
+  'endless.resume.title': 'Unfinished streak: {n}',
+  'endless.resume.text': 'Watch a video to pick up where you left off.',
+  'endless.resume.yes': '▶ Continue the streak',
+  'endless.resume.no': 'Start over',
   'season.newyear': "❄️ New Year yard — today's gift is bigger!",
   'boss.chip': 'Boss',
   'skins.title': 'Car colour',
@@ -913,6 +921,10 @@ const TR: Dict = {
   'endless.continue': 'Sıradaki bölüm',
   'endless.stop': 'Koşuyu bitir',
   'endless.newBest': '🏆 Yeni seri rekoru!',
+  'endless.resume.title': 'Yarım kalan seri: {n}',
+  'endless.resume.text': 'Videoyu izle — kaldığın yerden devam et.',
+  'endless.resume.yes': '▶ Seriye devam et',
+  'endless.resume.no': 'Yeniden başla',
   'season.newyear': '❄️ Yılbaşı bahçesi — bugünün hediyesi daha büyük!',
   'boss.chip': 'Boss',
   'skins.title': 'Araba rengi',
@@ -1505,7 +1517,8 @@ const TR_HINTS: Dict = {
   'Финал! Веди дедов жигулёнок через весь двор — шаг за шагом': 'Final! Dedenin arabasını tüm bahçeden adım adım geçir'
 };
 
-const DICTS: Record<Lang, Dict> = { ru: RU, en: EN, tr: TR };
+// Экспортируется для теста паритета ключей (tests/i18n-parity.test.ts).
+export const DICTS: Record<Lang, Dict> = { ru: RU, en: EN, tr: TR };
 const NAME_TABLES: Record<Exclude<Lang, 'ru'>, Dict> = { en: EN_NAMES, tr: TR_NAMES };
 const HINT_TABLES: Record<Exclude<Lang, 'ru'>, Dict> = { en: EN_HINTS, tr: TR_HINTS };
 
@@ -1532,7 +1545,7 @@ export function setLang(lang: Lang): void {
 
 export function t(key: string, vars: Record<string, string | number> = {}): string {
   let s = DICTS[current][key] ?? DICTS.ru[key] ?? key;
-  for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, String(v));
+  for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
   return s;
 }
 

@@ -72,6 +72,61 @@ test.describe('Аналитика: interstitial показан или нет', (
   });
 });
 
+test.describe('Аналитика: жёсткий кап interstitial', () => {
+  // README обещает «не более 11 interstitial за кампанию». Раньше лимит жил
+  // только в арифметике дефолтов; теперь показы считаются явно, и двенадцатый
+  // подряд «Далее» (при `?adNow=1` реклама после каждой победы) обязан дать
+  // interstitial_capped вместо очередного requested. Гоняем через «Бесконечный
+  // двор»: у него тот же рекламный путь, но нет боссов и финала кампании.
+  test('после 11 показов реклама не вызывается, приходит interstitial_capped', async ({ page }) => {
+    test.setTimeout(180_000);
+    await installLogHook(page);
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'parkovka.save.v1',
+        JSON.stringify({
+          v: 1,
+          stars: { '100': 3 },
+          sound: true,
+          music: true,
+          lang: 'ru',
+          lastLevel: 100,
+          targetSkin: 0,
+          campaignDone: true,
+          endingSeen: true
+        })
+      );
+    });
+    await page.goto('/?mock=1&lang=ru&analyticsDebug=1&adNow=1');
+    await page.getByTestId('menu-endless').click();
+    await expect(page.getByTestId('screen-game')).toContainText('Бесконечный двор');
+
+    const winAndNext = async (): Promise<void> => {
+      await page.evaluate(() =>
+        (window as unknown as { __e2eWinLevel: (opts: { starCollected: boolean }) => void }).__e2eWinLevel({
+          starCollected: true
+        })
+      );
+      await expect(page.getByTestId('win-overlay')).toBeVisible();
+      await page.getByTestId('btn-next').click();
+      const close = page.getByTestId('mock-ad-close');
+      if (await close.isVisible()) {
+        await expect(close).toBeEnabled({ timeout: 5000 });
+        await close.click();
+        await expect(page.getByTestId('mock-ad')).toHaveCount(0);
+      }
+      await expect(page.getByTestId('screen-game')).toContainText('Бесконечный двор', { timeout: 15_000 });
+    };
+
+    for (let i = 0; i < 12; i++) await winAndNext();
+
+    const events = await eventDetails(page);
+    expect(typesOf(events, 'interstitial_shown')).toHaveLength(11);
+    expect(typesOf(events, 'interstitial_requested')).toHaveLength(11);
+    expect(typesOf(events, 'interstitial_capped').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
 test.describe('Аналитика: воронка без дублей', () => {
   test('старт уровня и победа дают ровно по одному событию', async ({ page }) => {
     await installLogHook(page);

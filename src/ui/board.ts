@@ -23,6 +23,11 @@ const M = 90; // поля вокруг двора: забор, куры
 
 export interface BoardEvents {
   onPick(piece: number): void;
+  /**
+   * Скорость перетаскивания 0..1 (сглаженная) — питает кроссфейд лупов тяги.
+   * Опционален: старые подписчики и тесты не обязаны его знать.
+   */
+  onDragSpeed?(intensity: number): void;
   /** Палец/мышь отпущены (независимо от того, был ли ход). */
   onRelease(): void;
   /** Ход применён; state уже обновлён внутри BoardView. */
@@ -70,6 +75,10 @@ interface DragInfo {
   bumpedPos: boolean;
   bumpedNeg: boolean;
   moved: boolean;
+  /** Сглаженная скорость drag'а 0..1 и метка времени последнего события. */
+  speed?: number;
+  lastOff?: number;
+  lastMoveAt?: number;
 }
 
 interface InputPoint {
@@ -1234,6 +1243,8 @@ export class BoardView {
       // синтетические события (тесты) не имеют активного указателя
     }
     this.events.onPick(idx);
+    this.drag.speed = 0;
+    this.drag.lastMoveAt = undefined;
     e.preventDefault();
   }
 
@@ -1257,6 +1268,16 @@ export class BoardView {
     if (!d) return;
     const cur = this.currentOffset(e);
     if (!cur) return;
+    // Сглаженная скорость указателя в клетках/кадр → интенсивность звука тяги.
+    const now = performance.now();
+    if (d.lastMoveAt !== undefined) {
+      const dt = Math.max(8, now - d.lastMoveAt);
+      const speed = Math.min(1, Math.abs(cur.off - (d.lastOff ?? cur.off)) / (dt / 16.7) / 2.2);
+      d.speed = (d.speed ?? 0) * 0.72 + speed * 0.28;
+      this.events.onDragSpeed?.(d.speed);
+    }
+    d.lastMoveAt = now;
+    d.lastOff = cur.off;
     const { axis, off } = cur;
     const maxF = d.exitAxis === axis && d.exitSign > 0 ? d.visPos[axis] : d.pos[axis];
     const minF = -(d.exitAxis === axis && d.exitSign < 0 ? d.neg[axis] : d.neg[axis]);

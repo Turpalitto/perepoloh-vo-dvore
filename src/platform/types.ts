@@ -46,8 +46,12 @@ export interface LeaderboardSnapshot {
  * этой доски соревнования в нём не было вообще: игрок видел только собственный
  * счёт. Доску нужно завести в консоли под этим же именем — SDK отклонит
  * неизвестное имя, и вызов молча уйдёт в catch (см. yandex.ts).
+ *
+ * `eliteweekly` — недельный чемпионат (Stage B): одно испытание недели у всех
+ * игроков, очки = медаль × 1000 − ходы. Доска опциональна: без неё чемпионат
+ * работает как еженедельное испытание с локальным рекордом (см. elite-weekly.ts).
  */
-export type LeaderboardName = 'yardstars' | 'dailystreak' | 'eliteleague';
+export type LeaderboardName = 'yardstars' | 'dailystreak' | 'eliteleague' | 'eliteweekly';
 
 export interface Platform {
   readonly name: 'mock' | 'yandex' | 'local-fallback';

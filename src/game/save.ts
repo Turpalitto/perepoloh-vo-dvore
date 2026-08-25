@@ -78,6 +78,12 @@ export interface SaveData {
    * отнимается — список только пополняется.
    */
   achievements?: string[];
+  /**
+   * Результат недельного чемпионата (Stage B): лучшая зачётная попытка недели.
+   * Смена недели вытесняет прошлый результат; при merge одной недели берётся
+   * максимум очков, разных — более свежая неделя (та же политика, что у weekly).
+   */
+  eliteWeekly?: { week: string; score: number; medal: number };
 }
 
 export function defaultSave(): SaveData {
@@ -213,7 +219,8 @@ export function sanitizeSave(raw: unknown): SaveData | null {
           const list = [...new Set(r.bossDone.filter((n): n is number => Number.isInteger(n) && n > 0))];
           return list.length ? list : undefined;
         })()
-      : undefined
+      : undefined,
+    eliteWeekly: sanitizeEliteWeekly(r.eliteWeekly)
   };
 }
 
@@ -304,8 +311,35 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
       return set.size ? [...set] : undefined;
     })(),
     achievements: mergeSeen(a.achievements, b.achievements),
-    endlessResume: Math.max(a.endlessResume ?? 0, b.endlessResume ?? 0) || undefined
+    endlessResume: Math.max(a.endlessResume ?? 0, b.endlessResume ?? 0) || undefined,
+    eliteWeekly: mergeEliteWeekly(sanitizeEliteWeekly(a.eliteWeekly), sanitizeEliteWeekly(b.eliteWeekly))
   };
+}
+
+/** Та же неделя — максимум очков; разные недели — более свежая. */
+function mergeEliteWeekly(
+  a: SaveData['eliteWeekly'],
+  b: SaveData['eliteWeekly']
+): SaveData['eliteWeekly'] {
+  if (!a) return b;
+  if (!b) return a;
+  if (a.week !== b.week) return a.week > b.week ? a : b;
+  return a.score >= b.score ? a : b;
+}
+
+/** Валидация результата недельного чемпионата (форма и диапазоны). */
+function sanitizeEliteWeekly(raw: unknown): SaveData['eliteWeekly'] {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const r = raw as { week?: unknown; score?: unknown; medal?: unknown };
+  const week = r.week;
+  const score = r.score;
+  const medal = r.medal;
+  // Формат ключа недели задаёт currentWeekKey() (дата понедельника YYYY-MM-DD);
+  // проверяем форму, чтобы не связать сейв с внутренним форматом.
+  if (typeof week !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(week)) return undefined;
+  if (!Number.isInteger(score) || (score as number) < 0 || (score as number) > 3999) return undefined;
+  if (![1, 2, 3].includes(medal as number)) return undefined;
+  return { week, score: score as number, medal: medal as number };
 }
 
 /**
@@ -459,6 +493,24 @@ export class SaveStore {
   setEndlessResume(streak: number | undefined): void {
     this.data.endlessResume = streak;
     this.persist();
+  }
+
+  /**
+   * Результат зачётной попытки недельного чемпионата. Возвращает true, если
+   * он стал лучшим результатом этой недели (и его стоит отправить в доску).
+   */
+  recordEliteWeekly(week: string, score: number, medal: number): boolean {
+    const current = this.data.eliteWeekly;
+    if (current?.week === week && current.score >= score) return false;
+    this.data.eliteWeekly = { week, score, medal };
+    this.persist();
+    return true;
+  }
+
+  /** Результат чемпионата актуален для переданной недели. */
+  eliteWeeklyOf(week: string): { score: number; medal: number } | null {
+    const entry = this.data.eliteWeekly;
+    return entry?.week === week ? { score: entry.score, medal: entry.medal } : null;
   }
 
   /** Записывает событие недельной цели (win/perfect — сумма, endless — максимум серии). */

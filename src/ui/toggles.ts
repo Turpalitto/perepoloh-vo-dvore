@@ -38,7 +38,12 @@ export class SettingsToggles {
   }
 
   soundHtml(testid: string): string {
-    return this.iconBtn(testid, 'audio.sound', this.deps.audio.enabled ? soundOnIcon : soundOffIcon);
+    return this.iconBtn(
+      testid,
+      'audio.sound',
+      this.deps.audio.enabled ? soundOnIcon : soundOffIcon,
+      this.deps.audio.enabled
+    );
   }
 
   wireSound(el: HTMLElement): void {
@@ -47,6 +52,7 @@ export class SettingsToggles {
       this.deps.audio.setEnabled(on);
       this.deps.store.setSound(on);
       el.innerHTML = on ? soundOnIcon : soundOffIcon;
+      el.setAttribute('aria-pressed', String(on));
       this.deps.audio.play('click');
     });
   }
@@ -55,7 +61,8 @@ export class SettingsToggles {
     return this.iconBtn(
       testid,
       'audio.music',
-      this.deps.audio.musicEnabled ? musicOnIcon : musicOffIcon
+      this.deps.audio.musicEnabled ? musicOnIcon : musicOffIcon,
+      this.deps.audio.musicEnabled
     );
   }
 
@@ -65,6 +72,7 @@ export class SettingsToggles {
       this.deps.audio.setMusicEnabled(on);
       this.deps.store.setMusic(on);
       el.innerHTML = on ? musicOnIcon : musicOffIcon;
+      el.setAttribute('aria-pressed', String(on));
       this.deps.audio.play('click');
     });
   }
@@ -73,7 +81,8 @@ export class SettingsToggles {
     return this.iconBtn(
       testid,
       'audio.vibration',
-      this.deps.store.vibrationEnabled() ? vibrateOnIcon : vibrateOffIcon
+      this.deps.store.vibrationEnabled() ? vibrateOnIcon : vibrateOffIcon,
+      this.deps.store.vibrationEnabled()
     );
   }
 
@@ -82,6 +91,7 @@ export class SettingsToggles {
       const on = !this.deps.store.vibrationEnabled();
       this.deps.store.setVibration(on);
       el.innerHTML = on ? vibrateOnIcon : vibrateOffIcon;
+      el.setAttribute('aria-pressed', String(on));
       this.deps.audio.play('click');
       if (on) this.deps.vibrate(20);
     });

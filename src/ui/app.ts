@@ -100,6 +100,8 @@ import { yardSVG } from './yard';
 import { confettiHtml } from './confetti';
 import { SettingsToggles } from './toggles';
 import { TVNavigator } from './tv-navigation';
+import { pickWeeklyChallenge, weeklyScore } from '../game/elite-weekly';
+import { wireDialog, type DialogOptions } from './dialog';
 
 /**
  * Уровни, где подсказка бесплатна и не жжёт платный токен — не только
@@ -198,6 +200,8 @@ export class App {
   private restartCounts = new Map<number, number>();
   /** Счётчики воронки за сессию (номер уровня и попытки) — см. session-stats.ts. */
   private readonly sessionStats = new SessionStats();
+  /** Неделя, попытка которой сейчас играется (недельный чемпионат). */
+  private weeklyRunWeek: string | null = null;
   /** Один запрос на таблицу лидерборда за раз (TTL 45с) — см. leaderboard-cache.ts. */
   private readonly leaderboardCache: LeaderboardCache;
 
@@ -450,6 +454,15 @@ export class App {
     if (shown) this.interstitialsShown++;
   }
 
+  /**
+   * Роль/фокус/ловушка Tab для модальных оверлеев. Тонкая обёртка над
+   * wireDialog из ui/dialog.ts — здесь только чтобы не импортировать её
+   * в каждом методе экранов.
+   */
+  private wireDialog(overlay: HTMLElement, opts: DialogOptions = {}): void {
+    wireDialog(overlay, opts);
+  }
+
   private dailyKey(): string {
     return todayKey(new Date(this.platform.serverTime()));
   }
@@ -524,6 +537,7 @@ export class App {
         <button class="btn btn-primary btn-big" data-testid="garage-close">${t('garage.close')}</button>
       </div>`;
     this.q('.overlay-slot').appendChild(overlay);
+    this.wireDialog(overlay, { onCancel: () => this.q('[data-testid=garage-close]').click() });
     const close = () => overlay.remove();
     overlay.querySelector('[data-testid=garage-close]')!.addEventListener('click', () => {
       this.audio.play('click');
@@ -867,10 +881,13 @@ export class App {
     // Доска лиги грузится только тем, кто в лигу вошёл: остальным она пуста и
     // лишь занимает экран, а запрос всё равно стоит квоты SDK.
     const leagueOpen = this.store.data.campaignDone === true;
-    const [starsSnap, streakSnap, leagueSnap] = await Promise.all([
+    const [starsSnap, streakSnap, leagueSnap, weeklySnap] = await Promise.all([
       this.leaderboardCache.get('yardstars'),
       this.leaderboardCache.get('dailystreak'),
-      leagueOpen ? this.leaderboardCache.get('eliteleague') : Promise.resolve(null)
+      leagueOpen ? this.leaderboardCache.get('eliteleague') : Promise.resolve(null),
+      leagueOpen && this.store.data.eliteWeekly
+        ? this.leaderboardCache.get('eliteweekly')
+        : Promise.resolve(null)
     ]);
     const stars = starsSnap.entries;
     const streak = streakSnap.entries;
@@ -897,7 +914,8 @@ export class App {
     content.innerHTML =
       board(t('leaderboard.stars'), stars, myStars, ' ★') +
       board(t('leaderboard.streak'), streak, myStreak, ` ${t('leaderboard.days')}`) +
-      (leagueSnap ? board(t('leaderboard.league'), leagueSnap.entries, leagueSnap.me, ' 🏅') : '');
+      (leagueSnap ? board(t('leaderboard.league'), leagueSnap.entries, leagueSnap.me, ' 🏅') : '') +
+      (weeklySnap ? board(t('leaderboard.weekly'), weeklySnap.entries, weeklySnap.me, ' 🏆') : '');
   }
 
   private async inviteNeighbor(button: HTMLButtonElement): Promise<void> {
@@ -949,6 +967,7 @@ export class App {
         'gift.close'
       )}</button></div>`;
     this.q('.overlay-slot').appendChild(overlay);
+    this.wireDialog(overlay, { onCancel: () => overlay.querySelector<HTMLElement>('[data-testid=gift-close]')?.click() });
     overlay.querySelector('[data-testid=gift-close]')!.addEventListener('click', () => overlay.remove());
     if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=gift-close]')!.focus({ preventScroll: true });
   }
@@ -1007,6 +1026,7 @@ export class App {
     };
     render();
     this.q('.overlay-slot').appendChild(overlay);
+    this.wireDialog(overlay, { onCancel: () => overlay.querySelector<HTMLElement>('[data-testid=weekly-close]')?.click() });
   }
 
   private showRules(): void {
@@ -1021,6 +1041,7 @@ export class App {
         <button class="btn btn-primary btn-big" data-testid="btn-rules-close">${t('rules.close')}</button>
       </div>`;
     this.q('.overlay-slot').appendChild(overlay);
+    this.wireDialog(overlay, { onCancel: () => overlay.querySelector<HTMLElement>('[data-testid=btn-rules-close]')?.click() });
     const close = () => overlay.remove();
     overlay.querySelector('[data-testid=btn-rules-close]')!.addEventListener('click', () => {
       this.audio.play('click');
@@ -1417,6 +1438,7 @@ export class App {
         <button class="btn" data-testid="endless-resume-no">${t('endless.resume.no')}</button>
       </div>`;
     this.q('.overlay-slot').appendChild(overlay);
+    this.wireDialog(overlay, { onCancel: () => overlay.querySelector<HTMLElement>('[data-testid=endless-resume-no]')?.click() });
     overlay.querySelector('[data-testid=endless-resume-yes]')!.addEventListener('click', async (event) => {
       const button = event.currentTarget as HTMLButtonElement;
       if (button.disabled) return;
@@ -1588,6 +1610,7 @@ export class App {
       const d = document.createElement('div');
       d.className = 'hint-toast deadlock-toast';
       d.setAttribute('data-testid', 'deadlock-toast');
+      d.setAttribute('role', 'alert');
       d.textContent = t('deadlock.warn');
       this.q('.overlay-slot').appendChild(d);
       deadlock.el = d;
@@ -1615,6 +1638,7 @@ export class App {
         this.hideOnboardingHand();
       },
       onRelease: () => this.audio.engineStop(),
+      onDragSpeed: (t) => this.audio.engineSetIntensity(t),
       onBump: () => {
         this.audio.play('thud');
         this.vibrate(14);
@@ -1927,6 +1951,8 @@ export class App {
       // модификатор — второй тост уезжает под первый.
       toast.className = modifierShown ? 'hint-toast stacked' : 'hint-toast';
       toast.setAttribute('data-testid', 'hint-toast');
+      // Тост появляется сам, без фокуса игрока — скринридер обязан его объявить.
+      toast.setAttribute('role', 'status');
       toast.textContent = hintText;
       this.q('.overlay-slot').appendChild(toast);
       window.setTimeout(() => toast.classList.add('gone'), 4200);
@@ -2017,6 +2043,7 @@ export class App {
         </div>
       </div>`;
     this.q('.overlay-slot').appendChild(overlay);
+    this.wireDialog(overlay, { onCancel: () => overlay.querySelector<HTMLElement>('[data-testid=btn-resume]')?.click() });
     this.toggles.wireSound(overlay.querySelector('[data-testid=pause-sound]')!);
     this.toggles.wireMusic(overlay.querySelector('[data-testid=pause-music]')!);
     this.toggles.wireVibration(overlay.querySelector('[data-testid=pause-vibration]')!);
@@ -2201,6 +2228,7 @@ export class App {
         </div>
       </div>`;
     this.q('.overlay-slot').appendChild(overlay);
+    this.wireDialog(overlay);
     const starEls = overlay.querySelectorAll('.win-stars .star.full');
     starEls.forEach((s, i) => {
       (s as HTMLElement).style.animationDelay = `${0.2 + i * 0.28}s`;
@@ -2303,6 +2331,7 @@ export class App {
         </div>
       </div>`;
     this.q('.overlay-slot').appendChild(overlay);
+    this.wireDialog(overlay);
     overlay.querySelectorAll('.win-stars .star.full').forEach((s, i) => {
       (s as HTMLElement).style.animationDelay = `${0.2 + i * 0.28}s`;
       s.classList.add('pop');
@@ -2444,11 +2473,16 @@ export class App {
             ${(this.store.data.endlessBest ?? 0) > 0 ? `<span>🌀 ${t('elite.bestEndless', { n: this.store.data.endlessBest ?? 0 })}</span>` : ''}
           </div>
         </div>
+        ${this.weeklyCardHtml()}
         ${sections}
       </div>`;
     this.q('[data-testid=btn-back]').addEventListener('click', () => {
       this.audio.play('click');
       this.showMenu();
+    });
+    this.q('[data-testid=elite-weekly-play]').addEventListener('click', () => {
+      this.audio.play('click');
+      this.startWeeklyChallenge(currentWeekKey());
     });
     this.root.querySelectorAll<HTMLButtonElement>('.elite-card').forEach((b) =>
       b.addEventListener('click', () => {
@@ -2479,12 +2513,55 @@ export class App {
         <button class="btn btn-primary btn-big" data-testid="elite-intro-close">${t('rules.close')}</button>
       </div>`;
     this.q('.elite-screen').appendChild(overlay);
+    this.wireDialog(overlay, { onCancel: () => overlay.querySelector<HTMLElement>('[data-testid=elite-intro-close]')?.click() });
     overlay.querySelector('[data-testid=elite-intro-close]')!.addEventListener('click', () => {
       this.audio.play('click');
       overlay.remove();
       if (this.platform.isTV) this.tv.focusDefault(true);
     });
     if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=elite-intro-close]')!.focus({ preventScroll: true });
+  }
+
+  /** Карточка недельного чемпионата над дивизионами лиги. */
+  private weeklyCardHtml(): string {
+    const challenge = pickWeeklyChallenge(currentWeekKey());
+    const level = sourceLevel(challenge);
+    const best = this.store.eliteWeeklyOf(currentWeekKey());
+    const mod =
+      challenge.modifier !== 'none' ? `<span class="elite-mod">${t(`elite.mod.${challenge.modifier}`)}</span>` : '';
+    const goals = eliteGoalRows(challenge)
+      .map((r) => r.text)
+      .join(' · ');
+    return `
+      <section class="elite-weekly" data-testid="elite-weekly">
+        <h3 class="elite-section">🏆 ${t('elite.weekly.title')}</h3>
+        <div class="elite-weekly-card">
+          <div class="elite-weekly-info">
+            <span>${escapeHTML(levelText('name', level.name) ?? level.name)}${mod}</span>
+            <span class="elite-weekly-best">${
+              best ? t('elite.weekly.best', { n: best.score }) : t('elite.weekly.noAttempt')
+            }</span>
+            <small class="elite-weekly-rules">${t('elite.weekly.rules')}</small>
+          </div>
+          <button class="btn btn-primary" data-testid="elite-weekly-play" title="${escapeHTML(goals)}">${t(
+            'elite.weekly.play'
+          )}</button>
+        </div>
+      </section>`;
+  }
+
+  /** Зачётная попытка чемпионата: то же испытание у всех игроков недели. */
+  private startWeeklyChallenge(week: string): void {
+    const challenge = pickWeeklyChallenge(week);
+    this.weeklyRunWeek = week;
+    track({
+      type: 'elite_challenge_started',
+      challengeId: challenge.id,
+      division: divisionOf(challenge.id),
+      modifier: challenge.modifier,
+      remixed: challenge.remixed
+    });
+    this.runLevel(sourceLevel(challenge), false, undefined, false, challenge.modifier, challenge);
   }
 
   private startEliteChallenge(id: number): void {
@@ -2549,6 +2626,23 @@ export class App {
         !achievementsBefore.has(achievement.key) && unlockedAchievementKeys(this.store.data).has(achievement.key)
     );
     this.store.rememberAchievements(unlockedAchievementKeys(this.store.data));
+
+    // Недельный чемпионат: попытка засчитана в очки недели, улучшение — в доску.
+    let weeklyNote = '';
+    if (this.weeklyRunWeek) {
+      const week = this.weeklyRunWeek;
+      this.weeklyRunWeek = null;
+      const score = weeklyScore(earned, attempt.moves);
+      if (score > 0 && this.store.recordEliteWeekly(week, score, earned)) {
+        void this.platform.submitScore('eliteweekly', score);
+        this.leaderboardCache.invalidate('eliteweekly');
+        weeklyNote = `<div class="win-upgrade" data-testid="elite-weekly-score">🏆 ${t('elite.weekly.scored', { n: score })}</div>`;
+      } else if (score > 0) {
+        const kept = this.store.eliteWeeklyOf(week)?.score ?? score;
+        weeklyNote = `<div class="win-upgrade" data-testid="elite-weekly-score">🏆 ${t('elite.weekly.bestKept', { n: kept })}</div>`;
+      }
+    }
+
     this.audio.play(earned === 3 ? 'win' : earned > 0 ? 'star' : 'thud');
     this.vibrate(earned > 0 ? [28, 45, 28] : 14);
 
@@ -2570,6 +2664,7 @@ export class App {
         }</div>
         ${improved ? `<div class="win-upgrade">${t('elite.result.improved')}</div>` : ''}
         <div class="win-note">🏅 ${t('elite.points')}: ${points}</div>
+        ${weeklyNote}
         ${rankUp ? `<div class="win-master" data-testid="elite-rankup">${t('elite.result.rankUp', { rank: t(`rank.${rank.key}`) })}</div>` : ''}
         ${newAchievements
           .map(
@@ -2589,6 +2684,7 @@ export class App {
         </div>
       </div>`;
     this.q('.overlay-slot').appendChild(overlay);
+    this.wireDialog(overlay);
     overlay.querySelector('[data-testid=elite-retry]')!.addEventListener('click', () => {
       this.audio.play('click');
       this.startEliteChallenge(challenge.id);

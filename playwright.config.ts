@@ -19,6 +19,15 @@ export default defineConfig({
     {
       name: 'mobile',
       use: { viewport: { width: 360, height: 800 }, hasTouch: true, isMobile: true }
+    },
+    {
+      // Safari/iOS — значимая доля аудитории Яндекс Игр, а движок один на все
+      // устройства Apple. Десктопный WebKit ловит несовместимости дешевле,
+      // чем жалобы игроков. Скоуп — базовый смоук (загрузка/уровень/меню):
+      // полный набор остаётся на Chromium, где живут mock-реклама и пульт.
+      name: 'webkit',
+      use: { viewport: { width: 1280, height: 720 }, browserName: 'webkit' },
+      testMatch: /e2e\/(smoke|webkit)\.spec\.ts/
     }
   ]
 });

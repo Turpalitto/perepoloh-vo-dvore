@@ -43,6 +43,11 @@ export class GameAudio {
   private ambientStarted = false;
   private engine: { osc: OscillatorNode; lfo: OscillatorNode; gain: GainNode } | null = null;
   private engineSample: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+  /** Пара лупов тяги (engine_low/high) с кроссфейдом по скорости drag'а. */
+  private enginePair: {
+    low: { src: AudioBufferSourceNode; gain: GainNode };
+    high: { src: AudioBufferSourceNode; gain: GainNode };
+  } | null = null;
   private musicGain: GainNode | null = null;
   private musicTimer: number | null = null;
   private musicBar = 0;
@@ -242,8 +247,50 @@ export class GameAudio {
    * длину буфера) не подходит — здесь свой зацикленный источник с явным
    * стартом/стопом, тот же приём, что и у синтез-фолбэка (`this.engine`).
    */
+  /**
+   * Интенсивность тяги во время drag'а: 0 — холостой ход, 1 — разгон.
+   * Управляет кроссфейдом пары лупов engine_low/engine_high; на синтез-фолбэке
+   * и одиночном engine_idle — плавно меняет громкость (дешёвая имитация).
+   */
+  engineSetIntensity(t: number): void {
+    const k = Number.isFinite(t) ? Math.max(0, Math.min(1, t)) : 0;
+    if (this.enginePair && this.ctx) {
+      const { low, high } = this.enginePair;
+      low.gain.gain.linearRampToValueAtTime(0.16 * (1 - k), this.ctx.currentTime + 0.08);
+      high.gain.gain.linearRampToValueAtTime(0.13 * k, this.ctx.currentTime + 0.08);
+      return;
+    }
+    if (this.engineSample && this.ctx) {
+      this.engineSample.gain.gain.linearRampToValueAtTime(0.1 + 0.09 * k, this.ctx.currentTime + 0.08);
+    }
+  }
+
   engineStart(): void {
-    if (!this.enabled || this.suspended() || !this.ctx || !this.master || this.engine || this.engineSample) return;
+    if (!this.enabled || this.suspended() || !this.ctx || !this.master || this.engine || this.engineSample || this.enginePair) return;
+    // Прогреваем пару лупов на будущие заезды (не блокируя текущий запуск).
+    if (this.sampleLoader && !this.sampleLoader.hasFailed('engine_low')) {
+      void this.sampleLoader.load('engine_low', SOUND_FILE_URLS.engine_low);
+    }
+    if (this.sampleLoader && !this.sampleLoader.hasFailed('engine_high')) {
+      void this.sampleLoader.load('engine_high', SOUND_FILE_URLS.engine_high);
+    }
+    const lowBuf = this.sampleLoader?.get('engine_low');
+    const highBuf = this.sampleLoader?.get('engine_high');
+    if (lowBuf && highBuf) {
+      const mkLoop = (buffer: AudioBuffer, gainValue: number) => {
+        const src = this.ctx!.createBufferSource();
+        src.buffer = buffer;
+        src.loop = true;
+        const gain = this.ctx!.createGain();
+        gain.gain.setValueAtTime(0, this.ctx!.currentTime);
+        gain.gain.linearRampToValueAtTime(gainValue, this.ctx!.currentTime + 0.12);
+        src.connect(gain).connect(this.master!);
+        src.start();
+        return { src, gain };
+      };
+      this.enginePair = { low: mkLoop(lowBuf, 0.16), high: mkLoop(highBuf, 0) };
+      return;
+    }
     const buffer = this.sampleLoader?.get('engine_idle');
     if (buffer) {
       const src = this.ctx.createBufferSource();
@@ -281,6 +328,15 @@ export class GameAudio {
   }
 
   engineStop(): void {
+    if (this.enginePair && this.ctx) {
+      const { low, high } = this.enginePair;
+      this.enginePair = null;
+      low.gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.15);
+      high.gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.15);
+      low.src.stop(this.ctx.currentTime + 0.2);
+      high.src.stop(this.ctx.currentTime + 0.2);
+      return;
+    }
     if (this.engineSample && this.ctx) {
       const { src, gain } = this.engineSample;
       this.engineSample = null;

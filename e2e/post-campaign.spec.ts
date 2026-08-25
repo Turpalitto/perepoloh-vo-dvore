@@ -468,3 +468,32 @@ test.describe('Endless: rewarded-восстановление серии', () =>
     await expect(page.getByTestId('endless-resume')).toHaveCount(0);
   });
 });
+
+test.describe('Недельный чемпионат', () => {
+  // Stage B: на экране лиги появляется карточка испытания недели; зачётная
+  // попытка приносит очки (медаль ×1000 − ходы) в сейв и в доску eliteweekly.
+  test('карточка недели видна, зачётная попытка начисляет очки', async ({ page }) => {
+    test.setTimeout(60_000);
+    await seedSave(page);
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await openElite(page);
+
+    const card = page.getByTestId('elite-weekly');
+    await expect(card).toBeVisible();
+    await expect(card).toContainText('зачётных попыток');
+
+    await page.getByTestId('elite-weekly-play').click();
+    await expect(page.getByTestId('board')).toBeVisible({ timeout: 15_000 });
+    await page.evaluate(() =>
+      (window as unknown as { __e2eWinLevel: (opts?: { starCollected?: boolean }) => void }).__e2eWinLevel({
+        starCollected: true
+      })
+    );
+    // Результат испытания показывает начисление очков чемпионата.
+    await expect(page.getByTestId('elite-result')).toBeVisible();
+    await expect(page.getByTestId('elite-weekly-score')).toContainText(/\d+/);
+    const save = (await readSave(page)) as { eliteWeekly?: { week: string; score: number } };
+    expect(save.eliteWeekly?.week).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(save.eliteWeekly?.score).toBeGreaterThan(0);
+  });
+});

@@ -43,8 +43,10 @@ async function seedSave(page: Page, overrides: SaveData = {}): Promise<void> {
 async function seedBeforeFinalBoss(page: Page): Promise<void> {
   // «Пройдено всё, кроме финала» — по позиции в кампании: уровни, вставленные
   // после релиза, имеют id вне 1..99, и диапазон оставил бы их непройденными,
-  // отправив «Продолжить» не на финального босса.
-  const beforeFinal = CAMPAIGN_LEVEL_IDS.slice(0, -1);
+  // отправив «Продолжить» не на финального босса. Финал — слот босса 100,
+  // а не последний элемент массива: после него лежит глава 10.
+  const finalIndex = CAMPAIGN_LEVEL_IDS.indexOf(LAST_CAMPAIGN_LEVEL_ID);
+  const beforeFinal = CAMPAIGN_LEVEL_IDS.slice(0, finalIndex);
   const stars = Object.fromEntries(beforeFinal.map((id) => [String(id), 3]));
   await seedSave(page, {
     stars,
@@ -358,7 +360,10 @@ test.describe('Post-campaign', () => {
     ).toBe(0);
 
     await page.getByTestId('btn-back').click();
-    const beforeFinal = CAMPAIGN_LEVEL_IDS.slice(0, -1);
+    // Финал — слот босса 100, а не последний элемент массива (после него
+    // лежит глава 10): сеем «всё, кроме сюжетного финала» по позиции босса.
+    const finalIndex = CAMPAIGN_LEVEL_IDS.indexOf(LAST_CAMPAIGN_LEVEL_ID);
+    const beforeFinal = CAMPAIGN_LEVEL_IDS.slice(0, finalIndex);
     const stars = Object.fromEntries(beforeFinal.map((id) => [String(id), 3]));
     await page.evaluate(
       ({ stars, lastLevel }) => {

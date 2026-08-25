@@ -12,14 +12,20 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { BOSSES } from '../src/game/boss';
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const levels = JSON.parse(readFileSync(join(repoRoot, 'src/levels/levels.json'), 'utf8')) as Array<{ id: number }>;
 
 export const CAMPAIGN_LEVEL_IDS: number[] = levels.map((level) => level.id);
 
-/** Последний уровень кампании — финал, он же слот финального босса. */
-export const LAST_CAMPAIGN_LEVEL_ID = CAMPAIGN_LEVEL_IDS[CAMPAIGN_LEVEL_IDS.length - 1];
+/**
+ * Сюжетный финал кампании — слот финального босса. Не последний элемент
+ * массива: бонусные уровни (глава 10) лежат после босса 100, и сиды
+ * post-campaign тестов должны приводить именно к боссу, а не к уровню 128.
+ * Источник тот же, что у игры, — `BOSSES` из src/game/boss.ts.
+ */
+export const LAST_CAMPAIGN_LEVEL_ID = Math.max(...BOSSES.map((boss) => boss.id));
 
 /** Потолок счётчика звёзд в меню: три звезды за уровень. */
 export const CAMPAIGN_MAX_STARS = CAMPAIGN_LEVEL_IDS.length * 3;

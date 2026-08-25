@@ -1084,6 +1084,19 @@ const TR: Dict = {
  * уровней по сложности, а название с содержимым не меняется.
  */
 const EN_NAMES: Dict = {
+  // Глава 10 «Всё сразу».
+  'Всё на льду': 'Everything on Ice',
+  'Куриный переполох': 'Hen Pandemonium',
+  'Задержанный выезд': 'Delayed Exit',
+  'Лёд и звёзды': 'Ice and Stars',
+  'Куры и звёзды': 'Hens and Stars',
+  'Ворота на замке': 'Gate Under Lock',
+  'Скользкий курятник': 'Slippery Henhouse',
+  'Лёд на страже': 'Ice Standing Guard',
+  'Куриный затор': 'Chicken Jam',
+  'Тройное испытание': 'Triple Trial',
+  'Ледяной капкан': 'Icy Trap',
+  'Всё сразу': 'All at Once',
   // Ремиксы Высшей лиги — тот же двор, изменённый расклад.
   'Сено и бочка': 'Hay and Barrel',
   'Погреб переставлен': 'Cellar Rearranged',
@@ -1225,6 +1238,19 @@ const EN_NAMES: Dict = {
 };
 
 const EN_HINTS: Dict = {
+  // Подсказки главы 10.
+  'Лёд не прощает остановки — планируй проезды насквозь': 'Ice forgives no stops — plan to slide all the way through',
+  'Курица меняет клетку после каждого хода — считай её прыжки': 'The hen hops after every move — count her jumps',
+  'Ворота открыты, только пока кнопка занята техникой': 'The gate stays open only while a vehicle holds the button',
+  'На льду не остановиться: собери звезду на пролёте': 'You cannot stop on ice — collect the star on the fly',
+  'Куры и звезда: подгадай прыжок под маршрут сбора': 'Hens and a star: time your route around their jumps',
+  'Держи кнопку под колесом — иначе ворота захлопнутся': 'Keep a wheel on the button, or the gate will slam shut',
+  'Скользкий двор и живые куры: продумай оба каприза сразу': 'A slippery yard plus lively hens: plan for both whims at once',
+  'Лёд у ворот: кнопку придётся прижимать на ходу': 'Ice by the gate: press the button without stopping',
+  'Курица следит за воротами — обмани её тайминг': 'The hen guards the gate — outsmart her timing',
+  'Звезда, лёд и куры: три каприза в одном дворе': 'Star, ice and hens: three whims in one yard',
+  'Капкан держит ворота замкнутыми — ищи сухую дорожку': 'The trap keeps the gate locked — find a dry lane',
+  'Финал двора: лёд, куры и кнопка — всё сразу. Не спешись': 'Yard finale: ice, hens and the button — all at once',
   // Механики Высшей лиги: правило встречается впервые, подсказка обязательна.
   'Кнопка держит ворота: съехал с неё — створки захлопнулись':
     'The button only holds the gate while occupied — drive off and it slams shut',
@@ -1302,6 +1328,19 @@ const EN_HINTS: Dict = {
 };
 
 const TR_NAMES: Dict = {
+  // Глава 10 «Всё сразу».
+  'Всё на льду': 'Buzda Her Şey',
+  'Куриный переполох': 'Tavuk Kargaşası',
+  'Задержанный выезд': 'Gecikmeli Çıkış',
+  'Лёд и звёзды': 'Buz ve Yıldızlar',
+  'Куры и звёзды': 'Tavuklar ve Yıldızlar',
+  'Ворота на замке': 'Kapıda Kilit',
+  'Скользкий курятник': 'Kaygan Kümes',
+  'Лёд на страже': 'Nöbetteki Buz',
+  'Куриный затор': 'Tavuk Tıkanıklığı',
+  'Тройное испытание': 'Üçlü Sınav',
+  'Ледяной капкан': 'Buz Tuzağı',
+  'Всё сразу': 'Hepsi Birden',
   // Ремиксы Высшей лиги — тот же двор, изменённый расклад.
   'Сено и бочка': 'Saman ve Fıçı',
   'Погреб переставлен': 'Yeniden Dizilmiş Kiler',
@@ -1443,6 +1482,19 @@ const TR_NAMES: Dict = {
 };
 
 const TR_HINTS: Dict = {
+  // Подсказки главы 10.
+  'Лёд не прощает остановки — планируй проезды насквозь': 'Buz durmayı affetmez — sonuna kadar kaymayı planla',
+  'Курица меняет клетку после каждого хода — считай её прыжки': 'Tavuk her hamleden sonra zıplar — sıçramalarını say',
+  'Ворота открыты, только пока кнопка занята техникой': 'Kapı yalnızca düğmenin altında araç varken açık kalır',
+  'На льду не остановиться: собери звезду на пролёте': 'Buzda durulmaz: yıldızı geçerken topla',
+  'Куры и звезда: подгадай прыжок под маршрут сбора': 'Tavuklar ve bir yıldız: rotanı sıçramalara göre ayarla',
+  'Держи кнопку под колесом — иначе ворота захлопнутся': 'Düğmenin altında bir tekerlek tut, yoksa kapı kapanır',
+  'Скользкий двор и живые куры: продумай оба каприза сразу': 'Kaygan bahçe ve canlı tavuklar: iki kaprise birden hazırlan',
+  'Лёд у ворот: кнопку придётся прижимать на ходу': 'Kapının yanında buz: düğmeye durmadan basmalısın',
+  'Курица следит за воротами — обмани её тайминг': 'Tavuk kapıyı koruyor — zamanlamasını alt et',
+  'Звезда, лёд и куры: три каприза в одном дворе': 'Yıldız, buz ve tavuklar: tek bahçede üç kapris',
+  'Капкан держит ворота замкнутыми — ищи сухую дорожку': 'Tuzağı kapıyı kilitli tutar — kuru bir şerit bul',
+  'Финал двора: лёд, куры и кнопка — всё сразу. Не спешись': 'Bahçe finali: buz, tavuklar ve düğme — hepsi birden',
   // Yüksek Lig mekanikleri: kural ilk kez karşılaşılıyor, ipucu zorunlu.
   'Кнопка держит ворота: съехал с неё — створки захлопнулись':
     'Düğme kapıyı sadece üstünde biri varken tutar — çekilirsen kapı çarparak kapanır',

@@ -39,10 +39,11 @@ test.describe('UI boundaries', () => {
     await page.locator('.levels-grid').evaluate((element) => {
       element.scrollTop = element.scrollHeight;
     });
-    await expect(page.getByTestId('level-card-100')).toBeInViewport();
-    expect(
-      await overlapArea(page, '[data-testid="level-card-100"]', '[data-testid="mock-banner"]')
-    ).toBe(0);
+    // Последняя карточка по позиции, а не «уровень 100»: после финального босса
+    // в кампании лежит глава 10, и низ списка — это её уровни.
+    const lastLevelCard = '.levels-grid .level-card:last-child';
+    await expect(page.locator(lastLevelCard)).toBeInViewport();
+    expect(await overlapArea(page, lastLevelCard, '[data-testid="mock-banner"]')).toBe(0);
 
     await page.getByTestId('btn-back').click();
     await page.getByTestId('menu-achievements').click();

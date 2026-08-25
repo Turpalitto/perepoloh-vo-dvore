@@ -252,27 +252,33 @@ describe('лёд в кампании — постфактум-абляция к�
   });
 
   for (const level of iceLevels) {
-    it(`уровень ${level.id} «${level.name}»: каждая клетка несёт вес и имеет роль`, () => {
-      const impact = analyzeIceImpact(level);
-      expect(impact.solvable && !impact.exhausted).toBe(true);
-      expect(impact.fullOptimal).toBe(level.par);
-      // Абляция обязана давать определённый ответ: упор в лимит состояний
-      // ничего не доказывает, и «значимость» такой клетки была бы фикцией.
-      for (const cell of impact.cells) {
-        expect(cell.exhaustedWithout, `клетка (${cell.cell.x},${cell.cell.y}): абляция без ответа`).toBe(false);
-        expect(cell.solvableWithout, `клетка (${cell.cell.x},${cell.cell.y}): без неё уровень нерешаем`).toBe(true);
-      }
-      // Подсказка берёт первый ход оптимального решения: если бы оно вставало
-      // на лёд, игра предлагала бы невозможный ход.
-      expect(impact.landsOnIce).toBe(false);
+    it(
+      `уровень ${level.id} «${level.name}»: каждая клетка несёт вес и имеет роль`,
+      () => {
+        const impact = analyzeIceImpact(level);
+        expect(impact.solvable && !impact.exhausted).toBe(true);
+        expect(impact.fullOptimal).toBe(level.par);
+        // Абляция обязана давать определённый ответ: упор в лимит состояний
+        // ничего не доказывает, и «значимость» такой клетки была бы фикцией.
+        for (const cell of impact.cells) {
+          expect(cell.exhaustedWithout, `клетка (${cell.cell.x},${cell.cell.y}): абляция без ответа`).toBe(false);
+          expect(cell.solvableWithout, `клетка (${cell.cell.x},${cell.cell.y}): без неё уровень нерешаем`).toBe(true);
+        }
+        // Подсказка берёт первый ход оптимального решения: если бы оно вставало
+        // на лёд, игра предлагала бы невозможный ход.
+        expect(impact.landsOnIce).toBe(false);
 
-      for (const cell of impact.cells) {
-        const where = `(${cell.cell.x},${cell.cell.y})`;
-        expect(
-          cell.required,
-          `клетка ${where}: роль «${cell.role}», без неё оптимум ${cell.optimalWithout} против ${impact.fullOptimal}`
-        ).toBe(true);
-      }
-    });
+        for (const cell of impact.cells) {
+          const where = `(${cell.cell.x},${cell.cell.y})`;
+          expect(
+            cell.required,
+            `клетка ${where}: роль «${cell.role}», без неё оптимум ${cell.optimalWithout} против ${impact.fullOptimal}`
+          ).toBe(true);
+        }
+      },
+      // Абляция — солв на каждую клетку и на каждый альтернативный вариант
+      // остановки. На полях 7×7 главы 10 это на порядок дороже, чем на 6×6.
+      level.width > 6 ? 60_000 : 5000
+    );
   }
 });

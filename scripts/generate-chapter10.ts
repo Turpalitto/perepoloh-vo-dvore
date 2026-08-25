@@ -75,7 +75,8 @@ function argValue(flag: string): string | undefined {
 const run = {
   seed: argValue('--seed') ? Number(argValue('--seed')) : preset.seed,
   iterations: argValue('--iter') ? Number(argValue('--iter')) : preset.iterations,
-  floor: argValue('--floor') ? Number(argValue('--floor')) : preset.floor
+  floor: argValue('--floor') ? Number(argValue('--floor')) : preset.floor,
+  fast: args.includes('--fast')
 };
 if (run.floor > preset.maxOptimal) {
   throw new Error(`--floor ${run.floor} больше maxOptimal ${preset.maxOptimal}`);
@@ -235,8 +236,13 @@ function addMeaningfulIce(level: LevelDef, count: number): LevelDef | null {
  * без неё оптимум обязан упасть, и стеной её заменить нельзя. Сначала дешёвый
  * отбор по диапазону на смежных парах, затем дорогой разбор значимости — на
  * лучших по оценке кандидатах.
+ *
+ * fast=true пропускает дорогой разбор внутри перебора: первый кандидат,
+ * проходящий диапазон, возвращается сразу. Это НЕ ослабляет гарантию —
+ * finalChecksPass после сборки всё равно гоняет analyzeChickenImpact и
+ * отбрасывает декоративную курицу («подменяется стеной»).
  */
-function addMeaningfulChicken(level: LevelDef, lo: number, hi: number): LevelDef | null {
+function addMeaningfulChicken(level: LevelDef, lo: number, hi: number, fast: boolean): LevelDef | null {
   const full = solve(level, { stateLimit: SEARCH_LIMIT });
   if (!full.solvable || full.exhausted) return null;
   const swept = sweptKeys(level, full.path);
@@ -251,6 +257,7 @@ function addMeaningfulChicken(level: LevelDef, lo: number, hi: number): LevelDef
       const cand: LevelDef = { ...level, chickens };
       const res = solve(cand, { stateLimit: SEARCH_LIMIT });
       if (!res.solvable || res.exhausted || res.optimal < lo || res.optimal > hi) continue;
+      if (fast) return cand;
       candidates.push({ level: cand, optimal: res.optimal });
     }
   }
@@ -369,7 +376,7 @@ for (let i = 0; i < run.iterations && !found; i++) {
   }
 
   if (preset.mechs.includes('chickens')) {
-    const withChicken = addMeaningfulChicken(current, run.floor, preset.maxOptimal + 4);
+    const withChicken = addMeaningfulChicken(current, run.floor, preset.maxOptimal + 4, run.fast);
     if (!withChicken) {
       drop.noChicken++;
       continue;
@@ -419,7 +426,7 @@ if (found) {
     ...(found.level.gateSwitch ? ['gate-switch'] : []),
     ...(preset.mechs.includes('ice') ? ['ice'] : []),
     ...(preset.mechs.includes('chickens') ? ['chickens'] : []),
-    ...(preset.mechs.includes('held') ? ['gate-held'] : [])
+    ...(preset.mechs.includes('held') ? ['gate-switch'] : [])
   ];
   const out: LevelDef = {
     ...found.level,

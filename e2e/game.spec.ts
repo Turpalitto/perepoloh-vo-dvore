@@ -429,10 +429,10 @@ test.describe('Переполох во дворе', () => {
     // Уровень 1 обучающий — подсказка на нём бесплатна и не тратит выданный
     // токен (осознанно, полировка первой сессии): токен остаётся в копилке.
     await page.getByTestId('menu-play').click();
-    await expect(page.getByTestId('btn-hint')).toContainText('Бесплатная подсказка');
+    await expect(page.getByTestId('btn-hint')).toContainText('осталось бесплатных: 3');
     await page.getByTestId('btn-hint').click();
     await expect(page.locator('.hint-chevron').first()).toBeVisible();
-    await expect(page.getByTestId('btn-hint')).toContainText('Бесплатная подсказка');
+    await expect(page.getByTestId('btn-hint')).toContainText('осталось бесплатных: 2');
     await expect(page.getByTestId('mock-ad')).toHaveCount(0);
     const save = await page.evaluate(() => JSON.parse(localStorage.getItem('parkovka.save.v1') ?? '{}'));
     expect(save.hintTokens).toBe(2); // токен из подарка не потрачен на обучающем уровне
@@ -1144,7 +1144,7 @@ test.describe('Первая сессия: онбординг, hint без ток
     });
     await page.goto('/?mock=1&lang=ru');
     await page.getByTestId('menu-play').click();
-    await expect(page.getByTestId('btn-hint')).toContainText('Бесплатная подсказка');
+    await expect(page.getByTestId('btn-hint')).toContainText('осталось бесплатных: 3');
     await page.getByTestId('btn-hint').click();
     await page.waitForTimeout(300);
     const save = await page.evaluate(() => JSON.parse(localStorage.getItem('parkovka.save.v1') ?? '{}'));

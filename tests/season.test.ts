@@ -27,9 +27,29 @@ describe('сезонные события', () => {
     expect(currentSeason(new Date('2026-07-20T12:00:00'))).toBeNull();
   });
 
+  it('весна: 1–10 мая', () => {
+    withSearch('');
+    expect(currentSeason(new Date('2026-04-30T12:00:00'))).toBeNull();
+    expect(currentSeason(new Date('2026-05-01T12:00:00'))?.id).toBe('spring');
+    expect(currentSeason(new Date('2026-05-10T12:00:00'))?.id).toBe('spring');
+    expect(currentSeason(new Date('2026-05-11T12:00:00'))).toBeNull();
+  });
+
+  it('урожай: 1–15 сентября', () => {
+    withSearch('');
+    expect(currentSeason(new Date('2026-08-31T12:00:00'))).toBeNull();
+    expect(currentSeason(new Date('2026-09-01T12:00:00'))?.id).toBe('harvest');
+    expect(currentSeason(new Date('2026-09-15T12:00:00'))?.id).toBe('harvest');
+    expect(currentSeason(new Date('2026-09-16T12:00:00'))).toBeNull();
+  });
+
   it('?season= переопределяет для QA', () => {
     withSearch('?season=newyear');
     expect(currentSeason(new Date('2026-07-20T12:00:00'))?.id).toBe('newyear');
+    withSearch('?season=spring');
+    expect(currentSeason(new Date('2026-07-20T12:00:00'))?.id).toBe('spring');
+    withSearch('?season=harvest');
+    expect(currentSeason(new Date('2026-07-20T12:00:00'))?.id).toBe('harvest');
     withSearch('?season=none');
     expect(currentSeason(new Date('2026-12-25T12:00:00'))).toBeNull();
   });

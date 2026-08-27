@@ -7,6 +7,8 @@ export interface SaveData {
   v: 1;
   /** Лучший результат по уровням: id -> 0..3 звезды. */
   stars: Record<string, number>;
+  /** Лучшие ходы по уровням: id -> минимальное число ходов, за которое пройден. */
+  bestMoves?: Record<string, number>;
   sound: boolean;
   music: boolean;
   /** Язык интерфейса; по умолчанию русский. */
@@ -32,6 +34,8 @@ export interface SaveData {
   notifyOptIn?: boolean;
   /** Лучшая серия в «Бесконечном дворе» (доступен после кампании). */
   endlessBest?: number;
+  /** История последних серий «Бесконечного двора» (≤10, новые в конце). */
+  endlessHistory?: number[];
   /**
    * Незавершённая серия «Бесконечного двора»: точка для rewarded-восстановления
    * (Stage C). Пишется после каждой победы в заезде; «Закончить забег» снимает.
@@ -175,6 +179,14 @@ export function sanitizeSave(raw: unknown): SaveData | null {
     notifyOptIn: r.notifyOptIn === true ? true : undefined,
     endlessBest:
       Number.isInteger(r.endlessBest) && (r.endlessBest as number) >= 0 ? (r.endlessBest as number) : undefined,
+    endlessHistory: Array.isArray(r.endlessHistory)
+      ? (() => {
+          const list = r.endlessHistory
+            .filter((n): n is number => Number.isInteger(n) && n >= 0 && n <= 9999)
+            .slice(-10);
+          return list.length ? list : undefined;
+        })()
+      : undefined,
     endlessResume:
       Number.isInteger(r.endlessResume) && (r.endlessResume as number) >= 0
         ? Math.min(9999, r.endlessResume as number)
@@ -220,8 +232,20 @@ export function sanitizeSave(raw: unknown): SaveData | null {
           return list.length ? list : undefined;
         })()
       : undefined,
-    eliteWeekly: sanitizeEliteWeekly(r.eliteWeekly)
+    eliteWeekly: sanitizeEliteWeekly(r.eliteWeekly),
+    bestMoves: sanitizeBestMoves(r.bestMoves)
   };
+}
+
+/** Личные рекорды ходов: только целые ≥1 по строковым id. */
+function sanitizeBestMoves(raw: unknown): Record<string, number> | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const n = Number(v);
+    if (Number.isInteger(n) && n >= 1 && n <= 999) out[k] = n;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** Медали Высшей лиги: только целые 1..3 по строковым id испытаний. */
@@ -290,6 +314,10 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
     highContrast: a.highContrast || b.highContrast || undefined,
     notifyOptIn: a.notifyOptIn || b.notifyOptIn || undefined,
     endlessBest: Math.max(a.endlessBest ?? 0, b.endlessBest ?? 0) || undefined,
+    // История серий не объединяется поэлементно (порядок неизвестен) —
+    // берём более длинную историю, при равенстве облачную (свежее по времени).
+    endlessHistory:
+      (a.endlessHistory?.length ?? 0) > (b.endlessHistory?.length ?? 0) ? a.endlessHistory : b.endlessHistory,
     tutorialSeen: a.tutorialSeen || b.tutorialSeen || undefined,
     weekly: mergeWeekly(a.weekly, b.weekly),
     campaignDone: a.campaignDone || b.campaignDone || undefined,
@@ -312,7 +340,15 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
     })(),
     achievements: mergeSeen(a.achievements, b.achievements),
     endlessResume: Math.max(a.endlessResume ?? 0, b.endlessResume ?? 0) || undefined,
-    eliteWeekly: mergeEliteWeekly(sanitizeEliteWeekly(a.eliteWeekly), sanitizeEliteWeekly(b.eliteWeekly))
+    eliteWeekly: mergeEliteWeekly(sanitizeEliteWeekly(a.eliteWeekly), sanitizeEliteWeekly(b.eliteWeekly)),
+    bestMoves: (() => {
+      const out = { ...(a.bestMoves ?? {}) };
+      for (const [k, v] of Object.entries(b.bestMoves ?? {})) {
+        const n = Number(v);
+        if (Number.isInteger(n) && n >= 1) out[k] = Math.min(out[k] ?? 999, n);
+      }
+      return Object.keys(out).length ? out : undefined;
+    })()
   };
 }
 
@@ -407,6 +443,19 @@ export class SaveStore {
     return true;
   }
 
+  bestMovesOf(levelId: number): number | undefined {
+    return this.data.bestMoves?.[String(levelId)];
+  }
+
+  /** Личный рекорд ходов: сохраняем только лучший (меньший) результат. */
+  recordBestMoves(levelId: number, moves: number): void {
+    if (!Number.isInteger(moves) || moves < 1) return;
+    const prev = this.bestMovesOf(levelId);
+    if (prev !== undefined && prev <= moves) return;
+    this.data.bestMoves = { ...(this.data.bestMoves ?? {}), [String(levelId)]: moves };
+    this.persist();
+  }
+
   setSound(on: boolean): void {
     this.data.sound = on;
     this.persist();
@@ -484,6 +533,13 @@ export class SaveStore {
     this.data.endlessBest = streak;
     this.persist();
     return true;
+  }
+
+  /** Дописывает завершённую серию в историю (последние 10). */
+  recordEndlessStreak(streak: number): void {
+    const list = [...(this.data.endlessHistory ?? []), Math.max(0, Math.min(9999, Math.floor(streak)))];
+    this.data.endlessHistory = list.slice(-10);
+    this.persist();
   }
 
   /**

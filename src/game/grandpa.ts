@@ -26,10 +26,17 @@ export type GrandpaEvent =
   | 'many-moves'
   | 'restart-repeat'
   | 'chapter-start'
+  | 'chapter-perfect'
   | 'boss-intro'
   | 'boss-phase'
   | 'boss-win'
   | 'campaign-done'
+  /** Серия уровня дня: 7 дней подряд (неделя вместе). */
+  | 'streak-week'
+  /** Серия уровня дня: 30 дней подряд (месяц — родня). */
+  | 'streak-month'
+  /** Виньетка «путь пройден» — каждые 5 уровней кампании, не боссы. */
+  | 'mileage'
   | 'return';
 
 export interface GrandpaLine {
@@ -118,13 +125,21 @@ export const GRANDPA_LINES: GrandpaLine[] = [
   { id: 'restart2', event: 'restart-repeat', mood: 'grumpy', cooldownMs: 20000 },
   // Начало главы
   { id: 'chapter1', event: 'chapter-start', mood: 'pointing', priority: 2 },
+  { id: 'chapterPerfect1', event: 'chapter-perfect', mood: 'celebrating', priority: 2 },
+  { id: 'chapterPerfect2', event: 'chapter-perfect', mood: 'happy', priority: 2 },
   // Возвращение
   { id: 'return1', event: 'return', mood: 'happy', priority: 1, once: false },
   // Боссы (сюжетные — высокий приоритет, обходят кулдаун)
   { id: 'bossIntro', event: 'boss-intro', mood: 'surprised', priority: 3 },
   { id: 'bossPhase', event: 'boss-phase', mood: 'pointing', priority: 3 },
   { id: 'bossWin', event: 'boss-win', mood: 'celebrating', priority: 3 },
-  { id: 'campaign', event: 'campaign-done', mood: 'celebrating', priority: 4, once: true }
+  { id: 'campaign', event: 'campaign-done', mood: 'celebrating', priority: 4, once: true },
+  // Story-beats: серия дня и «путь пройден»
+  { id: 'streakWeek', event: 'streak-week', mood: 'celebrating', priority: 2 },
+  { id: 'streakMonth', event: 'streak-month', mood: 'celebrating', priority: 2, once: true },
+  { id: 'mileage1', event: 'mileage', mood: 'happy', priority: 1 },
+  { id: 'mileage2', event: 'mileage', mood: 'thinking', priority: 1 },
+  { id: 'mileage3', event: 'mileage', mood: 'pointing', priority: 1 }
 ];
 
 export interface PickContext {

@@ -17,6 +17,7 @@ export type SoundName =
   | 'switch'
   | 'gate'
   | 'gateClose'
+  | 'gateSwing'
   | 'plankBreak'
   | 'win'
   | 'honk'
@@ -29,7 +30,10 @@ export type SoundName =
   | 'bossPhase'
   | 'tractorStart'
   | 'victoryDrive'
-  | 'chickenScatter';
+  | 'chickenScatter'
+  | 'medalBronze'
+  | 'medalSilver'
+  | 'medalGold';
 
 /** Лёгкая рандомизация высоты, чтобы звуки не были «из калькулятора». */
 const vary = (f: number) => f * (0.95 + Math.random() * 0.1);
@@ -545,6 +549,16 @@ export class GameAudio {
         });
         this.tone(vary(88), 0.11, 'sine', 0.3, 0.26, 58);
         break;
+      case 'gateSwing':
+        // Створка ударяется об упор после того, как ворота открылись: короткий
+        // деревянный «шлепок» поверх скрипа 'gate'. Сэмпл 'gate_swing' — реальная
+        // запись, фолбэк — низкий глухой удар. Без него открытие ворот звучало
+        // только скрипом и не давало ощущения «дверца легла на место».
+        this.playSample('gate_swing', 0.3, () => {
+          this.tone(vary(120), 0.09, 'square', 0.28, 0, 80);
+          this.noise(0.08, 0.2, 700, 0, 320);
+        });
+        break;
       case 'plankBreak':
         // Хруст ломающейся доски: сухой треск (шум с высоким срезом) плюс
         // низкий «провал» — клетка стала непроходимой навсегда.
@@ -621,6 +635,19 @@ export class GameAudio {
             this.noise(0.05, 0.05, 2400, i * 0.06 + 0.01);
           }
         });
+        break;
+      case 'medalBronze':
+        this.tone(440, 0.08, 'triangle', 0.1, 0, 330);
+        this.noise(0.06, 0.04, 1800, 0.03);
+        break;
+      case 'medalSilver':
+        this.tone(660, 0.1, 'triangle', 0.12, 0, 440);
+        this.tone(880, 0.12, 'triangle', 0.12, 0.06, 660);
+        break;
+      case 'medalGold':
+        this.tone(880, 0.12, 'triangle', 0.14, 0, 660);
+        this.tone(1100, 0.14, 'triangle', 0.14, 0.08, 880);
+        this.tone(1320, 0.16, 'triangle', 0.14, 0.16, 1100);
         break;
     }
   }

@@ -863,8 +863,12 @@ export class BoardView {
       <path d="${tail}" class="rule-tip-body"/>
       <rect x="${left}" y="${top}" width="${width}" height="${height}" rx="16" class="rule-tip-body"/>
       ${rows}
+      <g class="rule-tip-close" data-testid="rule-tip-close" style="cursor:pointer;pointer-events:auto">
+        <rect x="${left + width - 24}" y="${top + 6}" width="18" height="18" rx="9" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+        <text x="${left + width - 15}" y="${top + 19}" text-anchor="middle" fill="var(--cream)" font-size="14px" font-weight="700">✕</text>
+      </g>
     </g>`;
-    this.ruleTimer = window.setTimeout(() => this.clearRuleTip(), 3600);
+    this.ruleTimer = null; // sticky — не убираем по таймеру
   }
 
   clearRuleTip(): void {
@@ -1168,6 +1172,11 @@ export class BoardView {
 
   private onDown(e: InputPoint): void {
     if (!this.interactive || this.animLock || this.state.won || this.drag) return;
+    // Закрытие прилипшего правила через ✕
+    if (this.ruleLayer.querySelector('.rule-tip-close') && (e.target as Element).closest('.rule-tip-close')) {
+      this.clearRuleTip();
+      return;
+    }
     const target = e.target as Element;
     const g = target.closest<SVGGElement>('g[data-idx]');
     if (!g) {
@@ -1436,7 +1445,8 @@ export class BoardView {
     g.classList.add('track');
     g.innerHTML = `
       <line x1="${cx1 - offX}" y1="${cy1 - offY}" x2="${cx2 - offX}" y2="${cy2 - offY}" stroke="rgba(93,64,25,0.3)" stroke-width="7" stroke-linecap="round" stroke-dasharray="14 10"/>
-      <line x1="${cx1 + offX}" y1="${cy1 + offY}" x2="${cx2 + offX}" y2="${cy2 + offY}" stroke="rgba(93,64,25,0.3)" stroke-width="7" stroke-linecap="round" stroke-dasharray="14 10"/>`;
+      <line x1="${cx1 + offX}" y1="${cy1 + offY}" x2="${cx2 + offX}" y2="${cy2 + offY}" stroke="rgba(93,64,25,0.3)" stroke-width="7" stroke-linecap="round" stroke-dasharray="14 10"/>
+      <line x1="${cx1}" y1="${cy1}" x2="${cx2}" y2="${cy2}" stroke="rgba(93,64,25,0.18)" stroke-width="14" stroke-linecap="round" class="slip"/>`;
     this.tracksLayer.appendChild(g);
     window.setTimeout(() => g.remove(), 2600);
     this.spawnDust(cx1, cy1);

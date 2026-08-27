@@ -103,6 +103,8 @@ import { TVNavigator } from './tv-navigation';
 import { pickWeeklyChallenge, weeklyScore } from '../game/elite-weekly';
 import { wireDialog, type DialogOptions } from './dialog';
 
+import { endlessSparkline } from './sparkline';
+
 /**
  * Уровни, где подсказка бесплатна и не жжёт платный токен — не только
  * первые три онбординговых, но и вступление в каждую новую механику по всей
@@ -124,6 +126,32 @@ const MAX_INTERSTITIALS_PER_SESSION = 11;
 
 const MEDAL_ICON: Record<Medal, string> = { 0: '', 1: '🥉', 2: '🥈', 3: '🥇' };
 const MEDAL_KEY: Record<Medal, string> = { 0: 'medal.none', 1: 'medal.bronze', 2: 'medal.silver', 3: 'medal.gold' };
+
+/** Иллюстрация-эмодзи капсулы «Новая глава» (индекс = номер главы). */
+const CHAPTER_INTRO_ART: Record<number, string> = {
+  2: '🚚',
+  3: '📦',
+  4: '🧊',
+  5: '🔧',
+  6: '🐔',
+  7: '🏆',
+  8: '🎚️',
+  9: '⚡',
+  10: '🌪️'
+};
+
+/**
+ * Уникальная «сцена-триада» победы над боссом (индекс = id уровня-босса).
+ * У каждого босса своя мини-сцена вместо одинакового кубка — визуально
+ * подчёркивает, что это событие, а не «ещё один уровень».
+ */
+const BOSS_VICTORY_ART: Record<number, string> = {
+  10: '🚜💨🧰',
+  25: '🐔🪿🐔',
+  50: '🚚😤🚗',
+  75: '⛈️🌪️🚙',
+  100: '🚗💨🌅'
+};
 
 /**
  * Три порога испытания текстом. Ключи для них лежали в словаре, но нигде не
@@ -202,6 +230,8 @@ export class App {
   private readonly sessionStats = new SessionStats();
   /** Неделя, попытка которой сейчас играется (недельный чемпионат). */
   private weeklyRunWeek: string | null = null;
+  /** Главы, чья капсула уже показана в этой сессии (один раз за сессию). */
+  private readonly chapterIntroSeen = new Set<number>();
   /** Один запрос на таблицу лидерборда за раз (TTL 45с) — см. leaderboard-cache.ts. */
   private readonly leaderboardCache: LeaderboardCache;
 
@@ -675,7 +705,7 @@ export class App {
                       (this.store.data.endlessBest ?? 0) > 0
                         ? `<small>${t('endless.best', { n: this.store.data.endlessBest ?? 0 })}</small>`
                         : ''
-                    }</button>`
+                    }${endlessSparkline(this.store.data.endlessHistory)}</button>`
                   : endless === 'teaser'
                     ? `<button class="mode-tab mode-tab-locked" data-testid="menu-endless-locked" disabled aria-disabled="true"><span>🔒 ${t(
                         'mode.endless'
@@ -1074,11 +1104,12 @@ export class App {
         const levelsOfChapter = chapterLevels(chapter);
         const chapterStars = levelsOfChapter.reduce((sum, chapterLevel) => sum + this.store.starsOf(chapterLevel.id), 0);
         parts.push(
-          `<div class="chapter-header"><span>${t(`chapter.${chapter}`)}</span><small>★ ${chapterStars} / ${levelsOfChapter.length * 3}</small></div>`
+          `<div class="chapter-header"><span>${t(`chapter.${chapter}`)}</span><small>★ ${chapterStars} / ${levelsOfChapter.length * 3}</small></div><div class="chapter-tip">${t(`chapter.${chapter}.tip`)}</div>`
         );
       }
       const unlocked = isLevelUnlocked(LEVELS, this.store.data, l.id);
       const stars = this.store.starsOf(l.id);
+      const best = this.store.bestMovesOf(l.id);
       parts.push(`
         <button class="level-card ${unlocked ? '' : 'locked'}${l.id === currentId ? ' current' : ''}" data-level="${l.id}" data-testid="level-card-${l.id}" ${l.id === currentId ? 'data-tv-default' : ''} title="${escapeHTML(levelText('name', l.name) ?? l.name)}" ${
           unlocked ? '' : 'disabled'
@@ -1090,6 +1121,7 @@ export class App {
               ? starIcons(stars)
               : `<svg class="lock" viewBox="0 0 24 24" width="22" height="22" aria-label="Закрыт"><rect x="5" y="10.5" width="14" height="10" rx="3" fill="#a08c66"/><path d="M8 11 V7.5 a4 4 0 0 1 8 0 V11" fill="none" stroke="#a08c66" stroke-width="2.6"/></svg>`
           }</span>
+          ${best ? `<span class="level-best">${best} / ${l.par}</span>` : ''}
         </button>`);
     });
     const cards = parts.join('');
@@ -1342,24 +1374,31 @@ export class App {
     const overlay = document.createElement('div');
     overlay.className = 'overlay boss-victory';
     overlay.setAttribute('data-testid', 'boss-victory');
+    const bossArt = BOSS_VICTORY_ART[def.id];
     overlay.innerHTML = `
       ${confettiHtml(40)}
       <div class="dialog boss-dialog win-dialog">
-        <div class="boss-badge boss-badge-win">🏆</div>
+        <div class="boss-badge boss-badge-win">${bossArt ? bossArt[1] : '🏆'}</div>
          <h2>${t(def.nameKey)}</h2>
          <div class="win-stars" data-testid="win-stars" data-stars="${stars}">${starIcons(stars)}</div>
          <p class="boss-victory-text" data-testid="boss-victory-text">${t(def.victoryKey)}</p>
+         ${bossArt ? `<div class="boss-victory-art" aria-hidden="true">${bossArt}</div>` : ''}
          ${(() => {
            const rewardNotes = [yardStageNote, upgradeNote, skinNote, achievementNote].join('');
            return rewardNotes ? `<div class="win-rewards" data-testid="win-rewards">${rewardNotes}</div>` : '';
          })()}
         ${next ? `<button class="btn btn-primary btn-big" data-testid="btn-next">${t('win.next')}</button>` : ''}
+        <button class="btn" data-testid="btn-boss-share">📣 ${t('boss.share')}</button>
         <button class="btn" data-testid="btn-win-menu">${t('win.menu')}</button>
       </div>`;
     this.q('.overlay-slot').appendChild(overlay);
     overlay.querySelectorAll('.win-stars .star.full').forEach((s, i) => {
       (s as HTMLElement).style.animationDelay = `${0.2 + i * 0.28}s`;
       s.classList.add('pop');
+    });
+    overlay.querySelector<HTMLButtonElement>('[data-testid=btn-boss-share]')?.addEventListener('click', async (event) => {
+      this.audio.play('click');
+      await this.shareText(t('boss.shareText', { boss: t(def.nameKey) }), event.currentTarget as HTMLButtonElement, t('boss.shared'));
     });
     overlay.querySelector('[data-testid=btn-next]')?.addEventListener('click', () => {
       this.audio.play('click');
@@ -1452,6 +1491,8 @@ export class App {
     overlay.querySelector('[data-testid=endless-resume-no]')!.addEventListener('click', () => {
       this.audio.play('click');
       overlay.remove();
+      // Отказ от продолжения = забег окончен: фиксируем серию в истории.
+      if (streak > 0) this.store.recordEndlessStreak(streak);
       this.store.setEndlessResume(undefined);
       this.beginEndlessRun(0);
     });
@@ -1462,7 +1503,7 @@ export class App {
   private async playNextEndless(): Promise<void> {
     this.disposeActiveBoard();
     this.root.innerHTML = `<div class="screen game-screen endless-loading" data-testid="screen-endless-loading">
-      <div class="hint-toast">🌀 ${t('endless.loading')}</div>
+      <div class="hint-toast"><span class="dust-spinner" aria-hidden="true"></span> ${t('endless.loading')}</div>
     </div>`;
     const streak = this.endlessStreak;
     const seed = (Date.now() ^ (streak * 2654435761)) >>> 0;
@@ -1578,12 +1619,12 @@ export class App {
           <button class="btn btn-redo" data-testid="btn-redo" disabled ${blocksUndo(modifier) ? 'hidden' : ''} aria-label="${t('btn.redo')}" title="${t('btn.redo')}">↪</button>
           <button class="btn" data-testid="btn-restart">${t('btn.restart')}</button>
           <button class="btn" data-testid="btn-hint" ${blocksHints(modifier) ? 'hidden' : ''}>${
-            !daily && !challenge && level.id >= 1 && level.id <= 3
-              ? t('btn.hintFree')
+            !daily && !challenge && FREE_HINT_LEVEL_IDS.has(level.id)
+              ? t('btn.hintFreeLeft', { n: 3 })
               : (this.store.data.hintTokens ?? 0) > 0
                 ? `💡 ${t('btn.hintTokens', { n: this.store.data.hintTokens ?? 0 })}`
                 : this.freeHintsLeft > 0
-                  ? t('btn.hintFree')
+                  ? t('btn.hintFreeLeft', { n: this.freeHintsLeft })
                   : t('btn.hintAd')
           }</button>
           <button class="btn btn-skip" data-testid="btn-skip" style="display:none">${t('btn.skipAd')}</button>
@@ -1678,7 +1719,10 @@ export class App {
         this.audio.play('switch');
         this.vibrate([18, 35, 24]);
       },
-      onGateOpen: () => this.audio.play('gate'),
+      onGateOpen: () => {
+        this.audio.play('gate');
+        this.audio.play('gateSwing');
+      },
       onGateClose: () => {
         // Держащаяся кнопка: ворота захлопнулись, потому что фигура съехала с
         // кнопки. Вибрация короче, чем у нажатия, — это потеря, а не успех.
@@ -1800,6 +1844,17 @@ export class App {
       },
       hasOnboardingToast ? 5000 : 650
     );
+    // Стартовый «GO!» на самом первом уровне: мигает и исчезает, не блокирует
+    // ввод и не отвлекает от онбординг-руки. Только обычная кампания, уровень 1.
+    if (level.id === 1 && !daily && !challenge && !endless) {
+      const go = document.createElement('div');
+      go.className = 'go-popup';
+      go.setAttribute('data-testid', 'go-popup');
+      go.setAttribute('aria-hidden', 'true');
+      go.textContent = t('go.title');
+      this.q('.overlay-slot').appendChild(go);
+      window.setTimeout(() => go.remove(), 1100);
+    }
     this.setGameplay(true);
     if (this.platform.isTV) bv.svg.focus({ preventScroll: true });
 
@@ -1901,6 +1956,20 @@ export class App {
       this.showMenu();
     });
     const hintBtn = this.q<HTMLButtonElement>('[data-testid=btn-hint]');
+    // Обучающие уровни кампании: три бесплатные подсказки с видимым остатком на
+    // самой кнопке — игрок знает, сколько ещё «бесплатных» он может потратить.
+    let tutorialHintsLeft = !daily && !challenge && FREE_HINT_LEVEL_IDS.has(level.id) ? 3 : 0;
+    const refreshHintBtn = () => {
+      if (tutorialHintsLeft > 0) {
+        hintBtn.textContent = t('btn.hintFreeLeft', { n: tutorialHintsLeft });
+      } else if ((this.store.data.hintTokens ?? 0) > 0) {
+        hintBtn.innerHTML = `💡 ${t('btn.hintTokens', { n: this.store.data.hintTokens ?? 0 })}`;
+      } else if (this.freeHintsLeft > 0) {
+        hintBtn.textContent = t('btn.hintFreeLeft', { n: this.freeHintsLeft });
+      } else {
+        hintBtn.textContent = t('btn.hintAd');
+      }
+    };
     hintBtn.addEventListener('click', async () => {
       if (finished || cur.won || hintBtn.disabled) return;
       this.audio.play('click');
@@ -1911,21 +1980,15 @@ export class App {
         let hintSource: 'free' | 'token' | 'rewarded' = 'free';
         // Обучающие уровни кампании: подсказка бесплатна и не жжёт платный токен —
         // это часть онбординга, не рекламной/платной экономики подсказок.
-        const isTutorialLevel = !daily && !challenge && FREE_HINT_LEVEL_IDS.has(level.id);
-        if (isTutorialLevel) {
-          hintBtn.textContent = t('btn.hintFree');
+        if (tutorialHintsLeft > 0) {
+          tutorialHintsLeft--;
+          refreshHintBtn();
         } else if (this.store.spendHintToken()) {
           hintSource = 'token';
-          const tokens = this.store.data.hintTokens ?? 0;
-          hintBtn.innerHTML =
-            tokens > 0
-              ? `💡 ${t('btn.hintTokens', { n: tokens })}`
-              : this.freeHintsLeft > 0
-                ? t('btn.hintFree')
-                : t('btn.hintAd');
+          refreshHintBtn();
         } else if (this.freeHintsLeft > 0) {
           this.freeHintsLeft--;
-          hintBtn.textContent = t('btn.hintAd');
+          refreshHintBtn();
         } else {
           hintSource = 'rewarded';
           ok = await this.showRewardedFor('hint', level.id);
@@ -1993,6 +2056,41 @@ export class App {
       }, 900);
       if (!this.store.data.tutorialSeen) this.showOnboardingHand(bv, level);
     }
+    // Капсула «Новая глава»: один раз за сессию на первом уровне главы 2+.
+    // Главу 1 не отмечаем — там туториал и приветствие деда, тройное
+    // перекрытие на старте новичку только помешает. Боссовые фазы не трогаем:
+    // их source-уровень может стоять на границе главы (босс 25 = старт
+    // главы 3), и капсула перехватила бы кнопки босс-диалога.
+    if (!daily && !challenge && !endless && !boss) {
+      const pos = campaignPositionOf(level.id);
+      if (pos > 1 && isChapterStart(pos)) {
+        const ch = chapterOfPosition(pos);
+        if (ch > 1 && !this.chapterIntroSeen.has(ch)) {
+          this.chapterIntroSeen.add(ch);
+          this.showChapterIntro(ch);
+        }
+      }
+    }
+  }
+
+  /** Сюжетная капсула перед первым уровнем новой главы. */
+  private showChapterIntro(ch: number): void {
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay chapter-intro-overlay';
+    overlay.setAttribute('data-testid', 'chapter-intro');
+    const close = (): void => {
+      overlay.remove();
+    };
+    overlay.innerHTML = `
+      <div class="dialog chapter-intro">
+        <h2 id="chapter-intro-title">${t(`chapter.${ch}`)}</h2>
+        <div class="chapter-intro-art" aria-hidden="true">${CHAPTER_INTRO_ART[ch] ?? '🚗'}</div>
+        <p>${t(`chapter.${ch}.intro`)}</p>
+        <button class="btn btn-primary btn-big" data-testid="chapter-intro-go" data-tv-default>${t('chapter.intro.go')}</button>
+      </div>`;
+    this.root.appendChild(overlay);
+    overlay.querySelector('[data-testid=chapter-intro-go]')?.addEventListener('click', close);
+    this.wireDialog(overlay, { onCancel: close });
   }
 
   /**
@@ -2079,7 +2177,7 @@ export class App {
       this.syncAudioPause();
       overlay.remove();
       bv.interactive = true;
-      this.setGameplay(true);
+    this.setGameplay(true);
       if (this.platform.isTV) bv.svg.focus({ preventScroll: true });
     });
     overlay.querySelector('[data-testid=btn-pause-restart]')!.addEventListener('click', () => {
@@ -2135,6 +2233,8 @@ export class App {
       this.leaderboardCache.invalidate('dailystreak');
     } else {
       const improved = this.store.recordResult(level.id, stars);
+      // Личный рекорд ходов — «мог бы лучше» на карточке уровня (M5).
+      this.store.recordBestMoves(level.id, endState.moves);
       const after = totalStars(this.store.data);
       // Открытие «Бесконечного двора» — переход доступа, а не побочный эффект
       // финала кампании: событие уходит ровно один раз, на том уровне, который
@@ -2167,6 +2267,10 @@ export class App {
     // При самом первом разе показываем отдельную финальную сцену вместо обычной
     // победы; повторно — обычная победа с пометкой «лига уже открыта».
     if (!daily && level.id === CAMPAIGN_LAST_ID && this.completeCampaignFinale()) return;
+    // Story-beats: серия дня — дед отмечает неделю и месяц вместе (после
+    // обычной победной реплики, важная веха её перекрывает).
+    if (daily && dailyStreak === 7) this.yardDirector?.react('streak-week');
+    if (daily && dailyStreak === 30) this.yardDirector?.react('streak-month');
     const newAchievements = ACHIEVEMENTS.filter(
       (achievement) =>
         !achievementsBefore.has(achievement.key) && unlockedAchievementKeys(this.store.data).has(achievement.key)
@@ -2176,6 +2280,11 @@ export class App {
     this.audio.play('win');
 
     const idx = daily ? -1 : LEVELS.findIndex((l) => l.id === level.id);
+    // Story-beat: виньетка «путь пройден» — каждые 5 уровней, не на боссах
+    // (у боссов своя сюжетная реплика) и не в daily/испытаниях.
+    if (!daily && idx >= 14 && (idx + 1) % 5 === 0 && !bossFor(level.id)) {
+      this.yardDirector?.react('mileage');
+    }
     const next = !daily && idx >= 0 && idx < LEVELS.length - 1 ? LEVELS[idx + 1] : null;
     const starNote = level.star
       ? endState.starCollected
@@ -2202,6 +2311,17 @@ export class App {
             n: chapterOfPosition(campaignPos)
           })}</div>`
         : '';
+    // Story-beat: «письмо от соседа» — живая реакция двора на закрытую главу.
+    const letterNote = chapterNote
+      ? `<div class="win-letter" data-testid="win-letter">✉️ <em>${t('win.letter', { n: chapterOfPosition(campaignPos) })}</em></div>`
+      : '';
+    // Если все уровни главы на три звезды — дед поздравляет (M7).
+    if (!daily && isChapterEnd(campaignPos, LEVELS)) {
+      const ch = chapterOfPosition(campaignPos);
+      if (chapterLevels(ch).every((cl) => this.store.starsOf(cl.id) === 3)) {
+        this.yardDirector?.react('chapter-perfect');
+      }
+    }
     const eliteReplayNote =
       !daily && level.id === CAMPAIGN_LAST_ID
         ? `<div class="win-note ok" data-testid="win-elite-open">🏅 ${t('elite.alreadyOpen')}</div>`
@@ -2237,7 +2357,7 @@ export class App {
           endState.moves <= level.par ? t('win.perfect') : ''
         }</div>
         ${(() => {
-          const rewardNotes = [starNote, masterNote, yardStageNote, chapterNote, eliteReplayNote, dailyNote, upgradeNote, skinNote, achievementNote].join('');
+          const rewardNotes = [starNote, masterNote, yardStageNote, chapterNote, letterNote, eliteReplayNote, dailyNote, upgradeNote, skinNote, achievementNote].join('');
           return rewardNotes ? `<div class="win-rewards" data-testid="win-rewards">${rewardNotes}</div>` : '';
         })()}
         <button class="btn share-btn" data-testid="btn-share">↗ ${t('daily.share')}</button>
@@ -2382,7 +2502,9 @@ export class App {
     });
     overlay.querySelector('[data-testid=btn-win-menu]')?.addEventListener('click', () => {
       this.audio.play('click');
-      // Явное «Закончить забег» — осознанный финал: точку восстановления снимаем.
+      // Явное «Закончить забег» — осознанный финал: точку восстановления снимаем,
+      // итог серии дописываем в историю (мини-график в меню).
+      if (this.endlessStreak > 0) this.store.recordEndlessStreak(this.endlessStreak);
       this.store.setEndlessResume(undefined);
       this.showMenu();
     });
@@ -2669,7 +2791,7 @@ export class App {
       }
     }
 
-    this.audio.play(earned === 3 ? 'win' : earned > 0 ? 'star' : 'thud');
+    this.audio.play(earned === 3 ? 'medalGold' : earned === 2 ? 'medalSilver' : earned === 1 ? 'medalBronze' : 'thud');
     this.vibrate(earned > 0 ? [28, 45, 28] : 14);
 
     const medalNow = next as Medal;

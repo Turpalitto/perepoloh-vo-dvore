@@ -15,6 +15,42 @@ function snowOverlay(): string {
     .join('')}</g>`;
 }
 
+/** Лепестки цветущих яблонь (весна): маленькие розовые «лепестки»-эллипсы. */
+function petalOverlay(): string {
+  const petals = [
+    [70, -12, 0], [160, -26, 1.1], [250, -8, 0.5], [340, -30, 1.7], [430, -16, 0.9],
+    [520, -34, 0.2], [610, -10, 1.3], [700, -22, 0.6], [790, -14, 1.8], [850, -30, 0.4]
+  ];
+  return `<g class="yard-petals">${petals
+    .map(
+      ([x, y, delay]) =>
+        `<ellipse cx="${x}" cy="${y}" rx="5" ry="3" style="animation-delay:${delay}s"/>`
+    )
+    .join('')}</g>`;
+}
+
+/** Золотые листья урожая (сентябрь): маленькие «листья»-ромбы. */
+function leafOverlay(): string {
+  const leaves = [
+    [80, -14, 0], [150, -28, 0.8], [260, -10, 1.5], [350, -26, 0.3], [440, -18, 1.2],
+    [530, -32, 0.6], [620, -8, 1.9], [710, -24, 0.1], [800, -12, 1.4], [860, -26, 0.7]
+  ];
+  return `<g class="yard-leaves">${leaves
+    .map(
+      ([x, y, delay]) =>
+        `<path d="M${x} ${y} l5 4 l-5 4 l-5 -4 z" style="animation-delay:${delay}s"/>`
+    )
+    .join('')}</g>`;
+}
+
+/** Сезонный слой поверх двора: снег (Новый год), лепестки (весна), листья (урожай). */
+function seasonOverlay(season: string | undefined): string {
+  if (season === 'newyear') return snowOverlay();
+  if (season === 'spring') return petalOverlay();
+  if (season === 'harvest') return leafOverlay();
+  return '';
+}
+
 export function yardSVG(u: Set<string>, trophies = 0, season?: string, stage = 0): string {
   const milestone = Math.min(10, Math.max(0, Math.floor(stage)));
   const era = Math.floor(milestone / 2);
@@ -400,6 +436,6 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string, stage = 0
     <g transform="translate(408,300)" data-tap="meow"><g class="tap-inner">${catArt()}</g></g>
     <g transform="translate(210,500) scale(1.4)" data-tap="cluck"><g class="tap-inner"><g class="chicken-bob">${chickenArt()}</g></g></g>
     <g transform="translate(268,530) scale(1.2) scale(-1,1)" data-tap="cluck"><g class="tap-inner"><g class="chicken-bob" style="animation-delay:2.3s">${chickenArt()}</g></g></g>
-    ${season === 'newyear' ? snowOverlay() : ''}
+    ${seasonOverlay(season)}
   </svg>`;
 }

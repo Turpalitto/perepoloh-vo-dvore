@@ -6,7 +6,7 @@
  */
 import { queryParam } from '../query';
 
-export type SeasonId = 'newyear';
+export type SeasonId = 'newyear' | 'spring' | 'harvest';
 
 export interface SeasonDef {
   id: SeasonId;
@@ -15,7 +15,9 @@ export interface SeasonDef {
 }
 
 const SEASONS: Record<SeasonId, SeasonDef> = {
-  newyear: { id: 'newyear', giftBonus: 1 }
+  newyear: { id: 'newyear', giftBonus: 1 },
+  spring: { id: 'spring', giftBonus: 1 },
+  harvest: { id: 'harvest', giftBonus: 1 }
 };
 
 /** Новогодний период: 20 декабря — 10 января (переходит через год). */
@@ -25,11 +27,23 @@ function isNewYear(date: Date): boolean {
   return (m === 11 && d >= 20) || (m === 0 && d <= 10);
 }
 
+/** Весна: 1–10 мая — лепестки яблонь по двору. */
+function isSpring(date: Date): boolean {
+  return date.getMonth() === 4 && date.getDate() <= 10;
+}
+
+/** Урожай: 1–15 сентября — золотые листья. */
+function isHarvest(date: Date): boolean {
+  return date.getMonth() === 8 && date.getDate() <= 15;
+}
+
 export function currentSeason(date: Date = new Date()): SeasonDef | null {
   const override = queryParam('season');
   if (override === 'none') return null;
   if (override && override in SEASONS) return SEASONS[override as SeasonId];
   if (isNewYear(date)) return SEASONS.newyear;
+  if (isSpring(date)) return SEASONS.spring;
+  if (isHarvest(date)) return SEASONS.harvest;
   return null;
 }
 

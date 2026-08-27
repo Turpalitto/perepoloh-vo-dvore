@@ -8,3 +8,4 @@ promo/ai-cover-src.png
 
 # QA-скриншоты локальных проверок (не для публикации)
 qa-screenshots/
+.DS_Store

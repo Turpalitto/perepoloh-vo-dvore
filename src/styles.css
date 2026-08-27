@@ -196,6 +196,16 @@ html.high-contrast .levels-grid {
   opacity: 0.9;
   animation: snowfall 7s linear infinite;
 }
+.yard-petals ellipse {
+  fill: #f4b8c8;
+  opacity: 0.85;
+  animation: petal-fall 8.5s ease-in infinite;
+}
+.yard-leaves path {
+  fill: #d9a441;
+  opacity: 0.85;
+  animation: leaf-fall 9s ease-in infinite;
+}
 @keyframes snowfall {
   0% {
     transform: translateY(0);
@@ -209,6 +219,53 @@ html.high-contrast .levels-grid {
   }
   100% {
     transform: translateY(560px);
+    opacity: 0;
+  }
+}
+/* Лепестки и листья чуть «плывут» по горизонтали — как будто ветер носит. */
+@keyframes petal-fall {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate(14px, 280px) rotate(160deg);
+  }
+  90% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(-10px, 560px) rotate(340deg);
+    opacity: 0;
+  }
+}
+@keyframes leaf-fall {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate(-16px, 280px) rotate(-150deg);
+  }
+  90% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(12px, 560px) rotate(-320deg);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yard-snow circle,
+  .yard-petals ellipse,
+  .yard-leaves path {
+    animation: none !important;
     opacity: 0;
   }
 }
@@ -718,6 +775,11 @@ html.high-contrast .levels-grid {
   font-weight: 700;
   opacity: 0.85;
 }
+.endless-sparkline {
+  display: block;
+  margin: 2px auto 0;
+  flex-shrink: 0;
+}
 .mode-tab.active {
   background: #fff;
   color: var(--ink);
@@ -868,6 +930,15 @@ html.high-contrast .levels-grid {
   color: var(--sun);
   font-size: 13px;
 }
+.chapter-tip {
+  grid-column: 1 / -1;
+  color: var(--cream);
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.92;
+  text-shadow: 0 1px 0 rgba(61, 44, 30, 0.35);
+  padding: 2px 6px 8px;
+}
 .level-card.current {
   box-shadow: 0 0 0 4px var(--sun), 0 7px 0 rgba(61, 44, 30, 0.42);
 }
@@ -934,6 +1005,15 @@ html.high-contrast .levels-grid {
 .lock {
   font-size: 18px;
   opacity: 0.6;
+}
+.level-best {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--wood-dark);
+  background: rgba(255, 247, 230, 0.6);
+  border-radius: 8px;
+  padding: 1px 6px;
+  margin-top: 4px;
 }
 
 /* ---------- игровой экран ---------- */
@@ -1502,6 +1582,19 @@ html.high-contrast .levels-grid {
     opacity: 0;
   }
 }
+/* «Slip-stream» после хода: широкая полупрозрачная полоса за фигурой,
+   исчезает быстрее пунктирной колеи — ощущение «только что проехал». */
+.track line.slip {
+  animation: slip-fade 0.5s ease forwards;
+}
+@keyframes slip-fade {
+  0% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 .hint-chevron {
   animation: chevron 1s ease-in-out infinite;
   pointer-events: none;
@@ -1558,6 +1651,17 @@ html.high-contrast .levels-grid {
 .gift-big {
   font-size: 64px;
   line-height: 1;
+}
+.chapter-intro-art {
+  font-size: 56px;
+  line-height: 1.1;
+  filter: drop-shadow(0 4px 0 rgba(61, 44, 30, 0.25));
+}
+.chapter-intro p {
+  margin: 0;
+  text-align: center;
+  line-height: 1.45;
+  color: var(--ink);
 }
 .gift-dialog p {
   margin: 0;
@@ -1736,6 +1840,55 @@ html.high-contrast .levels-grid {
   animation: toast-in 0.4s ease;
   transition: opacity 0.5s;
   z-index: 4;
+}
+/* Вращающийся «вихрь пыли» на загрузке уровня Бесконечного двора. */
+.dust-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--dirt) 0%, var(--wood-dark) 55%, rgba(125, 82, 39, 0) 70%);
+  animation: dust-spin 0.8s linear infinite;
+}
+@keyframes dust-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Стартовый «GO!» на уровне 1: крупная надпись поверх поля, мигает и исчезает,
+   не перехватывает ввод (pointer-events: none) и не лезет в a11y-дерево. */
+.go-popup {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--cream);
+  -webkit-text-stroke: 2px var(--accent-strong);
+  text-shadow: 0 6px 0 rgba(61, 44, 30, 0.35);
+  font-size: 84px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  pointer-events: none;
+  z-index: 5;
+  animation: go-pop 1.05s ease-out forwards;
+}
+@keyframes go-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.2);
+  }
+  30% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
 }
 .hint-toast.gone {
   opacity: 0;
@@ -1984,6 +2137,19 @@ html[data-daytime='night'] .yard-lamp-light {
   background: #e3f2ed;
   border-color: #45968f;
   color: #245e56;
+}
+/* «Письмо от соседа» — бумажная открытка на закрытие главы. */
+.win-letter {
+  background: var(--cream);
+  border: 2px dashed #c9a86a;
+  color: #6b4a1f;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 13px;
+  text-align: left;
+}
+.win-letter em {
+  font-style: italic;
 }
 
 /* Единая карточка наград: результат → звёзды → этап двора → улучшения →
@@ -2846,6 +3012,14 @@ html[data-daytime='night'] .yard-lamp-light {
   font-size: 15px;
   line-height: 1.35;
   margin: 6px 0 12px;
+}
+/* Уникальная сцена-триада победы над боссом (эмодзи-композиция). */
+.boss-victory-art {
+  font-size: 34px;
+  letter-spacing: 8px;
+  margin: -4px 0 10px;
+  filter: drop-shadow(0 3px 0 rgba(61, 44, 30, 0.25));
+  animation: gp-pop 0.5s cubic-bezier(0.2, 1.4, 0.5, 1) both;
 }
 .boss-phase-chip {
   display: inline-block;

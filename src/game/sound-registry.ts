@@ -14,6 +14,7 @@ export type SoundFileKey =
   | 'tractor_idle'
   | 'tractor_move'
   | 'gate_creak'
+  | 'gate_swing'
   | 'button_click'
   | 'wood_hit'
   | 'metal_hit'
@@ -44,6 +45,7 @@ export const SOUND_FILE_URLS: Record<SoundFileKey, string> = {
   tractor_idle: `${AUDIO_BASE}tractor_idle.mp3`,
   tractor_move: `${AUDIO_BASE}tractor_move.mp3`,
   gate_creak: `${AUDIO_BASE}gate_creak.mp3`,
+  gate_swing: `${AUDIO_BASE}gate_swing.mp3`,
   button_click: `${AUDIO_BASE}button_click.mp3`,
   wood_hit: `${AUDIO_BASE}wood_hit.mp3`,
   metal_hit: `${AUDIO_BASE}metal_hit.mp3`,

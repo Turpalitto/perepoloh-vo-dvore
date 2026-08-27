@@ -1520,6 +1520,16 @@ export class App {
             ? `🌀 ${t('endless.title')} · ${level.name}`
             : `${isBoss ? '👑 ' : ''}${campaignNumber(LEVELS, level.id) || level.id}. ${levelText('name', level.name)}`;
     const starHud = level.star ? `<span class="hud-star" data-testid="hud-star">★</span>` : '';
+    // Живой «звёздный трек»: три точки показывают, сколько звёзд игрок зарабатывает
+    // ПРЯМО СЕЙЧАС (starsFor от текущих ходов и собранной звезды). Точка загорается
+    // при входи в тир и гаснет при переборе лимита — это тот самый «почти-там»-сигнал,
+    // которого не хватало: игрок видел только сухую цель в hud-par. В мастер-испытаниях
+    // тиры звёзд не действуют (там медали), поэтому трек скрыт. Чистое дополнение к
+    // hud-par — текст цели уже озвучен в его aria-label, трек декоративный (aria-hidden).
+    const showTrack = !challenge;
+    const starTrack = showTrack
+      ? `<span class="hud-star-track" data-testid="hud-star-track" aria-hidden="true"><i data-star="1"></i><i data-star="2"></i><i data-star="3"></i></span>`
+      : '';
 
     // Условие третьей звезды показываем явно: раньше в HUD висел только мягкий
     // лимит par2, и игрок не знал, чем ★★★ отличается от ★★ — на уровнях со
@@ -1557,6 +1567,7 @@ export class App {
               : ''
           }
           <div class="hud-right">
+            ${starTrack}
             ${starHud}
             <div class="hud-moves"><span class="hud-moves-label">${t('hud.moves')}</span> <b data-testid="hud-moves">0</b><span class="hud-par" data-testid="hud-goal" title="${escapeHTML(goalAria)}" aria-label="${escapeHTML(goalAria)}">${goalText}</span></div>
           </div>
@@ -1584,6 +1595,8 @@ export class App {
     const movesEl = this.q('[data-testid=hud-moves]');
     const undoBtn = this.q<HTMLButtonElement>('[data-testid=btn-undo]');
     const hudStar = level.star ? this.q('[data-testid=hud-star]') : null;
+    const starTrackEl = showTrack ? this.q<HTMLSpanElement>('[data-testid=hud-star-track]') : null;
+    const starDots = starTrackEl ? Array.from(starTrackEl.querySelectorAll<HTMLElement>('i')) : [];
 
     let cur: GameState = createState(level);
     const undoStack: GameState[] = [];
@@ -1596,6 +1609,19 @@ export class App {
       undoBtn.disabled = undoStack.length === 0;
       redoBtn.disabled = redoStack.length === 0;
       hudStar?.classList.toggle('collected', cur.starCollected);
+      if (starDots.length) {
+        const earned = starsFor(level, cur.moves, cur.starCollected);
+        starDots.forEach((dot, i) => {
+          const on = i + 1 <= earned;
+          if (dot.classList.contains('on') !== on) {
+            dot.classList.toggle('on', on);
+            // Перезапуск pop-анимации (сброс + reflow), чтобы тир «Кудахнул» при входе.
+            dot.classList.remove('pop');
+            void dot.offsetWidth;
+            dot.classList.add('pop');
+          }
+        });
+      }
     };
 
     // детектор тупика: без ящиков любой ход обратим, уровень всегда проходим;

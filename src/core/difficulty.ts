@@ -75,7 +75,7 @@ export function analyzeDifficulty(level: LevelDef, opts: { stateLimit?: number }
       for (const d of allowedDirs(level.pieces[i])) {
         const m = maxSteps(level, s, i, d.dx, d.dy, grid);
         for (let steps = 1; steps <= m; steps++) {
-          const res = applyMove(level, s, i, d.dx, d.dy, steps);
+          const res = applyMove(level, s, i, d.dx, d.dy, steps, grid);
           if (!res) continue;
           const key = stateKey(res.state);
           let to = index.get(key);

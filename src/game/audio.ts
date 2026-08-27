@@ -123,6 +123,32 @@ export class GameAudio {
     this.applyMasterGain();
   }
 
+  /** Время, до которого музыка приглушена голосом деда (scheduled ramp). */
+  private voiceDuckUntil = 0;
+
+  /**
+   * Приглушает МУЗЫКУ (не мастер и не SFX) на время реплики деда, чтобы его
+   * «голос» не тонул в фоне. Дед идёт через master, минуя musicGain — поэтому
+   * голос остаётся чистым. Если одна реплика накладывается на другую, старый
+   * таймер восстановления проигрывает (сверяем voiceDuckUntil и currentTime).
+   */
+  duckMusicFor(ms: number): void {
+    if (!this.ctx || !this.musicGain) return;
+    const until = this.ctx.currentTime + ms / 1000;
+    this.voiceDuckUntil = until;
+    this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.musicGain.gain.setTargetAtTime(0.04, this.ctx.currentTime, 0.05);
+    window.setTimeout(() => this.restoreMusicDuck(), ms);
+  }
+
+  private restoreMusicDuck(): void {
+    if (!this.ctx || !this.musicGain) return;
+    // Другая реплика уже запросила новый duck — восстановление устарело.
+    if (this.voiceDuckUntil > this.ctx.currentTime) return;
+    this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.musicGain.gain.setTargetAtTime(0.16, this.ctx.currentTime, 0.15);
+  }
+
   /** Требование платформы: при сворачивании страницы звук останавливается. */
   setHidden(on: boolean): void {
     this.hidden = on;

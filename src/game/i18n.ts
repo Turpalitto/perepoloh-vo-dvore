@@ -1348,7 +1348,15 @@ const EN_HINTS: Dict = {
   'Каретный двор тесный — здесь пригодится каждая машина': 'The carriage yard is tight — every vehicle matters here',
   'Кузница — испытание на внимательность, считай каждый ход': 'The forge is a test of focus — count every move',
   'Финал! Веди дедов жигулёнок через весь двор — шаг за шагом':
-    "The finale! Drive grandpa's little car through the whole yard — step by step"
+    "The finale! Drive grandpa's little car through the whole yard — step by step",
+  // Короткие контекстные подсказки после обучения (уровни 7-9): не раскрывают
+  // решение, а подсказывают, с чего начинать разбор.
+  'Сначала освободи дорогу грузовику — только потом выводи жигулёнок':
+    'Clear the truck’s lane first, then guide the car out',
+  'Сено у стены мешает снизу — заходи с верхней части двора':
+    'The hay at the wall blocks the bottom — come in from the top',
+  'У сарая тесно: освободи один-два подхода, чтобы жигулёнок вышел':
+    'Tight by the barn: free one or two lanes so the car can pull out'
 };
 
 const TR_NAMES: Dict = {
@@ -1590,7 +1598,10 @@ const TR_HINTS: Dict = {
   'Сеновал сверху — расчищай снизу вверх': 'Samanlık yukarıda — aşağıdan yukarı aç',
   'Каретный двор тесный — здесь пригодится каждая машина': 'Fayton avlusu dar — burada her araç işe yarar',
   'Кузница — испытание на внимательность, считай каждый ход': 'Demirci dükkanı dikkat testi — her hamleyi say',
-  'Финал! Веди дедов жигулёнок через весь двор — шаг за шагом': 'Final! Dedenin arabasını tüm bahçeden adım adım geçir'
+  'Финал! Веди дедов жигулёнок через весь двор — шаг за шагом': 'Final! Dedenin arabasını tüm bahçeden adım adım geçir',
+  'Сначала освободи дорогу грузовику — только потом выводи жигулёнок': 'Önce kamyonun yolunu aç — sonra arabayı çıkar',
+  'Сено у стены мешает снизу — заходи с верхней части двора': 'Duvardaki saman aşağıdan engelliyor — üstten gir',
+  'У сарая тесно: освободи один-два подхода, чтобы жигулёнок вышел': 'Ahır dar: araba çıkabilsin diye bir-iki yol aç'
 };
 
 // Экспортируется для теста паритета ключей (tests/i18n-parity.test.ts).

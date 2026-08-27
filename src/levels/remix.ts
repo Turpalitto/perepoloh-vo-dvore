@@ -168,7 +168,7 @@ export function buildRemix(source: LevelDef, spec: RemixSpec, id: number): Level
   }
   if (spec.chickens?.length) {
     level.chickens = [...(level.chickens ?? []), ...spec.chickens.map((c) => ({ a: { ...c.a }, b: { ...c.b } }))];
-    if (!level.mechanics.includes('chicken')) level.mechanics.push('chicken');
+    if (!level.mechanics.includes('chickens')) level.mechanics.push('chickens');
   }
   if (spec.holdType && !level.mechanics.includes('gate-held')) level.mechanics.push('gate-held');
   if (!level.walls?.length) delete level.walls;

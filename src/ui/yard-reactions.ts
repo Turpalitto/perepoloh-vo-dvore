@@ -130,6 +130,8 @@ export class YardDirector {
     }
     // «Голос» деда — короткое добродушное бормотание (варьируется в audio).
     this.audio.play('grandpa');
+    // Пока дед говорит, фоновая музыка приглушается, чтобы реплика не тонула.
+    this.audio.duckMusicFor(sticky ? 5200 : 3200);
     window.clearTimeout(this.hideTimer);
     // Сюжетные реплики висят дольше; обычные — коротко и авто-исчезают.
     this.hideTimer = window.setTimeout(() => this.hide(), sticky ? 5200 : 3200);

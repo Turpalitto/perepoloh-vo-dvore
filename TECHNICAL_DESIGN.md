@@ -88,7 +88,7 @@ e2e/           Playwright: загрузка, прохождение, undo, со�
 
 **UI:** `campaign-ending.ts` — самодостаточный модуль финальной сцены (только `textContent`, без innerHTML для строк). Экраны лиги/результата — методы `App` (тот же паттерн, что остальные экраны; вынос в контроллер — отложенный P3, чтобы не рефакторить god object перед релизом). Прохождение испытания переиспользует `runLevel` с существующим плечом модификаторов + отслеживанием usedHint/usedUndo/usedRestart.
 
-**Не реализовано:** Stage B (недельный `eliteweekly` + лидерборд), Stage C (endless-множитель + rewarded-восстановление + трофей во дворе), Stage D («Испытание деда»), аналитика `elite_*`.
+**Не реализовано:** Stage C (endless-множитель + rewarded-восстановление + трофей во дворе), Stage D («Испытание деда»), аналитика `elite_*`. Stage B (недельный `eliteweekly` + лидерборд) — **реализован**: `src/game/elite-weekly.ts` (`pickWeeklyChallenge` FNV-1a по неделе, `weeklyScore` = медаль×1000 − ходы), поле сейва `eliteWeekly` (sanitize/merge в `save.ts`), карточка недели и доска `eliteweekly` в `app.ts`, тест `tests/elite-weekly.test.ts`.
 
 ## Живой двор, дед, боссы
 

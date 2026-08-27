@@ -1026,6 +1026,43 @@ html.high-contrast .levels-grid {
   transform: scale(1.15) rotate(8deg);
 }
 /*
+ * Живой «звёздный трек»: три точки под счётчиком ходов, загораются по мере
+ * заработанных звёзд (тиры 1/2/3 от starsFor). Гаснут при переборе лимита,
+ * «кудахчут» (pop) на переходе между тирами — тот самый сигнал «почти-там».
+ */
+.hud-star-track {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.hud-star-track i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(61, 44, 30, 0.35);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.hud-star-track i.on {
+  background: var(--sun);
+  box-shadow: 0 1px 0 #b07c1a;
+}
+.hud-star-track i.pop {
+  animation: dot-pop 0.35s cubic-bezier(0.34, 1.6, 0.64, 1);
+}
+@keyframes dot-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+/*
  * Нижний ряд игрового экрана. Кнопкам разрешено сжиматься: подписи здесь
  * длинные («Бесплатная подсказка»), и на 320px ряд из четырёх не помещался —
  * flex по умолчанию не ужимает элементы ниже их содержимого, поэтому крайние

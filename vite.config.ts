@@ -27,7 +27,8 @@ export default defineConfig({
       'tests/levels-solver-*.test.ts',
       'tests/elite.test.ts',
       'tests/endless.test.ts',
-      'tests/boss.test.ts'
+      'tests/boss.test.ts',
+      'tests/ice.test.ts'
     ],
     environment: 'node'
   }

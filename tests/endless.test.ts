@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { yieldToEventLoop } from './helpers';
 import {
   ENDLESS_MILESTONE_STEP,
   endlessConfig,
@@ -8,21 +7,26 @@ import {
   endlessMultiplier,
   generateEndless
 } from '../src/game/endless';
-import { solve } from '../src/core/solver';
+import { solveAsync } from '../src/core/solver';
 import { validateLevel } from '../src/core/validator';
 
-/** Проверяет, что сгенерированный уровень корректен и его par честный. */
-function assertVerified(streak: number, seed: number): ReturnType<typeof generateEndless> {
+/**
+ * Проверяет, что сгенерированный уровень корректен и его par честный.
+ * Async: под нагрузкой BFS одного уровня может подойти к RPC-таймауту
+ * репортёра vitest — solveAsync() отдаёт event loop по времени внутри поиска
+ * (см. src/core/solver.ts).
+ */
+async function assertVerified(streak: number, seed: number): Promise<ReturnType<typeof generateEndless>> {
   const level = generateEndless(streak, seed);
   expect(validateLevel(level)).toEqual([]);
-  const plain = solve(level);
+  const plain = await solveAsync(level);
   expect(plain.solvable).toBe(true);
   expect(plain.exhausted).toBe(false);
   // par в JSON обязан совпадать с оптимумом решателя — тот же инвариант, что в кампании.
   expect(level.par).toBe(plain.optimal);
   expect(level.par).toBeGreaterThanOrEqual(endlessFloor(streak));
   if (level.star) {
-    const withStar = solve(level, { requireStar: true });
+    const withStar = await solveAsync(level, { requireStar: true });
     expect(withStar.solvable).toBe(true);
     // третья звезда достижима в пределах порога par2.
     expect(withStar.optimal).toBeLessThanOrEqual(level.par2);
@@ -44,8 +48,7 @@ describe('бесконечный двор', () => {
 
   it('генерирует проверенные решателем уровни на разных сериях', { timeout: 90_000 }, async () => {
     for (const streak of [0, 2, 5, 8]) {
-      assertVerified(streak, 12345 + streak * 777);
-      await yieldToEventLoop();
+      await assertVerified(streak, 12345 + streak * 777);
     }
   });
 
@@ -66,9 +69,8 @@ describe('бесконечный двор', () => {
   it('умеет вводить нажимную кнопку ворот, сохраняя проходимость', { timeout: 120_000 }, async () => {
     let gated: ReturnType<typeof generateEndless> | null = null;
     for (let seed = 1; seed <= 20 && !gated; seed++) {
-      const level = assertVerified(8, seed * 3300);
+      const level = await assertVerified(8, seed * 3300);
       if (level.gateSwitch) gated = level;
-      await yieldToEventLoop();
     }
     expect(gated, 'ни один seed не дал уровень с кнопкой ворот').not.toBeNull();
     expect(gated!.mechanics).toContain('gate-switch');

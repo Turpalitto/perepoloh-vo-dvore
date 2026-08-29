@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { yieldToEventLoop } from './helpers';
 import levelsJson from '../src/levels/levels.json';
 import type { LevelDef } from '../src/core/types';
-import { solve } from '../src/core/solver';
+import { solveAsync } from '../src/core/solver';
 import {
   BOSSES,
   advancePhase,
@@ -51,15 +50,14 @@ describe('боссы — проходимость (решатель)', () => {
       for (const b of BOSSES) {
         for (const [phaseIndex, p] of b.phases.entries()) {
           const phaseLevel = bossPhaseLevel(p, levelById(p.sourceLevelId)!, b.id, phaseIndex);
-          const res = solve(phaseLevel);
+          const res = await solveAsync(phaseLevel);
           expect(res.solvable, `boss ${b.id} phase ${p.id}`).toBe(true);
           expect(res.optimal).toBeGreaterThan(0);
           // если фаза требует звезду — решение со звездой тоже существует
           if (p.objective.requireStar && phaseLevel.star) {
-            const withStar = solve(phaseLevel, { requireStar: true });
+            const withStar = await solveAsync(phaseLevel, { requireStar: true });
             expect(withStar.solvable, `boss ${b.id} phase ${p.id} star`).toBe(true);
           }
-          await yieldToEventLoop();
         }
       }
     },
@@ -72,11 +70,10 @@ describe('боссы — проходимость (решатель)', () => {
         if (!p.remix) continue;
         const phaseLevel = bossPhaseLevel(p, levelById(p.sourceLevelId)!, b.id, phaseIndex);
         expect(validateLevel(phaseLevel, { withSolver: false }), `boss ${b.id} phase ${p.id} valid`).toEqual([]);
-        const res = solve(phaseLevel);
+        const res = await solveAsync(phaseLevel);
         expect(res.solvable, `boss ${b.id} phase ${p.id}`).toBe(true);
         expect(res.optimal, `boss ${b.id} phase ${p.id} par`).toBe(p.remix.par);
         expect(p.remix.par2).toBeGreaterThan(p.remix.par);
-        await yieldToEventLoop();
       }
     }
   }, 120_000);

@@ -19,7 +19,7 @@
     "check": "npm run typecheck && npm run lint && npm test && npm run test:solver && npm run verify:ice && npm run verify:planks && npm run verify:chickens && npm run verify:held && npm run verify:docs",
     "check:release": "npm run check && npm run solve && npm run build && npm run verify:dist && npm run e2e",
     "test": "vitest run",
-    "test:solver": "vitest run --config vitest.solver.config.ts",
+    "test:solver": "node scripts/run-solver-tests.mjs",
     "solve": "tsx scripts/solve.ts",
     "generate": "tsx scripts/generate.ts",
     "rebalance": "tsx scripts/rebalance-levels.ts",

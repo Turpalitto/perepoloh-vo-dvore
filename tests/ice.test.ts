@@ -3,7 +3,7 @@ import { applyMove, createState, maxSteps } from '../src/core/game';
 import { solve } from '../src/core/solver';
 import type { LevelDef } from '../src/core/types';
 import { validateLevel } from '../src/core/validator';
-import { type AblationOutcome, analyzeIceImpact, cellCarriesWeight } from '../src/core/ice-impact';
+import { type AblationOutcome, analyzeIceImpact, analyzeIceImpactAsync, cellCarriesWeight } from '../src/core/ice-impact';
 import { LEVELS } from '../src/game/campaign';
 
 /**
@@ -254,8 +254,11 @@ describe('лёд в кампании — постфактум-абляция к�
   for (const level of iceLevels) {
     it(
       `уровень ${level.id} «${level.name}»: каждая клетка несёт вес и имеет роль`,
-      () => {
-        const impact = analyzeIceImpact(level);
+      async () => {
+        // analyzeIceImpactAsync() — BFS сам отдаёт event loop по времени внутри
+        // поиска (см. src/core/solver.ts), иначе RPC-пинг репортёра (onTaskUpdate)
+        // не успевает достучаться и процесс падает по таймауту.
+        const impact = await analyzeIceImpactAsync(level);
         expect(impact.solvable && !impact.exhausted).toBe(true);
         expect(impact.fullOptimal).toBe(level.par);
         // Абляция обязана давать определённый ответ: упор в лимит состояний

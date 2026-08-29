@@ -19,7 +19,7 @@
  */
 import type { IceDef, LevelDef } from './types';
 import { createState, pieceCells } from './game';
-import { type SolveMove, solve } from './solver';
+import { type SolveMove, solve, solveAsync } from './solver';
 
 export type IceCellRole = 'проезд' | 'запрет стоянки' | 'нет роли';
 
@@ -106,53 +106,89 @@ function landingKeys(level: LevelDef, path: SolveMove[]): Set<string> {
   return keys;
 }
 
+function emptyImpact(full: { optimal: number; exhausted: boolean }, ice: IceDef[]): IceImpact {
+  return {
+    fullOptimal: full.optimal,
+    solvable: false,
+    exhausted: full.exhausted,
+    landsOnIce: false,
+    cells: ice.map((cell) => ({
+      cell,
+      optimalWithout: -1,
+      solvableWithout: false,
+      exhaustedWithout: false,
+      role: 'нет роли',
+      required: false
+    }))
+  };
+}
+
+function buildCellImpact(
+  level: LevelDef,
+  full: { path: SolveMove[]; optimal: number },
+  ice: IceDef[],
+  index: number,
+  without: { solvable: boolean; exhausted: boolean; optimal: number; path: SolveMove[] }
+): IceCellImpact {
+  const cellDef = ice[index];
+  const key = `${cellDef.x},${cellDef.y}`;
+  const swept = sweptKeys(level, full.path);
+  // Роль «запрет стоянки» доказывается коротким решением без этой клетки:
+  // если оно паркуется ровно на ней, лёд отнял у игрока именно эту позицию.
+  // Отсутствие решения такой ролью НЕ считается: снятие льда только добавляет
+  // легальные остановки, поэтому решаемый уровень без клетки не может стать
+  // нерешаемым — такой ответ означает исчерпанный поиск, то есть незнание.
+  const altLandsHere = without.solvable && landingKeys(level, without.path).has(key);
+  const role: IceCellRole = swept.has(key) ? 'проезд' : altLandsHere ? 'запрет стоянки' : 'нет роли';
+  const outcome: AblationOutcome = {
+    solvableWithout: without.solvable,
+    exhaustedWithout: without.exhausted,
+    optimalWithout: without.optimal,
+    role
+  };
+  return { cell: cellDef, ...outcome, required: cellCarriesWeight(outcome, full.optimal) };
+}
+
 export function analyzeIceImpact(level: LevelDef, opts: { stateLimit?: number } = {}): IceImpact {
   const ice = level.ice ?? [];
   const full = solve(level, opts);
-  if (!full.solvable) {
-    return {
-      fullOptimal: full.optimal,
-      solvable: false,
-      exhausted: full.exhausted,
-      landsOnIce: false,
-      cells: ice.map((cell) => ({
-        cell,
-        optimalWithout: -1,
-        solvableWithout: false,
-        exhaustedWithout: false,
-        role: 'нет роли',
-        required: false
-      }))
-    };
-  }
+  if (!full.solvable) return emptyImpact(full, ice);
 
   const iceKeys = new Set(ice.map((c) => `${c.x},${c.y}`));
-  const swept = sweptKeys(level, full.path);
   const landings = landingKeys(level, full.path);
   const landsOnIce = [...landings].some((key) => iceKeys.has(key));
 
-  const cells = ice.map((cell, index) => {
-    const key = `${cell.x},${cell.y}`;
+  const cells = ice.map((_cell, index) => {
     const without = solve({ ...level, ice: ice.filter((_, k) => k !== index) }, opts);
-    // Роль «запрет стоянки» доказывается коротким решением без этой клетки:
-    // если оно паркуется ровно на ней, лёд отнял у игрока именно эту позицию.
-    // Отсутствие решения такой ролью НЕ считается: снятие льда только добавляет
-    // легальные остановки, поэтому решаемый уровень без клетки не может стать
-    // нерешаемым — такой ответ означает исчерпанный поиск, то есть незнание.
-    const altLandsHere = without.solvable && landingKeys(level, without.path).has(key);
-    const role: IceCellRole = swept.has(key) ? 'проезд' : altLandsHere ? 'запрет стоянки' : 'нет роли';
-    const outcome: AblationOutcome = {
-      solvableWithout: without.solvable,
-      exhaustedWithout: without.exhausted,
-      optimalWithout: without.optimal,
-      role
-    };
-    return {
-      cell,
-      ...outcome,
-      required: cellCarriesWeight(outcome, full.optimal)
-    };
+    return buildCellImpact(level, full, ice, index, without);
   });
+
+  return { fullOptimal: full.optimal, solvable: true, exhausted: full.exhausted, landsOnIce, cells };
+}
+
+/**
+ * Асинхронный двойник `analyzeIceImpact()` для тяжёлых тестовых прогонов:
+ * использует `solveAsync()` (yield по времени внутри BFS) вместо синхронного
+ * `solve()`, иначе полная абляция уровней главы 10 может заблокировать event
+ * loop дольше RPC-таймаута репортёра vitest (см. src/core/solver.ts).
+ * CLI-скрипты (verify-ice.ts, generate-chapter10.ts, find-ice-remix.ts) вне
+ * vitest не подвержены этому таймауту и продолжают использовать синхронную
+ * версию без изменений.
+ */
+export async function analyzeIceImpactAsync(level: LevelDef, opts: { stateLimit?: number } = {}): Promise<IceImpact> {
+  const ice = level.ice ?? [];
+  const full = await solveAsync(level, opts);
+  if (!full.solvable) return emptyImpact(full, ice);
+
+  const iceKeys = new Set(ice.map((c) => `${c.x},${c.y}`));
+  const landings = landingKeys(level, full.path);
+  const landsOnIce = [...landings].some((key) => iceKeys.has(key));
+
+  const cells: IceCellImpact[] = [];
+  for (let index = 0; index < ice.length; index++) {
+    const without = await solveAsync({ ...level, ice: ice.filter((_, k) => k !== index) }, opts);
+    cells.push(buildCellImpact(level, full, ice, index, without));
+  }
 
   return { fullOptimal: full.optimal, solvable: true, exhausted: full.exhausted, landsOnIce, cells };
 }

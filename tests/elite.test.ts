@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { yieldToEventLoop } from './helpers';
 import { defaultSave, mergeSave, sanitizeSave } from '../src/game/save';
 import type { SaveData } from '../src/game/save';
 import {
@@ -29,7 +28,7 @@ import {
 import { SaveStore } from '../src/game/save';
 import type { Platform } from '../src/platform/types';
 import { createState, starsFor } from '../src/core/game';
-import { solve } from '../src/core/solver';
+import { solve, solveAsync } from '../src/core/solver';
 import { validateLevel } from '../src/core/validator';
 import { canonicalKey, exactKey } from '../src/core/canonical';
 import levelsJson from '../src/levels/levels.json';
@@ -160,20 +159,21 @@ describe('Высшая лига — 30 мастер-испытаний вали�
     async () => {
       for (const c of ELITE_CHALLENGES) {
         const level = sourceLevel(c);
-        const res = solve(level);
+        // solveAsync() — BFS сам отдаёт event loop по времени внутри поиска
+        // (см. src/core/solver.ts), иначе RPC-пинг репортёра не успевает.
+        const res = await solveAsync(level);
         expect(res.solvable).toBe(true);
         // gold.maxMoves = par (оптимум) — решатель должен уложиться
         expect(res.optimal).toBeLessThanOrEqual(c.gold.maxMoves);
         // серебро со звездой достижимо: решение со звездой в пределах silver
         if (c.silver.requireStar && level.star) {
-          const withStar = solve(level, { requireStar: true });
+          const withStar = await solveAsync(level, { requireStar: true });
           expect(withStar.solvable).toBe(true);
           expect(withStar.optimal).toBeLessThanOrEqual(c.silver.maxMoves);
         }
-        await yieldToEventLoop();
       }
     },
-    // solve() гоняется по 30 уровням — ~40с локально, CI-раннер медленнее дефолтных 60с
+    // solveAsync() гоняется по 30 уровням — ~40с локально, CI-раннер медленнее дефолтных 60с
     120_000
   );
 
@@ -418,16 +418,15 @@ describe('Высшая лига — ремиксы', () => {
       for (const c of remixes) {
         const level = sourceLevel(c);
         expect(validateLevel(level)).toEqual([]);
-        const res = solve(level);
+        const res = await solveAsync(level);
         expect(res.solvable).toBe(true);
         expect(res.exhausted).toBe(false);
         expect(res.optimal).toBe(level.par);
         if (level.star) {
-          const withStar = solve(level, { requireStar: true });
+          const withStar = await solveAsync(level, { requireStar: true });
           expect(withStar.solvable).toBe(true);
           expect(withStar.optimal).toBeLessThanOrEqual(level.par2);
         }
-        await yieldToEventLoop();
       }
     },
     240_000
@@ -448,7 +447,6 @@ describe('Высшая лига — ремиксы', () => {
           // в кампании: если задача не изменилась, это переставленная мебель.
           expect(level.par).toBeGreaterThan(origin.par);
         }
-        await yieldToEventLoop();
       }
     },
     120_000

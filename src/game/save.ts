@@ -2,6 +2,7 @@ import { campaignPositionOf } from './campaign';
 import type { DailyState } from './daily';
 import type { Platform } from '../platform/types';
 import { applyWeeklyClaim, applyWeeklyEvent, type WeeklyQuestKind, type WeeklyState } from './weekly';
+import type { GrandpaTrialProgress } from './grandpa-trial';
 
 export interface SaveData {
   v: 1;
@@ -9,6 +10,8 @@ export interface SaveData {
   stars: Record<string, number>;
   /** Лучшие ходы по уровням: id -> минимальное число ходов, за которое пройден. */
   bestMoves?: Record<string, number>;
+  /** Уровни, пройденные оптимально (ходы = par): id -> true. Однократный бонус подсказкой. */
+  masteredLevels?: Record<string, true>;
   sound: boolean;
   music: boolean;
   /** Язык интерфейса; по умолчанию русский. */
@@ -68,6 +71,13 @@ export interface SaveData {
    * берёт максимум медали по каждому испытанию, перезагрузка ничего не удваивает.
    */
   eliteMedals?: Record<string, number>;
+  /**
+   * Прогресс «Испытания деда» (Stage D, data-model): id -> { attempts, best,
+   * rewarded }. Попыток на испытание — 3 (`GRANDPA_TRIAL_ATTEMPTS`), медаль —
+   * та же шкала, что в лиге. Бонус подсказок выдаётся однократно, что
+   * гарантирует флаг `rewarded`; merge берёт максимумы и OR-флаг.
+   */
+  grandpaTrials?: Record<string, GrandpaTrialProgress>;
   /** Показанные однократные/сюжетные реплики деда (чтобы не повторять). */
   grandpaSeen?: string[];
   /** «Живой двор» (реакции деда) выключен игроком; по умолчанию включён. */
@@ -213,6 +223,7 @@ export function sanitizeSave(raw: unknown): SaveData | null {
     endingSeen: r.endingSeen === true ? true : undefined,
     eliteIntroSeen: r.eliteIntroSeen === true ? true : undefined,
     eliteMedals: sanitizeMedals(r.eliteMedals),
+    grandpaTrials: sanitizeGrandpaTrials(r.grandpaTrials),
     grandpaSeen: Array.isArray(r.grandpaSeen)
       ? (() => {
           const list = [...new Set(r.grandpaSeen.filter((k): k is string => typeof k === 'string'))].slice(0, 200);
@@ -233,7 +244,8 @@ export function sanitizeSave(raw: unknown): SaveData | null {
         })()
       : undefined,
     eliteWeekly: sanitizeEliteWeekly(r.eliteWeekly),
-    bestMoves: sanitizeBestMoves(r.bestMoves)
+    bestMoves: sanitizeBestMoves(r.bestMoves),
+    masteredLevels: sanitizeMasteredLevels(r.masteredLevels)
   };
 }
 
@@ -255,6 +267,61 @@ function sanitizeMedals(raw: unknown): Record<string, number> | undefined {
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     const n = Number(v);
     if (Number.isInteger(n) && n >= 1 && n <= 3) out[k] = n;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Отметки оптимального прохождения: только числовые ключи уровней и строго true. */
+function sanitizeMasteredLevels(raw: unknown): Record<string, true> | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const out: Record<string, true> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (v === true && /^\d+$/.test(k)) out[k] = true;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * Прогресс испытаний деда: попытки 0..3 (см. `GRANDPA_TRIAL_ATTEMPTS`), медаль
+ * 0..3, rewarded — только true. Битые записи отбрасываются целиком.
+ */
+function sanitizeGrandpaTrials(raw: unknown): Record<string, GrandpaTrialProgress> | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const out: Record<string, GrandpaTrialProgress> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v !== 'object' || v === null) continue;
+    const r = v as Record<string, unknown>;
+    const attempts = Number(r.attempts);
+    const best = Number(r.best);
+    if (!Number.isInteger(attempts) || attempts < 0 || attempts > 3) continue;
+    if (!Number.isInteger(best) || best < 0 || best > 3) continue;
+    out[k] = { attempts, best, rewarded: r.rewarded === true ? true : undefined };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * Merge испытаний деда: максимум попыток и медали по каждому id, rewarded — OR.
+ * Всё идемпотентно: повторный merge ничего не удваивает.
+ */
+function mergeGrandpaTrials(
+  a?: Record<string, GrandpaTrialProgress>,
+  b?: Record<string, GrandpaTrialProgress>
+): Record<string, GrandpaTrialProgress> | undefined {
+  if (!a && !b) return undefined;
+  const out: Record<string, GrandpaTrialProgress> = {};
+  for (const key of new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])) {
+    const pa = a?.[key];
+    const pb = b?.[key];
+    if (!pa || !pb) {
+      out[key] = (pa ?? pb) as GrandpaTrialProgress;
+      continue;
+    }
+    out[key] = {
+      attempts: Math.max(pa.attempts, pb.attempts),
+      best: Math.max(pa.best, pb.best),
+      rewarded: pa.rewarded || pb.rewarded || undefined
+    };
   }
   return Object.keys(out).length ? out : undefined;
 }
@@ -332,6 +399,7 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
     endingSeen: a.endingSeen || b.endingSeen || undefined,
     eliteIntroSeen: a.eliteIntroSeen || b.eliteIntroSeen || undefined,
     eliteMedals: mergeMedals(a.eliteMedals, b.eliteMedals),
+    grandpaTrials: mergeGrandpaTrials(a.grandpaTrials, b.grandpaTrials),
     grandpaSeen: mergeSeen(a.grandpaSeen, b.grandpaSeen),
     liveYard: a.liveYard === false || b.liveYard === false ? false : undefined,
     bossDone: (() => {
@@ -346,6 +414,13 @@ export function mergeSave(a: SaveData, b: SaveData): SaveData {
       for (const [k, v] of Object.entries(b.bestMoves ?? {})) {
         const n = Number(v);
         if (Number.isInteger(n) && n >= 1) out[k] = Math.min(out[k] ?? 999, n);
+      }
+      return Object.keys(out).length ? out : undefined;
+    })(),
+    masteredLevels: (() => {
+      const out: Record<string, true> = { ...(a.masteredLevels ?? {}) };
+      for (const [k, v] of Object.entries(b.masteredLevels ?? {})) {
+        if (v === true && /^\d+$/.test(k)) out[k] = true;
       }
       return Object.keys(out).length ? out : undefined;
     })()
@@ -454,6 +529,18 @@ export class SaveStore {
     if (prev !== undefined && prev <= moves) return;
     this.data.bestMoves = { ...(this.data.bestMoves ?? {}), [String(levelId)]: moves };
     this.persist();
+  }
+
+  /**
+   * Отметка оптимального прохождения уровня (ходы = par). Возвращает true
+   * только один раз — в первый раз; повторные оптимальные прохождения не дают.
+   */
+  recordMastered(levelId: number): boolean {
+    const key = String(levelId);
+    if (this.data.masteredLevels?.[key]) return false;
+    this.data.masteredLevels = { ...(this.data.masteredLevels ?? {}), [key]: true };
+    this.persist();
+    return true;
   }
 
   setSound(on: boolean): void {
@@ -646,6 +733,50 @@ export class SaveStore {
       this.persist();
     }
     return granted;
+  }
+
+  /** Добавляет подсказки (потолок 99) — бонусы серии endless и испытаний деда. */
+  addHintTokens(amount: number): void {
+    const add = Math.max(0, Math.floor(amount));
+    if (add === 0) return;
+    this.data.hintTokens = Math.min(99, (this.data.hintTokens ?? 0) + add);
+    this.persist();
+  }
+
+  /**
+   * Пишет попытку испытания деда: попытка +1 (потолок 3), медаль — максимум.
+   * Возвращает прежнюю/новую медаль и число попыток (для UI «улучшение»).
+   */
+  recordGrandpaTrialAttempt(trialId: string, medal: number): { previous: number; next: number; attempts: number } {
+    const current = this.data.grandpaTrials?.[trialId];
+    const previous = current?.best ?? 0;
+    const next = Math.max(previous, Math.min(3, Math.max(0, Math.floor(medal))));
+    const attempts = Math.min(3, (current?.attempts ?? 0) + 1);
+    if (!current || next !== previous || attempts !== current.attempts) {
+      this.data.grandpaTrials = {
+        ...(this.data.grandpaTrials ?? {}),
+        [trialId]: { attempts, best: next, rewarded: current?.rewarded }
+      };
+      this.persist();
+    }
+    return { previous, next, attempts };
+  }
+
+  /**
+   * Выдаёт бонус подсказок за первую медаль испытания деда — однократно
+   * (флаг `rewarded`). Медаль обязательна: без неё бонуса нет. Возвращает
+   * true, если бонус реально выдан.
+   */
+  claimGrandpaTrialReward(trialId: string, hints: number): boolean {
+    const current = this.data.grandpaTrials?.[trialId];
+    if (!current || current.rewarded || current.best < 1 || hints <= 0) return false;
+    this.data.grandpaTrials = {
+      ...(this.data.grandpaTrials ?? {}),
+      [trialId]: { ...current, rewarded: true }
+    };
+    this.data.hintTokens = Math.min(99, (this.data.hintTokens ?? 0) + hints);
+    this.persist();
+    return true;
   }
 
   liveYardEnabled(): boolean {

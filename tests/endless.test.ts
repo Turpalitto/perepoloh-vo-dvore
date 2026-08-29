@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { yieldToEventLoop } from './helpers';
-import { endlessConfig, endlessFloor, generateEndless } from '../src/game/endless';
+import {
+  ENDLESS_MILESTONE_STEP,
+  endlessConfig,
+  endlessFloor,
+  endlessMilestoneHints,
+  endlessMultiplier,
+  generateEndless
+} from '../src/game/endless';
 import { solve } from '../src/core/solver';
 import { validateLevel } from '../src/core/validator';
 
@@ -66,5 +73,29 @@ describe('бесконечный двор', () => {
     expect(gated, 'ни один seed не дал уровень с кнопкой ворот').not.toBeNull();
     expect(gated!.mechanics).toContain('gate-switch');
     expect(gated!.gateSwitch).toBeDefined();
+  });
+});
+
+describe('множитель серии и этапы (Stage C)', () => {
+  it('множитель растёт по границам тиров сложности', () => {
+    expect(endlessMultiplier(0)).toBe(1);
+    expect(endlessMultiplier(5)).toBe(1);
+    expect(endlessMultiplier(6)).toBe(2);
+    expect(endlessMultiplier(9)).toBe(2);
+    expect(endlessMultiplier(10)).toBe(3);
+    expect(endlessMultiplier(25)).toBe(3);
+  });
+
+  it('бонус подсказками даётся только на каждом 4-м уровне и равен множителю', () => {
+    expect(ENDLESS_MILESTONE_STEP).toBe(4);
+    expect(endlessMilestoneHints(0)).toBe(0);
+    expect(endlessMilestoneHints(3)).toBe(0);
+    expect(endlessMilestoneHints(4)).toBe(1);
+    expect(endlessMilestoneHints(5)).toBe(0);
+    expect(endlessMilestoneHints(8)).toBe(2);
+    expect(endlessMilestoneHints(12)).toBe(3);
+    expect(endlessMilestoneHints(20)).toBe(3);
+    // Отрицательная серия — мусор, бонуса нет.
+    expect(endlessMilestoneHints(-4)).toBe(0);
   });
 });

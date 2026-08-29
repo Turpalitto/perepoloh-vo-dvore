@@ -36,7 +36,7 @@
 - **core** (`src/core/`): `types.ts`, `game.ts` (правила движения, чистые функции), `solver.ts` (BFS), `validator.ts`, `levelgen.ts`. Без DOM, всё сериализуемо.
 - **levels** (`src/levels/`): `levels.json` (100 уровней), `elite-challenges.ts` (25 испытаний, деривируют пороги из par/par2).
 - **platform** (`src/platform/`): `types.ts` (`Platform`), `mock.ts`, `yandex.ts`, `index.ts` (выбор реализации).
-- **game** (`src/game/`): `save.ts`, `audio.ts`, `i18n.ts`, `progression.ts`, `daily*.ts`, `weekly.ts`, `endless.ts`, `achievements.ts`, `season.ts`, `elite.ts`, **`grandpa.ts`**, **`yard-events.ts`**, **`boss.ts`**.
+- **game** (`src/game/`): `save.ts`, `audio.ts`, `i18n.ts`, `progression.ts`, `daily*.ts`, `weekly.ts`, `endless.ts`, `achievements.ts`, `season.ts`, `elite.ts`, **`grandpa.ts`**, **`boss.ts`**.
 - **ui** (`src/ui/`): `app.ts` (god object-контроллер экранов), `board.ts` (`BoardView`: SVG-поле, ввод), `sprites.ts`, `thumbnail.ts`, `yard.ts`, `campaign-ending.ts`, **`yard-reactions.ts`** (`YardDirector`).
 - **tests/**, **e2e/**, **scripts/** (`solve.ts`, `verify-dist.ts`, генераторы).
 

@@ -1095,6 +1095,22 @@ html.high-contrast .levels-grid {
      посреди слова при обычном переносе. */
   white-space: pre-line;
 }
+/* Счётчик ходов относительно par: зелёный — уложились в оптимум,
+   красный — вышли за «двухзвёздочный» порог. */
+.hud-par.hud-par-ok {
+  opacity: 1;
+  color: #2e7d3b;
+}
+.hud-par.hud-par-warn {
+  opacity: 1;
+  color: #c0392b;
+}
+/* Реплей эталонного решения: HUD не отвечает, пока solver проигрывает ходы. */
+.replaying .hud-top,
+.replaying .hud-bottom {
+  pointer-events: none;
+  opacity: 0.55;
+}
 .hud-star {
   font-size: 30px;
   color: rgba(61, 44, 30, 0.4);

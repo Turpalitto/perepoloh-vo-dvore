@@ -879,12 +879,12 @@ test.describe('Босс уровня 10', () => {
     await page.getByTestId('menu-play').click();
     // вступление деда
     await expect(page.getByTestId('boss-intro')).toBeVisible();
-    await expect(page.getByTestId('boss-name')).toHaveText('Тракторный переполох');
+    await expect(page.getByTestId('boss-name')).toHaveText('Соседский грузовик');
     await page.getByTestId('boss-start').click();
     // фаза 1 из 2 + HUD
     await expect(page.getByTestId('board')).toBeVisible();
     await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 1 из 2');
-    await expect(page.getByTestId('screen-game')).toHaveClass(/boss-dust/);
+    await expect(page.getByTestId('screen-game')).toHaveClass(/boss-convoy/);
     // босс ещё НЕ пройден до полной победы
     expect((await readSave(page)).bossDone ?? []).not.toContain(10);
     // завершаем фазу 1 (e2e-хук)
@@ -894,7 +894,7 @@ test.describe('Босс уровня 10', () => {
     // переход во вторую фазу без перезагрузки
     await page.getByTestId('boss-continue').click();
     await expect(page.getByTestId('boss-phase')).toHaveText('Фаза 2 из 2');
-    await expect(page.getByTestId('screen-game')).toHaveClass(/boss-smoke/);
+    await expect(page.getByTestId('screen-game')).toHaveClass(/boss-neighbor/);
     // на свежей фазе отмена недоступна (undo не тянется через границу фаз)
     await expect(page.getByTestId('btn-undo')).toBeDisabled();
     // всё ещё не пройден
@@ -975,8 +975,8 @@ test.describe('Боссы 25/50/75/100', () => {
   }
 
   for (const boss of [
-    { slot: 25, name: 'Куры у ворот' },
-    { slot: 50, name: 'Соседский грузовик' },
+    { slot: 25, name: 'Переполох у погреба' },
+    { slot: 50, name: 'Тракторный переполох' },
     { slot: 75, name: 'Буря во дворе' }
   ]) {
     test(`босс ${boss.slot} «${boss.name}»: интро → фазы → победа, прогресс только после победы`, async ({ page }) => {

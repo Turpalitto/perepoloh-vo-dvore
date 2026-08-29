@@ -11,6 +11,24 @@ describe('сохранения', () => {
     expect(sanitizeSave({ ...defaultSave(), lang: 'tr', langChosen: true })?.langChosen).toBe(true);
   });
 
+  it('par-perfect: recordMastered срабатывает один раз, masteredLevels чистится и сливается', () => {
+    const base = defaultSave();
+    // мусор в сейве отбрасывается: только числовые ключи со значением true
+    const dirty = sanitizeSave({ ...base, masteredLevels: { '3': true, x: true, '5': false, '7': 1 } as never });
+    expect(dirty?.masteredLevels).toEqual({ '3': true });
+    // слияние — объединение множеств (у обоих true → остаётся true)
+    const local: SaveData = { ...base, masteredLevels: { '1': true, '2': true } };
+    const cloud: SaveData = { ...base, masteredLevels: { '2': true, '9': true } };
+    expect(mergeSave(local, cloud).masteredLevels).toEqual({ '1': true, '2': true, '9': true });
+    expect(mergeSave(local, { ...cloud, masteredLevels: undefined }).masteredLevels).toEqual({ '1': true, '2': true });
+
+    const platform = { saveData: async () => undefined } as unknown as Platform;
+    const store = new SaveStore(platform, base);
+    expect(store.recordMastered(12)).toBe(true);
+    expect(store.recordMastered(12)).toBe(false);
+    expect(store.data.masteredLevels?.['12']).toBe(true);
+  });
+
   it('выданные достижения переживают слияние и не теряются', () => {
     const base = defaultSave();
     const local: SaveData = { ...base, achievements: ['yardLegend'] };
@@ -126,6 +144,59 @@ describe('сохранения', () => {
     const a = { ...defaultSave(), hintTokens: 3, lastGift: '2026-07-19' };
     const b = { ...defaultSave(), hintTokens: 2, lastGift: '2026-07-20' };
     expect(mergeSave(a, b)).toMatchObject({ hintTokens: 3, lastGift: '2026-07-20' });
+  });
+
+  it('добавляет подсказки с потолком 99 и игнорирует мусор', () => {
+    const platform = { saveData: async () => undefined } as unknown as Platform;
+    const store = new SaveStore(platform, defaultSave());
+    store.addHintTokens(2);
+    expect(store.data.hintTokens).toBe(2);
+    store.addHintTokens(0);
+    store.addHintTokens(-5);
+    expect(store.data.hintTokens).toBe(2);
+    store.addHintTokens(200);
+    expect(store.data.hintTokens).toBe(99);
+  });
+
+  it('испытания деда: санитизация мусора и максимум при слиянии', () => {
+    const base = { attempts: 1, best: 2, rewarded: true };
+    expect(sanitizeSave({ ...defaultSave(), grandpaTrials: { 'grandpa-1': base } })?.grandpaTrials).toEqual({
+      'grandpa-1': base
+    });
+    const dirty = sanitizeSave({
+      ...defaultSave(),
+      grandpaTrials: {
+        'grandpa-1': { attempts: 4, best: 2 }, // попыток больше лимита — запись битая
+        'grandpa-2': { attempts: 1, best: 9 }, // медаль вне 0..3 — запись битая
+        'grandpa-3': { attempts: 2, best: 1, rewarded: 'yes' } // rewarded не boolean
+      }
+    })?.grandpaTrials;
+    expect(dirty).toEqual({ 'grandpa-3': { attempts: 2, best: 1 } });
+    const merged = mergeSave(
+      { ...defaultSave(), grandpaTrials: { 'grandpa-1': { attempts: 1, best: 1 } } },
+      { ...defaultSave(), grandpaTrials: { 'grandpa-1': { attempts: 2, best: 0, rewarded: true } } }
+    );
+    expect(merged.grandpaTrials?.['grandpa-1']).toEqual({ attempts: 2, best: 1, rewarded: true });
+    expect(mergeSave(defaultSave(), defaultSave()).grandpaTrials).toBeUndefined();
+  });
+
+  it('испытания деда: попытки тратятся до лимита, медаль — максимум, бонус — один раз', () => {
+    const platform = { saveData: async () => undefined } as unknown as Platform;
+    const store = new SaveStore(platform, defaultSave());
+    expect(store.recordGrandpaTrialAttempt('grandpa-1', 0)).toEqual({ previous: 0, next: 0, attempts: 1 });
+    expect(store.recordGrandpaTrialAttempt('grandpa-1', 2)).toEqual({ previous: 0, next: 2, attempts: 2 });
+    expect(store.recordGrandpaTrialAttempt('grandpa-1', 1)).toEqual({ previous: 2, next: 2, attempts: 3 });
+    // Лимит попыток: запись после третьей не меняет счётчик.
+    store.recordGrandpaTrialAttempt('grandpa-1', 3);
+    expect(store.data.grandpaTrials?.['grandpa-1']).toEqual({ attempts: 3, best: 3 });
+    // Бонус выдаётся однократно, подсказки приходят в сейв.
+    expect(store.claimGrandpaTrialReward('grandpa-1', 2)).toBe(true);
+    expect(store.data.hintTokens).toBe(2);
+    expect(store.claimGrandpaTrialReward('grandpa-1', 2)).toBe(false);
+    expect(store.data.hintTokens).toBe(2);
+    // Без медали бонуса нет.
+    store.recordGrandpaTrialAttempt('grandpa-2', 0);
+    expect(store.claimGrandpaTrialReward('grandpa-2', 1)).toBe(false);
   });
 
   it('сериализует сохранения и отправляет неизменяемые снимки', async () => {

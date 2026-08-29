@@ -290,9 +290,15 @@ export function iceArt(): string {
 
 export function starArt(): string {
   return `
-    <circle cx="50" cy="52" r="30" fill="#fff3c9" opacity="0.7"/>
-    <path d="M50 26 L57.6 42.4 L75.6 44.6 L62.3 57.1 L65.8 74.9 L50 66.2 L34.2 74.9 L37.7 57.1 L24.4 44.6 L42.4 42.4 Z"
-      fill="#f6c445" stroke="#d9a520" stroke-width="4" stroke-linejoin="round"/>`;
+    <ellipse cx="50" cy="83" rx="24" ry="5" fill="rgba(0,0,0,0.22)"/>
+    <path d="M21 44 Q15 58 21 72" fill="none" stroke="#9aa4ae" stroke-width="6" stroke-linecap="round"/>
+    <path d="M79 44 Q85 58 79 72" fill="none" stroke="#9aa4ae" stroke-width="6" stroke-linecap="round"/>
+    <rect x="21" y="36" width="58" height="45" rx="9" fill="#d7dde3" stroke="#9aa4ae" stroke-width="4"/>
+    <rect x="25" y="40" width="50" height="11" rx="5.5" fill="#eef2f5" opacity="0.85"/>
+    <rect x="37" y="24" width="26" height="13" rx="4" fill="#b9c2cb" stroke="#9aa4ae" stroke-width="3.5"/>
+    <rect x="45" y="17" width="10" height="8" rx="3" fill="#9aa4ae"/>
+    <path d="M50 47 l4.2 8.5 9.4 1.3-6.8 6.6 1.6 9.3-8.4-4.4-8.4 4.4 1.6-9.3-6.8-6.6 9.4-1.3z"
+      fill="#f6c445" stroke="#d9a520" stroke-width="3" stroke-linejoin="round"/>`;
 }
 
 /** Хрупкая доска (клетка поля): цела — дощатый настил, сломана — трещина и провал. */

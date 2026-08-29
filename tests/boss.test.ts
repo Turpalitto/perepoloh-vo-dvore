@@ -8,12 +8,14 @@ import {
   advancePhase,
   bossFor,
   bossObjectiveSatisfied,
+  bossPhaseLevel,
   bossProgress,
   createBossRun,
   currentPhase,
   restartBoss,
   reviveBossRun
 } from '../src/game/boss';
+import { validateLevel } from '../src/core/validator';
 
 const LEVELS = levelsJson as LevelDef[];
 const levelById = (id: number) => LEVELS.find((l) => l.id === id);
@@ -26,7 +28,8 @@ describe('боссы — структура', () => {
   });
 
   it('bossFor находит босса по слоту', () => {
-    expect(bossFor(10)?.nameKey).toBe('boss.tractor.name');
+    expect(bossFor(10)?.nameKey).toBe('boss.truck.name');
+    expect(bossFor(50)?.nameKey).toBe('boss.tractor.name');
     expect(bossFor(7)).toBeUndefined();
   });
 
@@ -46,14 +49,14 @@ describe('боссы — проходимость (решатель)', () => {
     'каждая фаза каждого босса решается штатным solver',
     async () => {
       for (const b of BOSSES) {
-        for (const p of b.phases) {
-          const level = levelById(p.sourceLevelId)!;
-          const res = solve(level);
+        for (const [phaseIndex, p] of b.phases.entries()) {
+          const phaseLevel = bossPhaseLevel(p, levelById(p.sourceLevelId)!, b.id, phaseIndex);
+          const res = solve(phaseLevel);
           expect(res.solvable, `boss ${b.id} phase ${p.id}`).toBe(true);
           expect(res.optimal).toBeGreaterThan(0);
           // если фаза требует звезду — решение со звездой тоже существует
-          if (p.objective.requireStar && level.star) {
-            const withStar = solve(level, { requireStar: true });
+          if (p.objective.requireStar && phaseLevel.star) {
+            const withStar = solve(phaseLevel, { requireStar: true });
             expect(withStar.solvable, `boss ${b.id} phase ${p.id} star`).toBe(true);
           }
           await yieldToEventLoop();
@@ -62,6 +65,21 @@ describe('боссы — проходимость (решатель)', () => {
     },
     120_000
   );
+
+  it('объявленный par ремикса фазы совпадает с оптимумом решателя', async () => {
+    for (const b of BOSSES) {
+      for (const [phaseIndex, p] of b.phases.entries()) {
+        if (!p.remix) continue;
+        const phaseLevel = bossPhaseLevel(p, levelById(p.sourceLevelId)!, b.id, phaseIndex);
+        expect(validateLevel(phaseLevel, { withSolver: false }), `boss ${b.id} phase ${p.id} valid`).toEqual([]);
+        const res = solve(phaseLevel);
+        expect(res.solvable, `boss ${b.id} phase ${p.id}`).toBe(true);
+        expect(res.optimal, `boss ${b.id} phase ${p.id} par`).toBe(p.remix.par);
+        expect(p.remix.par2).toBeGreaterThan(p.remix.par);
+        await yieldToEventLoop();
+      }
+    }
+  }, 120_000);
 });
 
 describe('боссы — контроллер фаз', () => {
@@ -73,7 +91,7 @@ describe('боссы — контроллер фаз', () => {
     expect(currentPhase(run, boss)!.id).toBe('free');
     run = advancePhase(run, boss);
     expect(run.phaseIndex).toBe(1);
-    expect(currentPhase(run, boss)!.id).toBe('start');
+    expect(currentPhase(run, boss)!.id).toBe('park');
     run = advancePhase(run, boss);
     expect(run.done).toBe(true);
     expect(currentPhase(run, boss)).toBeNull();

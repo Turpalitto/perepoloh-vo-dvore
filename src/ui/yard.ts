@@ -51,7 +51,14 @@ function seasonOverlay(season: string | undefined): string {
   return '';
 }
 
-export function yardSVG(u: Set<string>, trophies = 0, season?: string, stage = 0): string {
+/**
+ * Рекорд «Бесконечного двора», с которого во дворе появляется отдельный кубок
+ * за серию (Stage C). Порог совпадает с «чемпионской» отметкой — 10 уровней
+ * подряд; кубок статичный: это памятный знак, а не счётчик.
+ */
+const ENDLESS_TROPHY_STREAK = 10;
+
+export function yardSVG(u: Set<string>, trophies = 0, season?: string, stage = 0, endlessBest = 0): string {
   const milestone = Math.min(10, Math.max(0, Math.floor(stage)));
   const era = Math.floor(milestone / 2);
   const fenceFixed = u.has('fence');
@@ -372,6 +379,12 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string, stage = 0
   const trophyLayer = trophies > 0
     ? `<g transform="translate(214,174)" data-yard-obj="trophies"><rect x="-8" y="-12" width="${Math.min(trophies, 6) * 22 + 12}" height="32" rx="8" fill="rgba(61,44,30,.58)"/>${Array.from({ length: Math.min(trophies, 6) }, (_, i) => `<text x="${i * 22}" y="12" font-size="20">🏆</text>`).join('')}</g>`
     : '';
+  // Кубок за серию «Бесконечного двора» — правее полки недельных кубков,
+  // на тумбе: отличие от коллекционных кубков сразу видно.
+  const endlessTrophyLayer =
+    endlessBest >= ENDLESS_TROPHY_STREAK
+      ? `<g transform="translate(392,174)" data-yard-obj="endless-trophy"><ellipse cx="0" cy="16" rx="26" ry="6" fill="rgba(43,29,10,0.2)"/><rect x="-14" y="2" width="28" height="12" rx="4" fill="#8a6a43" stroke="#5f472b" stroke-width="3"/><text x="0" y="0" font-size="24" text-anchor="middle">🏆</text><text x="14" y="-14" font-size="12" text-anchor="middle">🌀</text></g>`
+      : '';
 
   // машинка-«жигулёнок» едет по двору (цвет — выбранный скин игрока)
   const skin = getTargetSkin();
@@ -421,6 +434,7 @@ export function yardSVG(u: Set<string>, trophies = 0, season?: string, stage = 0
     ${house}
     ${workshopLayer}
     ${trophyLayer}
+    ${endlessTrophyLayer}
     ${yard}
     ${progressLayer}
     ${wellLayer}

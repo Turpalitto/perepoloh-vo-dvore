@@ -9,7 +9,6 @@ import {
   pickLineVerbose,
   textKeyOf
 } from '../src/game/grandpa';
-import { RateLimiter, grandpaEventFor, isSharpMove } from '../src/game/yard-events';
 
 const ctx = (over: Partial<{ now: number; level: number; rng: () => number }> = {}) => ({
   now: 0,
@@ -96,28 +95,6 @@ describe('дед — выбор реплик', () => {
   it('все реплики имеют ключ локализации по конвенции', () => {
     for (const l of GRANDPA_LINES) expect(textKeyOf(l)).toBe(`grandpa.${l.id}`);
     expect(GRANDPA_LINES.length).toBeGreaterThanOrEqual(30);
-  });
-});
-
-describe('события двора', () => {
-  it('резкий ход — трактор/грузовик или далеко', () => {
-    expect(isSharpMove({ type: 'move-end', kind: 'tractor', distance: 1 })).toBe(true);
-    expect(isSharpMove({ type: 'move-end', kind: 'car', distance: 4 })).toBe(true);
-    expect(isSharpMove({ type: 'move-end', kind: 'car', distance: 1 })).toBe(false);
-  });
-
-  it('rate-limiter пропускает не чаще интервала', () => {
-    const rl = new RateLimiter(1000);
-    expect(rl.allow(0)).toBe(true);
-    expect(rl.allow(500)).toBe(false);
-    expect(rl.allow(1001)).toBe(true);
-  });
-
-  it('маппинг факта двора в событие деда', () => {
-    expect(grandpaEventFor({ type: 'collision' })).toBe('collision');
-    expect(grandpaEventFor({ type: 'level-won', stars: 3 })).toBe('win-perfect');
-    expect(grandpaEventFor({ type: 'level-won', stars: 2 })).toBe('win');
-    expect(grandpaEventFor({ type: 'move-end' })).toBeNull();
   });
 });
 

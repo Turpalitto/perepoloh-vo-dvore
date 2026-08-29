@@ -12,7 +12,7 @@ import {
   isChapterEnd,
   isChapterStart
 } from '../game/campaign';
-import { GameState, createState, starsFor } from '../core/game';
+import { GameState, applyMove, createState, starsFor } from '../core/game';
 import { track } from '../game/analytics';
 import type { RewardedContext } from '../game/analytics';
 import { hint, solve } from '../core/solver';
@@ -28,7 +28,7 @@ import {
   weeklyTrophies
 } from '../game/daily';
 import { DailyLevelService } from '../game/daily-client';
-import { generateEndless } from '../game/endless';
+import { endlessMilestoneHints, endlessMultiplier, generateEndless } from '../game/endless';
 import { SessionStats } from '../game/session-stats';
 import { currentSeason } from '../game/season';
 import {
@@ -84,6 +84,7 @@ import {
   advancePhase,
   bossFor,
   bossObjectiveSatisfied,
+  bossPhaseLevel,
   bossProgress,
   createBossRun,
   currentPhase
@@ -652,7 +653,7 @@ export class App {
     const campaignPercent = Math.round((completed / LEVELS.length) * 100);
     this.root.innerHTML = `
       <div class="screen menu-screen" data-testid="screen-menu">
-        <div class="yard-bg">${yardSVG(unlockedUpgrades(total), trophies, season?.id, yardStage)}</div>
+        <div class="yard-bg">${yardSVG(unlockedUpgrades(total), trophies, season?.id, yardStage, this.store.data.endlessBest ?? 0)}</div>
         <div class="menu-hud">
           <span class="hud-chip stars-total" data-testid="stars-total">★ ${total} / ${max}</span>
           <span class="hud-chip hud-hints" data-testid="menu-hint-tokens">💡 ${this.store.data.hintTokens ?? 0}</span>
@@ -1237,7 +1238,15 @@ export class App {
       this.showMenu();
       return;
     }
-    this.runLevel(this.levelById(phase.sourceLevelId), false, undefined, false, 'none', undefined, { def, run });
+    this.runLevel(
+      bossPhaseLevel(phase, this.levelById(phase.sourceLevelId), def.id, run.phaseIndex),
+      false,
+      undefined,
+      false,
+      'none',
+      undefined,
+      { def, run }
+    );
   }
 
   /** Фаза пройдена: сюжетная реплика, переход к следующей или финал. */
@@ -1634,6 +1643,7 @@ export class App {
 
     const host = this.q('.board-host');
     const movesEl = this.q('[data-testid=hud-moves]');
+    const goalEl = this.q('[data-testid=hud-goal]');
     const undoBtn = this.q<HTMLButtonElement>('[data-testid=btn-undo]');
     const hudStar = level.star ? this.q('[data-testid=hud-star]') : null;
     const starTrackEl = showTrack ? this.q<HTMLSpanElement>('[data-testid=hud-star-track]') : null;
@@ -1647,6 +1657,10 @@ export class App {
 
     const refreshHud = () => {
       movesEl.textContent = String(cur.moves);
+      // Счётчик ходов подкрашивается относительно par: зелёный — в пределах
+      // оптимума, красный — вышли за «два-звёздочный» порог.
+      goalEl.classList.toggle('hud-par-ok', cur.moves <= level.par);
+      goalEl.classList.toggle('hud-par-warn', cur.moves > level.par2);
       undoBtn.disabled = undoStack.length === 0;
       redoBtn.disabled = redoStack.length === 0;
       hudStar?.classList.toggle('collected', cur.starCollected);
@@ -1664,6 +1678,8 @@ export class App {
         });
       }
     };
+    // Начальное состояние HUD: подсветка «в пределах par» видна с первого экрана.
+    refreshHud();
 
     // детектор тупика: без ящиков любой ход обратим, уровень всегда проходим;
     // после траты ящика честно проверяем решателем
@@ -1800,8 +1816,40 @@ export class App {
           durationSeconds: Math.round(elapsedMs / 1000),
           hintUsed: attempt.usedHint
         });
-        this.finishLevel(level, cur, daily, dailyDate, endless);
+        this.finishLevel(level, cur, daily, dailyDate, endless, playReplay);
       }
+    };
+    // Реплей эталонного решения: путь считает solver, BoardView проигрывает его
+    // ход за ходом. Доступен из окна победы при par-прохождении.
+    const playReplay = (onDone: () => void): void => {
+      const res = solve(level);
+      if (!res.solvable || res.path.length === 0) {
+        onDone();
+        return;
+      }
+      bv.interactive = false;
+      this.root.classList.add('replaying');
+      let state = createState(level);
+      bv.setState(state, false);
+      movesEl.textContent = '0';
+      let i = 0;
+      const step = () => {
+        if (i >= res.path.length) {
+          this.root.classList.remove('replaying');
+          onDone();
+          return;
+        }
+        const mv = res.path[i++];
+        const outcome = applyMove(level, state, mv.piece, mv.dx, mv.dy, mv.steps);
+        if (outcome) {
+          state = outcome.state;
+          bv.setState(state, true);
+          movesEl.textContent = String(state.moves);
+          this.audio.play('move');
+        }
+        window.setTimeout(step, 620);
+      };
+      step();
     };
     // Только в e2e-сборке: детерминированно «выиграть» уровень, минуя ручной
     // подбор решения многофазных пазлов. Хук лишь подставляет тестовое состояние
@@ -1953,6 +2001,7 @@ export class App {
     this.q('[data-testid=btn-game-back]').addEventListener('click', () => {
       if (finished || cur.won) return;
       this.audio.play('click');
+      track({ type: 'level_exit', levelId: level.id, moves: cur.moves });
       this.showMenu();
     });
     const hintBtn = this.q<HTMLButtonElement>('[data-testid=btn-hint]');
@@ -2196,7 +2245,14 @@ export class App {
       overlay.querySelector<HTMLElement>('[data-testid=btn-resume]')!.focus({ preventScroll: true });
   }
 
-  private finishLevel(level: LevelDef, endState: GameState, daily = false, dailyDate?: string, endless = false): void {
+  private finishLevel(
+    level: LevelDef,
+    endState: GameState,
+    daily = false,
+    dailyDate?: string,
+    endless = false,
+    replay?: (onDone: () => void) => void
+  ): void {
     if (endless) {
       this.finishEndless(level, endState);
       return;
@@ -2217,6 +2273,7 @@ export class App {
     let newSkins: (typeof TARGET_SKINS)[number][] = [];
     let justMastered = false;
     let newYardStage = 0;
+    let parPerfect = false;
     let dailyStreak = 0;
     let weeklyCup = false;
     this.store.recordWeeklyEvent(currentWeekKey(), 'win', 1);
@@ -2235,6 +2292,13 @@ export class App {
       const improved = this.store.recordResult(level.id, stars);
       // Личный рекорд ходов — «мог бы лучше» на карточке уровня (M5).
       this.store.recordBestMoves(level.id, endState.moves);
+      // par-perfect: победа в пределах оптимального числа ходов. Раз за уровень —
+      // +1 подсказка и аналитическая метка «уровень освоен».
+      if (stars === 3 && endState.moves <= level.par && replay && this.store.recordMastered(level.id)) {
+        parPerfect = true;
+        this.store.addHintTokens(1);
+        track({ type: 'level_mastered', levelId: level.id, moves: endState.moves });
+      }
       const after = totalStars(this.store.data);
       // Открытие «Бесконечного двора» — переход доступа, а не побочный эффект
       // финала кампании: событие уходит ровно один раз, на том уровне, который
@@ -2297,6 +2361,9 @@ export class App {
           .join('')
       : '';
     const masterNote = justMastered ? `<div class="win-master" data-testid="win-master">${t('win.master')}</div>` : '';
+    const parPerfectNote = parPerfect
+      ? `<div class="win-master" data-testid="win-par-perfect">${t('win.parPerfect')}</div>`
+      : '';
     const yardStageNote = newYardStage
       ? `<div class="win-master yard-stage-unlocked" data-testid="win-yard-stage">${t('win.yardStage', {
           n: newYardStage * 10
@@ -2357,7 +2424,7 @@ export class App {
           endState.moves <= level.par ? t('win.perfect') : ''
         }</div>
         ${(() => {
-          const rewardNotes = [starNote, masterNote, yardStageNote, chapterNote, letterNote, eliteReplayNote, dailyNote, upgradeNote, skinNote, achievementNote].join('');
+          const rewardNotes = [starNote, masterNote, parPerfectNote, yardStageNote, chapterNote, letterNote, eliteReplayNote, dailyNote, upgradeNote, skinNote, achievementNote].join('');
           return rewardNotes ? `<div class="win-rewards" data-testid="win-rewards">${rewardNotes}</div>` : '';
         })()}
         <button class="btn share-btn" data-testid="btn-share">↗ ${t('daily.share')}</button>
@@ -2369,6 +2436,7 @@ export class App {
               : `<div class="win-note ok">${t('win.allDone')}</div><button class="btn btn-primary btn-big" data-testid="btn-final-menu">${t('win.menu')}</button>`
         }
         <div class="dialog-row">
+          ${replay && !daily && endState.moves <= level.par ? `<button class="btn" data-testid="btn-replay">▶ ${t('win.replay')}</button>` : ''}
           <button class="btn" data-testid="btn-again">${t('win.again')}</button>
           ${next ? `<button class="btn" data-testid="btn-win-menu">${t('win.menu')}</button>` : ''}
         </div>
@@ -2411,6 +2479,14 @@ export class App {
           });
       await this.shareText(text, event.currentTarget as HTMLButtonElement, t('daily.shared'));
     });
+    overlay.querySelector('[data-testid=btn-replay]')?.addEventListener('click', () => {
+      this.audio.play('click');
+      overlay.style.display = 'none';
+      replay?.(() => {
+        overlay.style.display = '';
+        this.audio.play('win');
+      });
+    });
     overlay.querySelector('[data-testid=btn-again]')?.addEventListener('click', () => {
       this.audio.play('click');
       if (daily) void this.startDaily();
@@ -2440,6 +2516,11 @@ export class App {
     const stars = starsFor(level, endState.moves, endState.starCollected);
     const achievementsBefore = unlockedAchievementKeys(this.store.data);
     const isNewBest = this.store.recordEndless(this.endlessStreak);
+    // Множитель серии (Stage C): каждый 4-й уровень заезда — этап, дающий
+    // подсказки по множителю тира (1/2/3). Начисление сразу в сейв, показ — в диалоге.
+    const multiplier = endlessMultiplier(this.endlessStreak);
+    const milestoneHints = endlessMilestoneHints(this.endlessStreak);
+    if (milestoneHints > 0) this.store.addHintTokens(milestoneHints);
     track({ type: 'endless_finished', streak: this.endlessStreak, best: this.store.data.endlessBest ?? this.endlessStreak });
     const newAchievements = ACHIEVEMENTS.filter(
       (achievement) =>
@@ -2467,7 +2548,8 @@ export class App {
         <div class="dialog-sub">${t('win.stats', { moves: endState.moves, par: level.par })}${
           endState.moves <= level.par ? t('win.perfect') : ''
         }</div>
-        <div class="win-upgrade" data-testid="endless-streak">🌀 ${t('endless.streak', { n: this.endlessStreak })} · ${t('endless.best', { n: this.store.data.endlessBest ?? 0 })}</div>
+        <div class="win-upgrade" data-testid="endless-streak">🌀 ${t('endless.streak', { n: this.endlessStreak })} · ${t('endless.best', { n: this.store.data.endlessBest ?? 0 })} · <span data-testid="endless-multiplier">${t('endless.multiplier', { n: multiplier })}</span></div>
+        ${milestoneHints > 0 ? `<div class="win-master" data-testid="endless-milestone">${t('endless.milestoneBonus', { n: milestoneHints })}</div>` : ''}
         ${isNewBest ? `<div class="win-master" data-testid="endless-new-best">${t('endless.newBest')}</div>` : ''}
         ${achievementNote}
         <button class="btn share-btn" data-testid="btn-share">↗ ${t('daily.share')}</button>

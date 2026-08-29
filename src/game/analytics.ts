@@ -19,6 +19,8 @@ export type GameAnalyticsEvent =
   | { type: 'level_start'; levelId: number; sessionLevelNumber: number; attemptNumber: number }
   | { type: 'first_move'; levelId: number; timeMs: number }
   | { type: 'level_restart'; levelId: number; moves: number }
+  /** Игрок свернул с уровня до победы (кнопка «назад») — точка оттока воронки. */
+  | { type: 'level_exit'; levelId: number; moves: number }
   | { type: 'hint_used'; levelId: number; source: 'free' | 'token' | 'rewarded' }
   | {
       type: 'level_complete';
@@ -31,6 +33,8 @@ export type GameAnalyticsEvent =
       durationSeconds: number;
       hintUsed: boolean;
     }
+  /** Впервые уровень пройден оптимально (ходы = par) — награда за мастерство. */
+  | { type: 'level_mastered'; levelId: number; moves: number }
   | { type: 'boss_start'; levelId: number }
   | { type: 'boss_phase_complete'; levelId: number; phase: number }
   | { type: 'boss_complete'; levelId: number; timeMs: number }

@@ -48,13 +48,12 @@
 
 ## Высшая лига — Stage A ✅, Stage B ✅, остальное не реализовано (Stage C/D)
 - [x] Stage B: недельный чемпионат `eliteweekly` (одно испытание недели, лидерборд, очки по медали и ходам, локальный рекорд) — `src/game/elite-weekly.ts`
-- [ ] Stage C: улучшенная endless-серия с множителем + одно rewarded-восстановление + трофей во дворе
-- [ ] Stage D: «Испытание деда» (5 испытаний, 3 попытки, бонусы) — только data-model
-- [ ] Аналитические события `elite_*` (нет аналитического слоя в проекте)
+- [x] Stage C: улучшенная endless-серия с множителем (`endlessMultiplier` ×1/×2/×3 + этапы-бонусы подсказками каждый 4-й уровень, `endless.ts`/`app.ts`) + одно rewarded-восстановление (`endlessResume`, `showEndlessResumeDialog`) + трофей во дворе (рекорд 10+, `endless-trophy` в `yard.ts`)
+- [x] Stage D: «Испытание деда» (5 испытаний, 3 попытки, бонусы) — data-model: `src/game/grandpa-trial.ts`, сейв-поле `grandpaTrials` (sanitize/merge), unit-тесты; UI-проводка отложена
+- [x] Аналитические события `elite_*` — подключены в `app.ts` (пункт был устаревшим: события появились вместе с лигой)
 
 ## Живой двор и дед (реализовано)
-- [x] `src/game/yard-events.ts` — YardEvent + RateLimiter + маппинг в события деда
-- [x] `src/game/grandpa.ts` — 30 реплик, чистый pickLine (кулдаун/анти-повтор/приоритет/once)
+- [x] `src/game/grandpa.ts` — 30 реплик, чистый pickLine (кулдаун/анти-повтор/приоритет/once); события деда порождаются напрямую в `app.ts`/`YardDirector` (черновой модуль `yard-events.ts` удалён как неиспользуемый)
 - [x] `src/ui/yard-reactions.ts` — YardDirector: SVG-портрет (7 настроений) + пузырь (aria-live, субтитр)
 - [x] Проводка в runLevel: старт/упор/трактор/звезда/ворота/подсказка/рестарт/победа
 - [x] SaveData: grandpaSeen (union merge) + liveYard toggle + методы

@@ -28,4 +28,13 @@ describe('визуальные этапы двора', () => {
     expect(finale).toContain('yard-champion-arch');
     expect(finale).not.toContain('fill="#fff2a8" opacity=".9"');
   });
+
+  it('показывает кубок серии «Бесконечного двора» только с рекордом 10+', () => {
+    expect(yardSVG(new Set(), 0, undefined, 0, 9)).not.toContain('data-yard-obj="endless-trophy"');
+    expect(yardSVG(new Set(), 0, undefined, 0, 0)).not.toContain('data-yard-obj="endless-trophy"');
+    const withTrophy = yardSVG(new Set(), 0, undefined, 0, 10);
+    expect(withTrophy).toContain('data-yard-obj="endless-trophy"');
+    // Недельные кубки при этом не задеты: пустая полка не рисуется.
+    expect(withTrophy).not.toContain('data-yard-obj="trophies"');
+  });
 });

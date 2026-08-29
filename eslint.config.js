@@ -38,5 +38,27 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-explicit-any': 'warn'
     }
+  },
+  /**
+   * Node-скрипты на чистом JS (`scripts/*.mjs`).
+   *
+   * `tsconfig.json` включает `scripts`, но без `allowJs`, поэтому `.mjs` в
+   * TS-проект не попадает — и `projectService: true` валил линт ошибкой разбора
+   * «was not found by the project service». Молчаливое последствие было хуже
+   * самой ошибки: `npm run lint` падал, а вместе с ним весь релизный гейт
+   * `npm run check` (typecheck + lint + test + solver + verify).
+   *
+   * Включать такие файлы в tsconfig только ради линтера значило бы тянуть
+   * `allowJs` в проверку типов всего проекта. Правильный минимум — линтовать
+   * их без типозависимых правил: синтаксис и очевидные дефекты по-прежнему
+   * проверяются, а правила, которым нужен тип-чекер, для них отключены.
+   */
+  {
+    files: ['**/*.mjs'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      parserOptions: { projectService: false, project: false },
+      globals: { ...globals.node }
+    }
   }
 );

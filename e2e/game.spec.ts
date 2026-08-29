@@ -1272,3 +1272,135 @@ test.describe('SDK fallback', () => {
     expect(errors[0]).toContain('[platform] SDK Яндекс Игр недоступен');
   });
 });
+
+/**
+ * Восстановление незавершённой попытки (P0-3).
+ *
+ * Проверяется не «фича работает», а четыре обещания, каждое из которых при
+ * нарушении стоит игроку либо потерянного времени, либо доверия:
+ * попытка выживает жёсткое закрытие вкладки; «Заново» её стирает; изменение
+ * данных уровня не восстанавливает несовместимую доску; соревновательные
+ * режимы восстановления не имеют.
+ */
+test.describe('Восстановление попытки', () => {
+  const RUN_KEY = 'parkovka.run.v1';
+
+  /** Тянем любую фигуру любым направлением, пока счётчик ходов не вырастет. */
+  async function makeSomeMoves(page: Page, want: number): Promise<number> {
+    const cell = await cellSize(page);
+    const ids = await page.locator('[data-piece]').evaluateAll((nodes) =>
+      nodes.map((n) => n.getAttribute('data-piece')!)
+    );
+    let moves = Number(await page.getByTestId('hud-moves').textContent());
+    for (let round = 0; round < 8 && moves < want; round++) {
+      for (const id of ids) {
+        if (moves >= want) break;
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1]
+        ]) {
+          const box = await page.locator(`[data-piece="${id}"]`).boundingBox();
+          if (!box) continue;
+          const sx = box.x + Math.min(box.width, cell) / 2;
+          const sy = box.y + Math.min(box.height, cell) / 2;
+          await page.mouse.move(sx, sy);
+          await page.mouse.down();
+          for (let s = 1; s <= 8; s++) await page.mouse.move(sx + (dx * cell * s) / 8, sy + (dy * cell * s) / 8);
+          await page.mouse.up();
+          await page.waitForTimeout(160);
+          const cur = Number(await page.getByTestId('hud-moves').textContent());
+          if (cur > moves) {
+            moves = cur;
+            break;
+          }
+        }
+      }
+    }
+    return moves;
+  }
+
+  test('попытка в кампании выживает жёсткое закрытие вкладки', async ({ browser }) => {
+    // Один контекст на весь тест: localStorage должен пережить закрытие страницы,
+    // иначе проверяется не восстановление, а свежий профиль.
+    const context = await browser.newContext();
+    let page = await context.newPage();
+    const errors = trackErrors(page);
+    await seedCampaignBefore(page, 40, 3);
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+
+    const moves = await makeSomeMoves(page, 3);
+    expect(moves).toBeGreaterThan(0);
+    // Дебаунс записи — 400 мс; ждём с запасом.
+    await page.waitForTimeout(700);
+    expect(await page.evaluate((k) => localStorage.getItem(k), RUN_KEY)).not.toBeNull();
+
+    await page.close();
+    page = await context.newPage();
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('hud-moves')).toHaveText(String(moves));
+    // Игрок обязан понять, почему доска не пустая.
+    await expect(page.getByTestId('resume-toast')).toBeVisible();
+    expect(errors).toEqual([]);
+    await context.close();
+  });
+
+  test('«Заново» стирает попытку немедленно', async ({ page }) => {
+    await seedCampaignBefore(page, 40, 3);
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await makeSomeMoves(page, 2);
+    await page.waitForTimeout(700);
+    expect(await page.evaluate((k) => localStorage.getItem(k), RUN_KEY)).not.toBeNull();
+
+    await page.getByTestId('btn-restart').click();
+    await page.waitForTimeout(300);
+    // Не «через 400 мс», а сразу: закрытие вкладки в окно дебаунса вернуло бы
+    // ровно то состояние, от которого игрок только что отказался.
+    expect(await page.evaluate((k) => localStorage.getItem(k), RUN_KEY)).toBeNull();
+    await expect(page.getByTestId('hud-moves')).toHaveText('0');
+  });
+
+  test('изменение данных уровня отбрасывает попытку, а не ломает доску', async ({ page }) => {
+    const errors = trackErrors(page);
+    await seedCampaignBefore(page, 40, 3);
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    const moves = await makeSomeMoves(page, 2);
+    expect(moves).toBeGreaterThan(0);
+    await page.waitForTimeout(700);
+
+    // Эмулируем обновление игры: раскладка уровня стала другой.
+    await page.evaluate((k) => {
+      const raw = localStorage.getItem(k)!;
+      const run = JSON.parse(raw);
+      run.fp = 'другая-раскладка';
+      localStorage.setItem(k, JSON.stringify(run));
+    }, RUN_KEY);
+
+    await page.reload();
+    await page.getByTestId('menu-play').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    // Уровень начат заново, тоста восстановления нет, ошибок нет.
+    await expect(page.getByTestId('hud-moves')).toHaveText('0');
+    await expect(page.getByTestId('resume-toast')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('ежедневный уровень не восстанавливается: попытка там и есть соревнование', async ({ page }) => {
+    await seedCampaignBefore(page, 40, 3);
+    await page.goto('/?mock=1&lang=ru&daytime=day');
+    await page.getByTestId('menu-daily').click();
+    await expect(page.getByTestId('board')).toBeVisible({ timeout: 15_000 });
+    await makeSomeMoves(page, 2);
+    await page.waitForTimeout(700);
+    expect(await page.evaluate((k) => localStorage.getItem(k), RUN_KEY)).toBeNull();
+  });
+});

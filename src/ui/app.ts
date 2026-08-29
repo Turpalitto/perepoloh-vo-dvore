@@ -90,6 +90,8 @@ import {
   currentPhase
 } from '../game/boss';
 import type { AdHandlers, LeaderboardEntry, Platform } from '../platform/types';
+import { clearRunRaw, readRunRaw, writeRunRaw } from '../platform/local-store';
+import { createRunSaver, decodeRun } from '../game/run-resume';
 import { createLeaderboardCache, type LeaderboardCache } from '../game/leaderboard-cache';
 import { queryParam } from '../query';
 import { BoardView } from './board';
@@ -209,6 +211,13 @@ export class App {
   private readonly dailyLevels = new DailyLevelService();
   private dailyLoading = false;
   private activeBoard: BoardView | null = null;
+  /**
+   * Сохранение незавершённой попытки текущего уровня, если уровень вообще
+   * подлежит восстановлению (только кампания, см. `runLevel`). Держится на
+   * уровне App, а не только в замыкании, потому что записать отложенную
+   * попытку обязаны два события вне экрана: уход со страницы и уход с экрана.
+   */
+  private activeRunSaver: { flush(): void; clear(): void; dispose(): void } | null = null;
   private yardDirector: YardDirector | null = null;
   /** Момент показа интро текущего босса — для аналитики `boss_complete.timeMs`. */
   private bossStartedAt = 0;
@@ -219,6 +228,14 @@ export class App {
    */
   private readonly grandpaDebug =
     (import.meta.env.DEV || import.meta.env.MODE === 'e2e') && queryParam('grandpaDebug') === '1';
+  /**
+   * Проверочный сеанс (QA-инструменты / редактор уровней). Тот же признак, по
+   * которому `main.ts` подменяет сейв и платформу. Нужен здесь ради одного:
+   * незавершённые попытки в таком сеансе не сохраняются, иначе уровень из
+   * редактора мог бы оставить попытку настоящей кампании.
+   */
+  private readonly qaSession =
+    (import.meta.env.DEV || import.meta.env.MODE === 'e2e') && queryParam('qaTools') === '1';
   private onboardingHandEl: HTMLElement | null = null;
   private endlessStreak = 0;
   /** Первый экран сессии не анимируем — переходить не от чего, и он может
@@ -280,9 +297,22 @@ export class App {
     this.tv.attach();
     document.addEventListener('visibilitychange', () => {
       this.audio.setHidden(document.hidden);
-      if (document.hidden) this.yardDirector?.setPaused(true);
-      else this.syncAudioPause();
+      if (document.hidden) {
+        this.yardDirector?.setPaused(true);
+        // Скрытие страницы — последний надёжный момент записи на мобильных:
+        // ОС может убить вкладку из фона без единого дальнейшего события.
+        // Ждать дебаунса здесь нельзя, поэтому пишем немедленно.
+        this.activeRunSaver?.flush();
+      } else this.syncAudioPause();
     });
+    /**
+     * `pagehide` — единственное событие ухода со страницы, на которое можно
+     * положиться в Safari/iOS (там `beforeunload` не срабатывает при переходе
+     * в кэш страниц). Дублирует `visibilitychange` намеренно: пропущенная
+     * запись стоит игроку до десяти минут работы, а лишняя — одного
+     * `setItem` на ту же строку.
+     */
+    window.addEventListener('pagehide', () => this.activeRunSaver?.flush());
     const unlockAudio = () => {
       this.audio.unlock();
       this.audio.startAmbient();
@@ -316,6 +346,10 @@ export class App {
   }
 
   private disposeActiveBoard(): void {
+    // Сначала докатываем отложенную запись попытки: уход с экрана уровня —
+    // последняя возможность её сохранить, дальше состояние доски исчезнет.
+    this.activeRunSaver?.dispose();
+    this.activeRunSaver = null;
     this.activeBoard?.destroy();
     this.activeBoard = null;
     this.yardDirector?.destroy();
@@ -1649,7 +1683,30 @@ export class App {
     const starTrackEl = showTrack ? this.q<HTMLSpanElement>('[data-testid=hud-star-track]') : null;
     const starDots = starTrackEl ? Array.from(starTrackEl.querySelectorAll<HTMLElement>('i')) : [];
 
-    let cur: GameState = createState(level);
+    /**
+     * Восстановление незавершённой попытки — только в обычной кампании.
+     *
+     * Ежедневный уровень, «бесконечный двор», испытания лиги, испытания деда
+     * и бои с боссами исключены сознательно: там попытка и есть предмет
+     * соревнования, и «продолжить с середины» превратило бы медаль в
+     * бесконечный перебор с сохранениями. У боссов вдобавок состояние доски
+     * — лишь часть многофазного `BossRun`, который живёт отдельно.
+     *
+     * QA-сеанс тоже исключён: там прогресс не персистится по определению, а
+     * уровни из редактора носят id кампании, и попытка из редактора могла бы
+     * «приехать» в настоящую кампанию. Отпечаток её почти наверняка отсёк бы
+     * (редактор меняет раскладку), но проверка по режиму надёжнее и дешевле.
+     */
+    const resumable = !daily && !endless && !challenge && !boss && !this.qaSession;
+    const restored = resumable ? decodeRun(level, readRunRaw()) : null;
+    let cur: GameState = restored ?? createState(level);
+    const runSaver = resumable
+      ? createRunSaver(level, { write: writeRunRaw, clear: clearRunRaw })
+      : null;
+    // Единственный слот: заходя в другой уровень, старую попытку не храним.
+    // Иначе игрок, ушедший с уровня 60 на 61, при возврате на 60 получил бы
+    // доску «как было», хотя сам выбрал начать заново из меню.
+    if (resumable && !restored) clearRunRaw();
     const undoStack: GameState[] = [];
     const redoStack: GameState[] = [];
     const redoBtn = this.q<HTMLButtonElement>('[data-testid=btn-redo]');
@@ -1784,12 +1841,19 @@ export class App {
         else if (level.id === 1 && cur.moves === 1) this.yardDirector?.react('first-move');
         refreshHud();
         updateDeadlock();
+        // Дебаунс внутри: серия быстрых ходов не превращается в серию
+        // синхронных записей в тот же кадр, что и анимация фигуры.
+        runSaver?.schedule(cur);
       },
       onExitDone: () => completeLevel()
     });
     // Единая точка завершения уровня (реальный выезд машины и e2e-хук ведут сюда).
     const completeLevel = (): void => {
       if (finished) return;
+      // Уровень взят — незавершённой попытки больше не существует. Стираем до
+      // всех ветвей и до проверки цели фазы: даже если выезд не будет
+      // засчитан, состояние «машина у ворот» бессмысленно восстанавливать.
+      runSaver?.clear();
       if (boss) {
         const phase = currentPhase(boss.run, boss.def);
         if (phase && !bossObjectiveSatisfied(phase, cur)) {
@@ -1864,6 +1928,7 @@ export class App {
       };
     }
     this.activeBoard = bv;
+    this.activeRunSaver = runSaver;
     // «Живой двор»: дед-комментатор. Обычные уровни — да; на испытаниях лиги
     // без подсказок он всё равно уместен, но во время рекламы/паузы молчит.
     this.yardDirector = new YardDirector(this.q('.game-screen'), this.audio, {
@@ -1917,6 +1982,8 @@ export class App {
       this.audio.play('undo');
       refreshHud();
       updateDeadlock();
+      // Отмена до нулевого хода = попытки больше нет: `schedule` сам сотрёт.
+      runSaver?.schedule(cur);
     });
     redoBtn.addEventListener('click', () => {
       if (finished || cur.won) return;
@@ -1928,6 +1995,7 @@ export class App {
       this.audio.play('move');
       refreshHud();
       updateDeadlock();
+      runSaver?.schedule(cur);
     });
     const skipBtn = this.q<HTMLButtonElement>('[data-testid=btn-skip]');
     /**
@@ -1960,6 +2028,10 @@ export class App {
       this.audio.play('click');
       refreshHud();
       hideDeadlock();
+      // «Заново» — явное решение игрока: сохранённая попытка стирается сразу,
+      // не дожидаясь дебаунса, иначе закрытие вкладки в следующие 400 мс
+      // вернуло бы ровно то состояние, от которого он отказался.
+      runSaver?.clear();
       if (!daily) {
         const count = (this.restartCounts.get(level.id) ?? 0) + 1;
         this.restartCounts.set(level.id, count);
@@ -2079,8 +2151,26 @@ export class App {
       modifierShown = true;
     }
 
-    // обучение: короткая подсказка + стрелка на первом уровне
-    const hintText = levelText('hint', level.hint);
+    // Восстановленная попытка: игрок обязан понять, почему доска не пустая.
+    // Без этого сообщения возврат выглядит как баг («уровень уже начат?»), а
+    // не как услуга. Тот же тост, что у обучения и модификаторов, — голос
+    // игры один. `role=status`: скринридер объявит, фокус не украдёт.
+    if (restored) {
+      const note = document.createElement('div');
+      note.className = 'hint-toast';
+      note.setAttribute('data-testid', 'resume-toast');
+      note.setAttribute('role', 'status');
+      note.textContent = t('resume.restored', { n: restored.moves });
+      this.q('.overlay-slot').appendChild(note);
+      window.setTimeout(() => note.classList.add('gone'), 4200);
+      window.setTimeout(() => note.remove(), 4800);
+    }
+
+    // обучение: короткая подсказка + стрелка на первом уровне.
+    // При восстановленной попытке обучающий тост подавлен: он позиционируется
+    // тем же `top`, что и сообщение о восстановлении, и лёг бы поверх него.
+    // Потери нет — игрок уже играл этот уровень и правило видел.
+    const hintText = restored ? null : levelText('hint', level.hint);
     if (hintText) {
       const toast = document.createElement('div');
       // Оба тоста абсолютно позиционированы по одному `top`, и до появления
@@ -2231,6 +2321,11 @@ export class App {
     });
     overlay.querySelector('[data-testid=btn-pause-restart]')!.addEventListener('click', () => {
       this.audio.play('click');
+      // «Заново» из паузы перезапускает уровень целиком через `startLevel`, а
+      // тот сносит доску через `disposeActiveBoard` — который обязан
+      // ДОСОХРАНИТЬ отложенную попытку. Здесь это ровно противоположно
+      // желанию игрока, поэтому попытку стираем до перезапуска.
+      this.activeRunSaver?.clear();
       if (daily) void this.startDaily();
       else {
         this.restartCounts.set(level.id, (this.restartCounts.get(level.id) ?? 0) + 1);

@@ -1,10 +1,9 @@
 import { createDebugTracker } from '../game/analytics';
 import type { SaveData } from '../game/save';
-import { sanitizeSave } from '../game/save';
+import { readLocalSave, writeLocalSave } from './local-store';
 import { DEFAULT_PLATFORM_CONFIG } from './types';
 import type { LeaderboardSnapshot, Platform } from './types';
 
-const STORAGE_KEY = 'parkovka.save.v1';
 const SAFE_LANG_FALLBACK = 'ru';
 
 /**
@@ -59,20 +58,11 @@ export function createLocalFallbackPlatform(): Platform {
     gameplayStart(): void {},
     gameplayStop(): void {},
     async loadData(): Promise<SaveData | null> {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return null;
-        return sanitizeSave(JSON.parse(raw));
-      } catch {
-        return null;
-      }
+      return readLocalSave();
     },
     async saveData(data: SaveData): Promise<void> {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch {
-        // localStorage недоступен (приватный режим/квота) — прогресс не персистится в этой сессии.
-      }
+      // Не бросает: отказ хранилища (приватный режим/квота) не должен ломать ход.
+      writeLocalSave(data);
     },
     async showInterstitial(): Promise<boolean> {
       // Реклама недоступна без платформы — показа не было.

@@ -1,13 +1,11 @@
 import './mock.css';
 import { createDebugTracker } from '../game/analytics';
 import type { SaveData } from '../game/save';
-import { sanitizeSave } from '../game/save';
+import { readLocalSave, writeLocalSave } from './local-store';
 import { queryParam } from '../query';
 import { DEFAULT_PLATFORM_CONFIG } from './types';
 import type { AdHandlers, LeaderboardName, LeaderboardSnapshot, Platform } from './types';
 import { elitePoints } from '../game/elite';
-
-const STORAGE_KEY = 'parkovka.save.v1';
 
 /** Оверлей фальшивой рекламы для локальной разработки. */
 function fakeAd(kind: 'interstitial' | 'rewarded', h: AdHandlers): Promise<boolean> {
@@ -89,8 +87,9 @@ export function createMockPlatform(): Platform {
         { rank: 2, name: 'Дед Егор', score: top(14, 720, 142) },
         { rank: 3, name: 'Сосед', score: top(9, 310, 97) }
       ];
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const save = raw ? sanitizeSave(JSON.parse(raw)) : null;
+      // Тот же путь чтения, что у loadData: битый сейв не должен ронять
+      // фальшивый лидерборд исключением из JSON.parse.
+      const save = readLocalSave();
       let me = null;
       if (save) {
         const score = daily
@@ -130,17 +129,10 @@ export function createMockPlatform(): Platform {
     gameplayStart(): void {},
     gameplayStop(): void {},
     async loadData(): Promise<SaveData | null> {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      try {
-        return sanitizeSave(JSON.parse(raw));
-      } catch {
-        console.warn('[platform] сохранение повреждено, начинаем заново');
-        return null;
-      }
+      return readLocalSave();
     },
     async saveData(data: SaveData): Promise<void> {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      writeLocalSave(data);
     },
     showInterstitial(h: AdHandlers): Promise<boolean> {
       // `?adSkip=1` эмулирует отказ платформы: у Яндекса interstitial штатно не

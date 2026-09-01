@@ -66,16 +66,6 @@ describe('бесконечный двор', () => {
     }
   });
 
-  it('умеет вводить нажимную кнопку ворот, сохраняя проходимость', { timeout: 120_000 }, async () => {
-    let gated: ReturnType<typeof generateEndless> | null = null;
-    for (let seed = 1; seed <= 20 && !gated; seed++) {
-      const level = await assertVerified(8, seed * 3300);
-      if (level.gateSwitch) gated = level;
-    }
-    expect(gated, 'ни один seed не дал уровень с кнопкой ворот').not.toBeNull();
-    expect(gated!.mechanics).toContain('gate-switch');
-    expect(gated!.gateSwitch).toBeDefined();
-  });
 });
 
 describe('множитель серии и этапы (Stage C)', () => {

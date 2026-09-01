@@ -41,10 +41,14 @@ import {
 import { getLang, levelText, setLang, t } from '../game/i18n';
 import {
   ENDLESS_UNLOCK_AT,
+  LEAGUE_PREVIEW_AT,
+  type LeagueAccess,
   campaignNumber,
   completedCampaignLevels,
   endlessAccess,
   isLevelUnlocked,
+  leagueAccess,
+  maxLeagueDivision,
   newlyUnlocked,
   nextLevelToPlay,
   nextUpgrade,
@@ -70,6 +74,7 @@ import {
   type EliteChallenge,
   campaignImpliedMedals,
   challengeUnlocked,
+  eliteChallenge,
   originLevel,
   divisionMedals,
   divisionOf,
@@ -92,6 +97,15 @@ import {
 import type { AdHandlers, LeaderboardEntry, Platform } from '../platform/types';
 import { clearRunRaw, readRunRaw, writeRunRaw } from '../platform/local-store';
 import { createRunSaver, decodeRun } from '../game/run-resume';
+import {
+  GRANDPA_TRIAL_ATTEMPTS,
+  GRANDPA_TRIALS,
+  type GrandpaTrialDef,
+  canPlayGrandpaTrial,
+  grandpaAttemptsLeft,
+  grandpaTrialMedal,
+  grandpaTrialReward
+} from '../game/grandpa-trial';
 import { createLeaderboardCache, type LeaderboardCache } from '../game/leaderboard-cache';
 import { queryParam } from '../query';
 import { BoardView } from './board';
@@ -665,6 +679,7 @@ export class App {
     // всё меню (CTA, табы, гараж) выводится из этого одного значения.
     const campaignDone = this.store.data.campaignDone === true;
     const endless = endlessAccess(LEVELS, this.store.data);
+    const league = leagueAccess(LEVELS, this.store.data);
     const unlockedSkinCount = TARGET_SKINS.filter((skin) =>
       skin.elite ? campaignDone : total >= skin.unlockStars
     ).length;
@@ -730,9 +745,17 @@ export class App {
             <div class="mode-switch" data-testid="mode-switch" role="group" aria-label="${t('menu.events')}">
               <button class="mode-tab${campaignDone ? '' : ' active'}" data-testid="menu-levels"><span>${t('mode.campaign')}</span></button>
               ${
-                campaignDone
+                league === 'full'
                   ? `<button class="mode-tab active mode-tab-elite" data-testid="menu-elite"><span>🏅 ${t('mode.elite')}</span></button>`
-                  : ''
+                  : league === 'preview'
+                    ? `<button class="mode-tab mode-tab-elite" data-testid="menu-elite"><span>🏅 ${t(
+                        'mode.elite'
+                      )}</span><small>${t('elite.previewTab')}</small></button>`
+                    : league === 'teaser'
+                      ? `<button class="mode-tab mode-tab-locked" data-testid="menu-elite-locked" disabled aria-disabled="true"><span>🔒 ${t(
+                          'mode.elite'
+                        )}</span><small>${t('elite.teaser', { n: LEAGUE_PREVIEW_AT })}</small></button>`
+                      : ''
               }
               ${
                 endless === 'open'
@@ -945,12 +968,13 @@ export class App {
   private async loadLeaderboardContent(): Promise<void> {
     // Доска лиги грузится только тем, кто в лигу вошёл: остальным она пуста и
     // лишь занимает экран, а запрос всё равно стоит квоты SDK.
-    const leagueOpen = this.store.data.campaignDone === true;
+    const access = leagueAccess(LEVELS, this.store.data);
+    const leagueOpen = access === 'preview' || access === 'full';
     const [starsSnap, streakSnap, leagueSnap, weeklySnap] = await Promise.all([
       this.leaderboardCache.get('yardstars'),
       this.leaderboardCache.get('dailystreak'),
       leagueOpen ? this.leaderboardCache.get('eliteleague') : Promise.resolve(null),
-      leagueOpen && this.store.data.eliteWeekly
+      access === 'full' && this.store.data.eliteWeekly
         ? this.leaderboardCache.get('eliteweekly')
         : Promise.resolve(null)
     ]);
@@ -1568,7 +1592,8 @@ export class App {
     endless = false,
     modifier: RuleModifier = 'none',
     challenge?: EliteChallenge,
-    boss?: { def: BossLevelDef; run: BossRun }
+    boss?: { def: BossLevelDef; run: BossRun },
+    grandpaTrial?: GrandpaTrialDef
   ): void {
     this.disposeActiveBoard();
     this.userPaused = false;
@@ -1596,7 +1621,9 @@ export class App {
     const bossWorldClass = bossPhase?.worldChange ?? '';
     const title = boss
       ? `⚡ ${t(boss.def.nameKey)}`
-      : challenge
+      : grandpaTrial
+        ? `🧓 ${t('grandpaTrial.playTitle')}`
+        : challenge
         ? `🏅 ${t('elite.challenge')} ${challenge.id}`
         : daily
           ? `🔥 ${t('daily.title')}`
@@ -1864,6 +1891,13 @@ export class App {
         }
         finished = true;
         this.onBossPhaseDone(boss.def, boss.run, cur);
+      } else if (grandpaTrial && challenge) {
+        finished = true;
+        this.finishGrandpaTrial(grandpaTrial, {
+          ...attempt,
+          moves: cur.moves,
+          starCollected: cur.starCollected
+        });
       } else if (challenge) {
         finished = true;
         this.finishEliteChallenge(challenge, { ...attempt, moves: cur.moves, starCollected: cur.starCollected });
@@ -2691,6 +2725,21 @@ export class App {
 
   // ---------- Высшая лига ----------
 
+  private currentLeagueAccess(): LeagueAccess {
+    return leagueAccess(LEVELS, this.store.data);
+  }
+
+  /** Правило входа в карточку дублируется при рендере и непосредственно перед стартом. */
+  private eliteCardPlayable(id: number): boolean {
+    const challenge = ELITE_CHALLENGES.find((entry) => entry.id === id);
+    if (!challenge) return false;
+    const medals = this.store.data.eliteMedals ?? {};
+    // Уже заслуженная медаль не должна отнимать доступ после изменения порогов.
+    if ((medals[String(id)] ?? 0) > 0) return true;
+    const maxDivision = maxLeagueDivision(this.currentLeagueAccess(), DIVISIONS.length);
+    return divisionOf(id) <= maxDivision && challengeUnlocked(medals, id);
+  }
+
   /** Финальная сцена кампании (один раз). Вход в лигу / возврат во двор. */
   private showCampaignEnding(): void {
     this.disposeActiveBoard();
@@ -2718,6 +2767,11 @@ export class App {
   private showEliteInner(): void {
     this.disposeActiveBoard();
     this.setGameplay(false);
+    const access = this.currentLeagueAccess();
+    if (access === 'hidden' || access === 'teaser') {
+      this.showMenuInner();
+      return;
+    }
     // Медали, уже заслуженные в кампании, выдаются при входе: идемпотентно,
     // поэтому повторные заходы ничего не меняют и сейв не переписывают.
     this.store.grantEliteMedals(campaignImpliedMedals(this.store.data.stars));
@@ -2732,14 +2786,16 @@ export class App {
     const golds = goldCount(this.store.data);
     const medals = this.store.data.eliteMedals ?? {};
     const sections = DIVISIONS.map((division) => {
-      const open = divisionUnlocked(medals, division.index);
+      const open =
+        division.index <= maxLeagueDivision(access, DIVISIONS.length) &&
+        divisionUnlocked(medals, division.index);
       const size = division.to - division.from + 1;
       const cards = ELITE_CHALLENGES.filter((c) => divisionOf(c.id) === division.index)
         .map((c) => {
           const medal = medalOf(this.store.data, c.id);
           // Карточка может быть открыта в закрытом дивизионе: медаль по ней
           // засчитана кампанией, и запрещать переигровку было бы враньём.
-          const playable = challengeUnlocked(medals, c.id);
+          const playable = this.eliteCardPlayable(c.id);
           const level = sourceLevel(c);
           const mod = c.modifier !== 'none' ? `<span class="elite-mod">${t(`elite.mod.${c.modifier}`)}</span>` : '';
           // Ремикс подписан честно: игрок должен знать, что двор перестроен, а
@@ -2760,7 +2816,9 @@ export class App {
               ]
                 .filter(Boolean)
                 .join(' · ')
-            : t('elite.divisionLocked', { n: DIVISION_UNLOCK_MEDALS })
+            : division.index > maxLeagueDivision(access, DIVISIONS.length)
+              ? t('elite.campaignLocked')
+              : t('elite.divisionLocked', { n: DIVISION_UNLOCK_MEDALS })
         )}">
           <span class="elite-card-medal">${playable ? MEDAL_ICON[medal] || '·' : '🔒'}</span>
           <span class="elite-card-num">${t('elite.challenge')} ${c.id}</span>
@@ -2775,7 +2833,11 @@ export class App {
           <span class="elite-section-sub">${
             open
               ? `🎖️ ${divisionMedals(medals, division.index)}/${size}`
-              : `🔒 ${t('elite.divisionLocked', { n: DIVISION_UNLOCK_MEDALS })}`
+              : `🔒 ${
+                  division.index > maxLeagueDivision(access, DIVISIONS.length)
+                    ? t('elite.campaignLocked')
+                    : t('elite.divisionLocked', { n: DIVISION_UNLOCK_MEDALS })
+                }`
           }</span>
         </h3>
         <div class="elite-grid">${cards}</div>`;
@@ -2798,16 +2860,31 @@ export class App {
             ${(this.store.data.endlessBest ?? 0) > 0 ? `<span>🌀 ${t('elite.bestEndless', { n: this.store.data.endlessBest ?? 0 })}</span>` : ''}
           </div>
         </div>
-        ${this.weeklyCardHtml()}
+        ${
+          access === 'full'
+            ? `<section class="elite-weekly" data-testid="grandpa-trials-entry">
+                <h3 class="elite-section">🧓 ${t('grandpaTrial.title')}</h3>
+                <div class="elite-weekly-card">
+                  <div class="elite-weekly-info"><span>${t('grandpaTrial.intro')}</span></div>
+                  <button class="btn btn-primary" data-testid="grandpa-trials-open">${t('grandpaTrial.open')}</button>
+                </div>
+              </section>`
+            : ''
+        }
+        ${this.weeklyCardHtml(access)}
         ${sections}
       </div>`;
     this.q('[data-testid=btn-back]').addEventListener('click', () => {
       this.audio.play('click');
       this.showMenu();
     });
-    this.q('[data-testid=elite-weekly-play]').addEventListener('click', () => {
+    this.root.querySelector('[data-testid=elite-weekly-play]')?.addEventListener('click', () => {
       this.audio.play('click');
       this.startWeeklyChallenge(currentWeekKey());
+    });
+    this.root.querySelector('[data-testid=grandpa-trials-open]')?.addEventListener('click', () => {
+      this.audio.play('click');
+      this.showGrandpaTrialsScreen();
     });
     this.root.querySelectorAll<HTMLButtonElement>('.elite-card').forEach((b) =>
       b.addEventListener('click', () => {
@@ -2848,7 +2925,13 @@ export class App {
   }
 
   /** Карточка недельного чемпионата над дивизионами лиги. */
-  private weeklyCardHtml(): string {
+  private weeklyCardHtml(access: LeagueAccess): string {
+    if (access !== 'full') {
+      return `<section class="elite-weekly locked" data-testid="elite-weekly-locked">
+        <h3 class="elite-section">🔒 ${t('elite.weekly.title')}</h3>
+        <div class="elite-weekly-card"><small>${t('elite.weekly.campaignLocked')}</small></div>
+      </section>`;
+    }
     const challenge = pickWeeklyChallenge(currentWeekKey());
     const level = sourceLevel(challenge);
     const best = this.store.eliteWeeklyOf(currentWeekKey());
@@ -2875,6 +2958,60 @@ export class App {
       </section>`;
   }
 
+  private showGrandpaTrialsScreen(): void {
+    if (this.currentLeagueAccess() !== 'full') {
+      this.showEliteScreen();
+      return;
+    }
+    this.disposeActiveBoard();
+    this.setGameplay(false);
+    const cards = GRANDPA_TRIALS.map((trial, index) => {
+      const challenge = eliteChallenge(trial.challengeId)!;
+      const level = sourceLevel(challenge);
+      const progress = this.store.data.grandpaTrials?.[trial.id];
+      const left = grandpaAttemptsLeft(progress);
+      const medal = (progress?.best ?? 0) as Medal;
+      return `<button class="elite-card${medal ? ' medaled' : ''}${left ? '' : ' locked'}"
+        data-testid="grandpa-trial-${trial.id}" data-grandpa-trial="${trial.id}" ${left ? '' : 'disabled'}>
+        <span class="elite-card-medal">${MEDAL_ICON[medal] || '🧓'}</span>
+        <span class="elite-card-num">${t('grandpaTrial.cardTitle', { n: index + 1 })}</span>
+        <span class="elite-card-src">${escapeHTML(levelText('name', level.name) ?? level.name)}</span>
+        <span class="elite-mod">${t('grandpaTrial.attemptsLeft', { n: left })}</span>
+        <span class="elite-mod">💡 +${trial.rewardHints}</span>
+      </button>`;
+    }).join('');
+    this.root.innerHTML = `<div class="screen elite-screen" data-testid="screen-grandpa-trials">
+      <div class="panel-top">
+        <button class="btn" data-testid="btn-back">${t('levels.back')}</button>
+        <h2>🧓 ${t('grandpaTrial.title')}</h2><span></span>
+      </div>
+      <p class="dialog-sub">${t('grandpaTrial.rules')}</p>
+      <div class="elite-grid">${cards}</div>
+    </div>`;
+    this.q('[data-testid=btn-back]').addEventListener('click', () => {
+      this.audio.play('click');
+      this.showEliteScreen();
+    });
+    this.root.querySelectorAll<HTMLButtonElement>('[data-grandpa-trial]').forEach((button) => {
+      button.addEventListener('click', () => {
+        this.audio.play('click');
+        this.startGrandpaTrial(button.dataset.grandpaTrial ?? '');
+      });
+    });
+    if (this.platform.isTV) this.q<HTMLElement>('[data-testid=btn-back]').focus({ preventScroll: true });
+  }
+
+  private startGrandpaTrial(id: string): void {
+    const trial = GRANDPA_TRIALS.find((entry) => entry.id === id);
+    const progress = trial ? this.store.data.grandpaTrials?.[trial.id] : undefined;
+    const challenge = trial ? eliteChallenge(trial.challengeId) : undefined;
+    if (this.currentLeagueAccess() !== 'full' || !trial || !challenge || !canPlayGrandpaTrial(progress)) {
+      this.showGrandpaTrialsScreen();
+      return;
+    }
+    this.runLevel(sourceLevel(challenge), false, undefined, false, challenge.modifier, challenge, undefined, trial);
+  }
+
   /** Зачётная попытка чемпионата: то же испытание у всех игроков недели. */
   private startWeeklyChallenge(week: string): void {
     const challenge = pickWeeklyChallenge(week);
@@ -2894,7 +3031,7 @@ export class App {
     // Дивизион мог закрыться между рендером и кликом (например, «Следующее»
     // после последнего испытания блока) — правило проверяется здесь, а не
     // только атрибутом disabled на кнопке.
-    if (!challenge || !challengeUnlocked(this.store.data.eliteMedals ?? {}, id)) {
+    if (!challenge || !this.eliteCardPlayable(id)) {
       this.showEliteScreen();
       return;
     }
@@ -2976,7 +3113,7 @@ export class App {
     const following = idx >= 0 && idx < ELITE_CHALLENGES.length - 1 ? ELITE_CHALLENGES[idx + 1] : null;
     // «Следующее» не должно перепрыгивать закрытый дивизион: медаль за это
     // испытание уже записана, поэтому проверка идёт по актуальному сейву.
-    const nextCh = following && challengeUnlocked(this.store.data.eliteMedals ?? {}, following.id) ? following : null;
+    const nextCh = following && this.eliteCardPlayable(following.id) ? following : null;
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.setAttribute('data-testid', 'elite-result');
@@ -3023,6 +3160,58 @@ export class App {
       this.showEliteScreen();
     });
     if (this.platform.isTV) overlay.querySelector<HTMLElement>('[data-testid=elite-retry]')!.focus({ preventScroll: true });
+  }
+
+  private finishGrandpaTrial(trial: GrandpaTrialDef, attempt: AttemptResult): void {
+    this.setGameplay(false);
+    this.audio.engineStop();
+    const earned = grandpaTrialMedal(trial, attempt);
+    const before = this.store.data.grandpaTrials?.[trial.id];
+    const rewardDue = grandpaTrialReward(trial, before, earned);
+    const result = this.store.recordGrandpaTrialAttempt(trial.id, earned);
+    const rewarded = rewardDue > 0 && this.store.claimGrandpaTrialReward(trial.id, rewardDue);
+    const left = Math.max(0, GRANDPA_TRIAL_ATTEMPTS - result.attempts);
+    const medal = result.next as Medal;
+    this.audio.play(earned === 3 ? 'medalGold' : earned === 2 ? 'medalSilver' : earned === 1 ? 'medalBronze' : 'thud');
+    this.vibrate(earned > 0 ? [28, 45, 28] : 14);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.setAttribute('data-testid', 'grandpa-trial-result');
+    overlay.innerHTML = `<div class="dialog elite-result-dialog">
+      <div class="elite-result-medal" data-testid="grandpa-trial-medal" data-medal="${medal}">${
+        MEDAL_ICON[medal] || '—'
+      }</div>
+      <h2>${earned > 0 ? t('grandpaTrial.resultTitle') : t('grandpaTrial.noMedal')}</h2>
+      <div class="dialog-sub">${t('grandpaTrial.attemptsLeft', { n: left })}</div>
+      ${
+        rewarded
+          ? `<div class="win-master" data-testid="grandpa-trial-reward">${t('grandpaTrial.rewarded', {
+              n: rewardDue
+            })}</div>`
+          : ''
+      }
+      ${
+        left > 0
+          ? `<button class="btn btn-primary btn-big" data-testid="grandpa-trial-retry">${t('win.again')}</button>`
+          : `<div class="win-note">${t('grandpaTrial.exhausted')}</div>`
+      }
+      <button class="btn" data-testid="grandpa-trial-back">${t('grandpaTrial.back')}</button>
+    </div>`;
+    this.q('.overlay-slot').appendChild(overlay);
+    this.wireDialog(overlay);
+    overlay.querySelector('[data-testid=grandpa-trial-retry]')?.addEventListener('click', () => {
+      this.audio.play('click');
+      this.startGrandpaTrial(trial.id);
+    });
+    overlay.querySelector('[data-testid=grandpa-trial-back]')!.addEventListener('click', () => {
+      this.audio.play('click');
+      this.showGrandpaTrialsScreen();
+    });
+    if (this.platform.isTV)
+      overlay.querySelector<HTMLElement>('[data-testid=grandpa-trial-retry], [data-testid=grandpa-trial-back]')?.focus({
+        preventScroll: true
+      });
   }
 
   private async shareText(text: string, button: HTMLButtonElement, doneLabel: string): Promise<void> {

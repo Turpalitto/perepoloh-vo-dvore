@@ -112,6 +112,32 @@ export function endlessAccess(levels: LevelDef[], save: SaveData): EndlessAccess
   return 'hidden';
 }
 
+/**
+ * Доступ к «Высшей лиге». Первый дивизион становится видимым до финала,
+ * чтобы игрок успел познакомиться с главным replay-режимом, но недельный
+ * чемпионат и дивизионы 2+ остаются наградой за завершение кампании.
+ */
+export const LEAGUE_TEASER_AT = 50;
+export const LEAGUE_PREVIEW_AT = 65;
+export const LEAGUE_PREVIEW_DIVISIONS = 1;
+
+export type LeagueAccess = 'hidden' | 'teaser' | 'preview' | 'full';
+
+export function leagueAccess(levels: LevelDef[], save: SaveData): LeagueAccess {
+  if (save.campaignDone === true) return 'full';
+  if (isPositionCleared(levels, save, LEAGUE_PREVIEW_AT)) return 'preview';
+  if (isPositionCleared(levels, save, LEAGUE_TEASER_AT)) return 'teaser';
+  return 'hidden';
+}
+
+/** Число дивизионов, разрешённых текущей стадией доступа. */
+export function maxLeagueDivision(access: LeagueAccess, totalDivisions: number): number {
+  const total = Math.max(0, Math.floor(totalDivisions));
+  if (access === 'full') return total;
+  if (access === 'preview') return Math.min(LEAGUE_PREVIEW_DIVISIONS, total);
+  return 0;
+}
+
 /** Следующий незавершённый уровень для кнопки «Играть». */
 export function nextLevelToPlay(levels: LevelDef[], save: SaveData): LevelDef {
   for (const l of levels) {

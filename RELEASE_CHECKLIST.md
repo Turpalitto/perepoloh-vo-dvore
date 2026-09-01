@@ -15,21 +15,21 @@
 
 ```bash
 npm ci
-npm run typecheck
-npm test
-npm run solve
-npm run e2e
-npm run build
-npm run verify:dist
+npm run check:release
 ```
 
 - В ZIP лежит содержимое `dist/`, а `index.html` находится в корне.
 - В production-бандле отсутствуют `mock-ad`, `Тестовая реклама`, `sdk.games.s3.yandex.net` и параметр `?mock=1`.
 - Для mobile загрузить `screenshots/mobile-game.png` и `screenshots/mobile-boss.png` (720×1280), для desktop — `desktop-game.png` и `desktop-boss.png` (1280×720).
 - Проверить предпросмотр Яндекса: первый запуск, авторизованный/гостевой игрок, офлайн, мобильный portrait/landscape.
+- На реальном iPhone/iPad в Safari проверить первый запуск, touch-drag, смену ориентации, safe-area и возврат из рекламы.
+- На слабом Android проверить загрузку, плавность SVG-поля, звук после background/foreground и отсутствие перезагрузки вкладки на длинной сессии.
 - На реальном Android TV пройти уровень только пультом: стрелки, OK, Back, подтверждение EXIT; проверить `deviceInfo.type=tv` и fullscreen.
-- Проверить LoadingAPI, GameplayAPI, стартовую паузу, fullscreen/rewarded и восстановление звука.
+- В черновике Яндекс Игр с реальным SDK проверить LoadingAPI, GameplayAPI, стартовую паузу, fullscreen/rewarded и восстановление звука; убедиться, что `YaGames` не подменён mock-платформой.
 - Проверить язык платформы на чистом профиле, облачное слияние сейва, review после уровня 5.
+- Проверить сохранение/возобновление в кампании после закрытия вкладки; для лиги, daily и Испытаний деда промежуточный ход не должен восстанавливаться.
+- Проверить поведение при заполненной/запрещённой localStorage: игра запускается, показывает безопасный fallback и не теряет управление.
+- Системной датой или e2e-фикстурой проверить границы сезонов, 31 декабря/1 января и 28 февраля/1 марта: подарок, daily и сезонный бонус не удваиваются.
 - Пройти daily, убедиться в записи `dailystreak`; завершить обычный уровень — проверить `yardstars`.
 
 ## После запуска

@@ -2386,6 +2386,18 @@ html[data-daytime='night'] .yard-lamp-light {
   .hud-left {
     gap: 4px;
   }
+  /* Метрики системного шрифта на Linux чуть шире macOS. Правый блок не должен
+     выталкивать цель за HUD на 320px, даже если заголовок уже сжат до нуля. */
+  .hud-right {
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .hud-moves {
+    padding: 6px 7px;
+  }
+  .hud-star {
+    font-size: 22px;
+  }
   /* Только в этом ряду: 44px — общий минимум тач-зоны, но «босс + звезда» на
      320px не влезает даже без слова «ходы» и с сжатым чипом. 40px — всё ещё
      уверенно нажимается, и это единственный оставшийся резерв ширины. */
@@ -2402,11 +2414,7 @@ html[data-daytime='night'] .yard-lamp-light {
     display: none;
   }
   .boss-phase-chip ~ .hud-right .hud-moves {
-    padding: 6px 7px;
     font-size: 10px;
-  }
-  .boss-phase-chip ~ .hud-right .hud-star {
-    font-size: 22px;
   }
   .leaderboard-content {
     grid-template-columns: 1fr;

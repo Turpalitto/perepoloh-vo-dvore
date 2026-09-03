@@ -26,7 +26,7 @@ export default defineConfig({
       'tests/fixtures/**',
       'tests/levels-solver-*.test.ts',
       'tests/elite.test.ts',
-      'tests/endless.test.ts',
+      'tests/endless*.test.ts',
       'tests/boss.test.ts',
       'tests/ice.test.ts'
     ],

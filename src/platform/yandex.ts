@@ -7,10 +7,9 @@ import type { AnalyticsTracker, GameAnalyticsEvent } from '../game/analytics';
 import { noopTracker } from '../game/analytics';
 import type { SaveData } from '../game/save';
 import { mergeSave, sanitizeSave } from '../game/save';
+import { readLocalSave, writeLocalSave } from './local-store';
 import { DEFAULT_PLATFORM_CONFIG } from './types';
 import type { AdHandlers, LeaderboardName, LeaderboardSnapshot, Platform, PlatformConfig } from './types';
-
-const STORAGE_KEY = 'parkovka.save.v1';
 
 /**
  * Счётчик Яндекс Метрики — единственный поддерживаемый приёмник воронки на
@@ -434,15 +433,8 @@ export function createYandexPlatform(): Platform {
     },
 
     async loadData(): Promise<SaveData | null> {
-      let local: SaveData | null = null;
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        try {
-          local = sanitizeSave(JSON.parse(raw));
-        } catch {
-          local = null;
-        }
-      }
+      // Чтение с восстановлением из резервной копии — см. `local-store.ts`.
+      const local: SaveData | null = readLocalSave();
       if (player) {
         try {
           const cloud = sanitizeSave((await player.getData(['save']))['save']);
@@ -459,7 +451,12 @@ export function createYandexPlatform(): Platform {
     },
 
     async saveData(data: SaveData): Promise<void> {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      // Локальная запись не бросает (см. `writeLocalSave`). Это принципиально:
+      // раньше исключение `localStorage.setItem` в приватном режиме Safari или
+      // при полной квоте уходило ДО `player.setData`, и авторизованный игрок
+      // терял облачный сейв при полностью исправном облаке. Два хранилища
+      // независимы, отказ одного не отменяет второе.
+      writeLocalSave(data);
       if (player) {
         try {
           await player.setData({ save: data }, true);

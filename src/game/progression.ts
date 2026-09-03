@@ -38,6 +38,25 @@ export function nextUpgrade(total: number): UpgradeStage | null {
   return UPGRADES.find((u) => u.stars > total) ?? null;
 }
 
+/**
+ * Прогресс до следующего улучшения двора для экрана результата.
+ * Возвращает уже открытый порог (prev), целевой порог (next) и накопленные
+ * звёзды в границах `[prev, next]`, чтобы проценты можно было посчитать
+ * локально. `null`, если все улучшения уже открыты.
+ */
+export function upgradeProgress(
+  total: number
+): { key: string; current: number; target: number } | null {
+  const next = nextUpgrade(total);
+  if (!next) return null;
+  let prev = 0;
+  for (const u of UPGRADES) {
+    if (u.stars <= total) prev = u.stars;
+    else break;
+  }
+  return { key: next.key, current: total - prev, target: next.stars - prev };
+}
+
 /** Улучшения, открывшиеся при росте суммы звёзд с before до after. */
 export function newlyUnlocked(before: number, after: number): UpgradeStage[] {
   return UPGRADES.filter((u) => u.stars > before && u.stars <= after);
@@ -110,6 +129,32 @@ export function endlessAccess(levels: LevelDef[], save: SaveData): EndlessAccess
   if (isPositionCleared(levels, save, ENDLESS_UNLOCK_AT)) return 'open';
   if (isPositionCleared(levels, save, ENDLESS_TEASER_AT)) return 'teaser';
   return 'hidden';
+}
+
+/**
+ * Доступ к «Высшей лиге». Первый дивизион становится видимым до финала,
+ * чтобы игрок успел познакомиться с главным replay-режимом, но недельный
+ * чемпионат и дивизионы 2+ остаются наградой за завершение кампании.
+ */
+export const LEAGUE_TEASER_AT = 50;
+export const LEAGUE_PREVIEW_AT = 65;
+export const LEAGUE_PREVIEW_DIVISIONS = 1;
+
+export type LeagueAccess = 'hidden' | 'teaser' | 'preview' | 'full';
+
+export function leagueAccess(levels: LevelDef[], save: SaveData): LeagueAccess {
+  if (save.campaignDone === true) return 'full';
+  if (isPositionCleared(levels, save, LEAGUE_PREVIEW_AT)) return 'preview';
+  if (isPositionCleared(levels, save, LEAGUE_TEASER_AT)) return 'teaser';
+  return 'hidden';
+}
+
+/** Число дивизионов, разрешённых текущей стадией доступа. */
+export function maxLeagueDivision(access: LeagueAccess, totalDivisions: number): number {
+  const total = Math.max(0, Math.floor(totalDivisions));
+  if (access === 'full') return total;
+  if (access === 'preview') return Math.min(LEAGUE_PREVIEW_DIVISIONS, total);
+  return 0;
 }
 
 /** Следующий незавершённый уровень для кнопки «Играть». */

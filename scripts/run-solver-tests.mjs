@@ -37,7 +37,13 @@ const testsDir = path.join(root, 'tests');
 // Тот же список, что в vitest.solver.config.ts (include), но развёрнутый в
 // конкретные файлы — единственный источник правды на списки уровней остаётся
 // tests/solver-shards.ts, здесь только имена файлов.
-const solverPatterns = [/^levels-solver-\d+\.test\.ts$/, /^elite\.test\.ts$/, /^endless\.test\.ts$/, /^boss\.test\.ts$/, /^ice\.test\.ts$/];
+const solverPatterns = [
+  /^levels-solver-\d+\.test\.ts$/,
+  /^elite\.test\.ts$/,
+  /^endless(?:-[a-z0-9-]+)?\.test\.ts$/,
+  /^boss\.test\.ts$/,
+  /^ice\.test\.ts$/
+];
 
 const files = readdirSync(testsDir)
   .filter((name) => solverPatterns.some((re) => re.test(name)))

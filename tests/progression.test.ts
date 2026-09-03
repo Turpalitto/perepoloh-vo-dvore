@@ -4,10 +4,15 @@ import type { LevelDef } from '../src/core/types';
 import {
   ENDLESS_TEASER_AT,
   ENDLESS_UNLOCK_AT,
+  LEAGUE_PREVIEW_AT,
+  LEAGUE_PREVIEW_DIVISIONS,
+  LEAGUE_TEASER_AT,
   campaignNumber,
   completedCampaignLevels,
   endlessAccess,
   isLevelUnlocked,
+  leagueAccess,
+  maxLeagueDivision,
   nextLevelToPlay,
   unlockedUpgrades,
   yardMilestone
@@ -88,6 +93,51 @@ describe('доступ к «Бесконечному двору»', () => {
       stars: Object.fromEntries(withInsert.slice(0, ENDLESS_UNLOCK_AT).map((l) => [String(l.id), 3]))
     };
     expect(endlessAccess(withInsert, save)).toBe('open');
+  });
+});
+
+describe('доступ к «Высшей лиге»', () => {
+  const clearedUpTo = (count: number) => ({
+    ...defaultSave(),
+    stars: Object.fromEntries(levels.slice(0, count).map((level) => [String(level.id), 3]))
+  });
+
+  it('скрыта до первого порога', () => {
+    expect(leagueAccess(levels, defaultSave())).toBe('hidden');
+    expect(leagueAccess(levels, clearedUpTo(LEAGUE_TEASER_AT - 1))).toBe('hidden');
+  });
+
+  it('показывает тизер до предпросмотра', () => {
+    expect(leagueAccess(levels, clearedUpTo(LEAGUE_TEASER_AT))).toBe('teaser');
+    expect(leagueAccess(levels, clearedUpTo(LEAGUE_PREVIEW_AT - 1))).toBe('teaser');
+  });
+
+  it('открывает предпросмотр первого дивизиона', () => {
+    expect(leagueAccess(levels, clearedUpTo(LEAGUE_PREVIEW_AT))).toBe('preview');
+    expect(maxLeagueDivision('preview', 5)).toBe(LEAGUE_PREVIEW_DIVISIONS);
+  });
+
+  it('campaignDone сохраняет полный доступ даже у разреженного сейва', () => {
+    expect(leagueAccess(levels, { ...defaultSave(), campaignDone: true })).toBe('full');
+    expect(maxLeagueDivision('full', 5)).toBe(5);
+  });
+
+  it('пороги считаются по позиции и идут после Endless', () => {
+    const withInsert = [...levels.slice(0, 5), { ...levels[0], id: 9002 }, ...levels.slice(5)];
+    const save = {
+      ...defaultSave(),
+      stars: Object.fromEntries(withInsert.slice(0, LEAGUE_PREVIEW_AT).map((level) => [String(level.id), 3]))
+    };
+    expect(leagueAccess(withInsert, save)).toBe('preview');
+    expect(LEAGUE_TEASER_AT).toBeGreaterThanOrEqual(ENDLESS_UNLOCK_AT);
+    expect(LEAGUE_PREVIEW_AT).toBeGreaterThan(LEAGUE_TEASER_AT);
+  });
+
+  it('не возвращает отрицательные или лишние дивизионы', () => {
+    expect(maxLeagueDivision('hidden', 5)).toBe(0);
+    expect(maxLeagueDivision('teaser', 5)).toBe(0);
+    expect(maxLeagueDivision('preview', 0)).toBe(0);
+    expect(maxLeagueDivision('preview', 1)).toBe(1);
   });
 });
 

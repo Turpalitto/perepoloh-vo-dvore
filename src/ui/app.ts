@@ -53,6 +53,7 @@ import {
   nextLevelToPlay,
   nextUpgrade,
   unlockedUpgrades,
+  upgradeProgress,
   yardMilestone
 } from '../game/progression';
 import { SaveStore, totalStars } from '../game/save';
@@ -119,6 +120,7 @@ import { SettingsToggles } from './toggles';
 import { TVNavigator } from './tv-navigation';
 import { pickWeeklyChallenge, weeklyScore } from '../game/elite-weekly';
 import { wireDialog, type DialogOptions } from './dialog';
+import { iconImg } from './icons';
 
 import { endlessSparkline } from './sparkline';
 
@@ -196,8 +198,8 @@ function eliteGoalRows(challenge: EliteChallenge): Array<{ medal: Medal; text: s
 
 const pauseIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="currentColor"/></svg>`;
 const backIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><path d="M14 5 L7 12 L14 19 M7.5 12 H20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const contrastIcon = `<svg viewBox="0 0 24 24" width="26" height="26"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 3 a9 9 0 0 1 0 18 Z" fill="currentColor"/></svg>`;
-const settingsIcon = `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5 7 7M17 17l1.5 1.5M18.5 5.5 17 7M7 17l-1.5 1.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="7.1" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
+const contrastIcon = iconImg('contrast');
+const settingsIcon = iconImg('settings');
 
 function starIcons(n: number, of = 3): string {
   let s = '';
@@ -548,7 +550,7 @@ export class App {
 
   private liveYardToggleHtml(testid: string): string {
     const on = this.store.liveYardEnabled();
-    return `<button class="icon-btn liveyard-toggle${on ? ' active' : ''}" data-testid="${testid}" aria-pressed="${on}" aria-label="${t('audio.liveYard')}">🧑‍🌾</button>`;
+    return `<button class="icon-btn liveyard-toggle${on ? ' active' : ''}" data-testid="${testid}" aria-pressed="${on}" aria-label="${t('audio.liveYard')}">${iconImg('person')}</button>`;
   }
 
   private wireLiveYardToggle(el: HTMLElement): void {
@@ -705,7 +707,7 @@ export class App {
         <div class="yard-bg">${yardSVG(unlockedUpgrades(total), trophies, season?.id, yardStage, this.store.data.endlessBest ?? 0)}</div>
         <div class="menu-hud">
           <span class="hud-chip stars-total" data-testid="stars-total">★ ${total} / ${max}</span>
-          <span class="hud-chip hud-hints" data-testid="menu-hint-tokens">💡 ${this.store.data.hintTokens ?? 0}</span>
+          <span class="hud-chip hud-hints" data-testid="menu-hint-tokens">${iconImg('lightbulb')}<span><small>${t('menu.hints')}</small>${this.store.data.hintTokens ?? 0}</span></span>
         </div>
         <div class="menu-ui">
           <div class="menu-hero">
@@ -774,8 +776,8 @@ export class App {
             <div class="menu-events" data-testid="menu-events" aria-label="${t('menu.events')}">
               <div class="event-cards">
                 <button class="event-card btn-daily" data-testid="menu-daily">
-                  <span class="event-card-title">🔥 ${t('daily.button')}${
-                    dailyModifier(dailyKey) !== 'none' ? ' 🎯' : ''
+                  <span class="event-card-title">${iconImg('fire')}<span>${t('daily.button')}</span>${
+                    dailyModifier(dailyKey) !== 'none' ? iconImg('target') : ''
                   }</span>
                   <small class="event-card-sub" data-testid="weekly-progress">${
                     isDoneToday(this.store.data.daily, new Date(`${dailyKey}T12:00:00`))
@@ -787,7 +789,7 @@ export class App {
                 </button>
                 <button class="event-card gift-btn" data-testid="menu-gift" ${giftClaimed ? 'disabled' : ''}>
                   <span class="event-card-title">${
-                    giftClaimed ? `💡 ${t('gift.tokens')}` : `🎁 ${t('gift.claim', { n: giftAmount })}`
+                    giftClaimed ? `${iconImg('lightbulb')}${t('gift.tokens')}` : `${iconImg('gift')}${t('gift.claim', { n: giftAmount })}`
                   }</span>
                   <small class="event-card-sub">${
                     giftClaimed
@@ -799,16 +801,16 @@ export class App {
               <div class="menu-meta-row">
                 <button class="btn" data-testid="menu-leaderboard" aria-label="${t(
                   'menu.leaderboard'
-                )}" title="${t('menu.leaderboard')}">🏆</button>
+                )}" title="${t('menu.leaderboard')}">${iconImg('trophy')}<span>${t('menu.leaderboard')}</span></button>
                 <button class="btn" data-testid="menu-achievements" aria-label="${t(
                   'achievements.title'
-                )}">🏅 ${achievementCount}/${ACHIEVEMENTS.length}</button>
+                )}">${iconImg('medal')}<span>${t('achievements.title')}<small>${achievementCount}/${ACHIEVEMENTS.length}</small></span></button>
                 <button class="btn${weeklyQuests.some((q) => q.done && !q.claimed) ? ' has-ready' : ''}" data-testid="menu-weekly" aria-label="${t(
                   'weekly.title'
-                )}">🎯 ${weeklyQuests.filter((q) => q.claimed).length}/${weeklyQuests.length}</button>
+                )}">${iconImg('target')}<span>${t('weekly.title')}<small>${weeklyQuests.filter((q) => q.claimed).length}/${weeklyQuests.length}</small></span></button>
                 <button class="btn" data-testid="menu-garage" aria-label="${t('menu.garage')}" title="${t(
                   'menu.garage'
-                )}">🚗 ${unlockedSkinCount}/${TARGET_SKINS.length}</button>
+                )}">${iconImg('car')}<span>${t('menu.garage')}<small>${unlockedSkinCount}/${TARGET_SKINS.length}</small></span></button>
               </div>
             </div>
           </div>
@@ -826,11 +828,11 @@ export class App {
             ${this.settingsItem(
               `<button class="icon-btn lang-toggle" data-testid="lang-toggle" aria-label="${t(
                 'settings.language'
-              )}">🌐<span class="lang-code">${getLang().toUpperCase()}</span></button>`,
+              )}">${iconImg('globe')}<span class="lang-code">${getLang().toUpperCase()}</span></button>`,
               t('settings.language')
             )}
             ${this.settingsItem(
-              `<button class="icon-btn" data-testid="menu-rules" aria-label="${t('rules.title')}">📖</button>`,
+              `<button class="icon-btn" data-testid="menu-rules" aria-label="${t('rules.title')}">${iconImg('book')}</button>`,
               t('menu.rules')
             )}
           </div>
@@ -2298,6 +2300,12 @@ export class App {
     this.onboardingHandEl = null;
   }
 
+  /** Убирает плавающие обучающие элементы перед показом финала победы. */
+  private clearTransientGameElements(): void {
+    this.q('.overlay-slot')?.querySelectorAll('.hint-toast, .go-popup')?.forEach((el) => el.remove());
+    this.hideOnboardingHand();
+  }
+
   /** Собранная звезда улетает с поля в HUD. */
   private flyStarToHud(): void {
     const from = this.root.querySelector('[data-testid=star]')?.getBoundingClientRect();
@@ -2386,6 +2394,11 @@ export class App {
       this.finishEndless(level, endState);
       return;
     }
+    // Победа перекрывает всё поле: убираем обучающие/служебные плавающие
+    // элементы (hint-toast, «GO!», онбординг-рука), иначе они ложатся поверх
+    // диалога результата и перекрывают награды. Удаляем только эти элементы —
+    // контент `.overlay-slot` не трогаем, он строится заново ниже.
+    this.clearTransientGameElements();
     this.setGameplay(false);
     this.audio.engineStop();
     this.vibrate([28, 45, 28]);
@@ -2541,6 +2554,34 @@ export class App {
       )
       .join('');
     const confettiCount = justMastered ? 44 : level.width > 6 ? 34 : 20;
+    // Экран результата: номер уровня, личный рекорд ходов, прогресс до
+    // следующего улучшения двора. Всё — деривация от уже обновлённого сейва,
+    // начисление наград идёт выше, повторный клик ничего не удваивает.
+    const totalNow = totalStars(this.store.data);
+    const best = !daily ? this.store.bestMovesOf(level.id) : undefined;
+    const upNext = !daily ? upgradeProgress(totalNow) : null;
+    const levelName = levelText('name', level.name) ?? level.name;
+    const levelKicker =
+      !daily && campaignPos > 0
+        ? `<div class="win-kicker" data-testid="win-level">${escapeHTML(t('win.levelNum', { n: campaignPos }))} — ${escapeHTML(levelName)}</div>`
+        : '';
+    const bestRow =
+      best !== undefined && best > 0
+        ? `<div class="win-best" data-testid="win-best">${escapeHTML(t('win.bestMoves', { moves: best }))}</div>`
+        : '';
+    let upgradeRow = '';
+    if (upNext && upNext.target > 0) {
+      const pct = Math.min(100, (upNext.current / upNext.target) * 100);
+      upgradeRow = `
+        <div class="win-upgrade-progress" data-testid="win-upgrade-progress" role="progressbar" aria-valuenow="${upNext.current}" aria-valuemin="0" aria-valuemax="${upNext.target}" aria-label="${escapeHTML(t('win.upgradeNext'))}: ${upNext.current} / ${upNext.target}">
+          <div class="win-upgrade-row">
+            <span class="win-upgrade-label">${escapeHTML(t('win.upgradeNext'))}</span>
+            <span class="win-upgrade-stars" aria-hidden="true">★ ${upNext.current} / ${upNext.target}</span>
+          </div>
+          <div class="win-upgrade-bar"><div class="win-upgrade-fill" style="--upgrade-pct:${pct}%"></div></div>
+        </div>`;
+    }
+    const extra = levelKicker || bestRow || upgradeRow ? `<div class="win-extra">${levelKicker}${bestRow}${upgradeRow}</div>` : '';
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.setAttribute('data-testid', 'win-overlay');
@@ -2552,6 +2593,7 @@ export class App {
         <div class="dialog-sub">${t('win.stats', { moves: endState.moves, par: level.par })}${
           endState.moves <= level.par ? t('win.perfect') : ''
         }</div>
+        ${extra}
         ${(() => {
           const rewardNotes = [starNote, masterNote, parPerfectNote, yardStageNote, chapterNote, letterNote, eliteReplayNote, dailyNote, upgradeNote, skinNote, achievementNote].join('');
           return rewardNotes ? `<div class="win-rewards" data-testid="win-rewards">${rewardNotes}</div>` : '';

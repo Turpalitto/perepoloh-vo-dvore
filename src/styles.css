@@ -4,12 +4,18 @@
   --dirt: #dbb271;
   --wood: #a9743f;
   --wood-dark: #7d5227;
-  --cream: #fff7e6;
-  --ink: #3d2c1e;
-  --accent: #e2574c;
+  --app-bg: #f3ebdd;
+  --surface-muted: #f5ead8;
+  --border: #d8c5a8;
+  --cream: #fff9ee;
+  --ink: #24352f;
+  --ink-muted: #6d7b74;
+  --accent: #e94b3c;
   /* Тот же красный, затемнённый до контраста ≥4.5:1 с --cream (WCAG AA):
      фон для текстовых кнопок .btn-primary. Декоративный --accent не трогаем. */
   --accent-strong: #c8433a;
+  --accent-deep: #a9342f;
+  --success: #3d7e3c;
   --blue: #3f7fd1;
   --sun: #f6c445;
   --sticky-banner-height: 0px;
@@ -28,7 +34,7 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
   background: var(--grass);
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--ink);
   user-select: none;
   -webkit-user-select: none;
@@ -81,7 +87,7 @@ body.sticky-banner-bottom .overlay-slot {
   min-height: 44px;
   padding: 12px 20px;
   cursor: pointer;
-  box-shadow: 0 4px 0 rgba(61, 44, 30, 0.35);
+  box-shadow: 0 3px 0 rgba(93, 64, 25, 0.32);
   transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.2s;
   touch-action: manipulation;
 }
@@ -96,6 +102,9 @@ body.sticky-banner-bottom .overlay-slot {
 .btn-primary {
   background: var(--accent-strong);
   color: var(--cream);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-deep);
 }
 .btn-big {
   font-size: 21px;
@@ -115,8 +124,16 @@ body.sticky-banner-bottom .overlay-slot {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 0 rgba(61, 44, 30, 0.35);
+  border: 1px solid var(--border);
+  box-shadow: 0 3px 0 rgba(93, 64, 25, 0.24);
   transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.ui-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  pointer-events: none;
 }
 .icon-btn:active {
   transform: translateY(3px);
@@ -305,13 +322,44 @@ html.high-contrast .levels-grid {
   pointer-events: none;
 }
 .hud-chip {
-  background: rgba(61, 44, 30, 0.62);
-  color: var(--cream);
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 249, 238, 0.94);
+  color: var(--ink);
   font-weight: 800;
   font-size: 14px;
-  padding: 7px 13px;
-  border-radius: 13px;
-  backdrop-filter: blur(2px);
+  padding: 7px 12px;
+  border: 1px solid rgba(216, 197, 168, 0.82);
+  border-radius: 14px;
+  box-shadow: 0 3px 0 rgba(93, 64, 25, 0.2);
+}
+.hud-chip > span:last-child {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+.hud-chip.stars-total {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.05;
+}
+.hud-chip small {
+  order: -1;
+  margin-bottom: 3px;
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+.hud-chip .ui-icon,
+.resource-mark {
+  width: 20px;
+  color: var(--sun);
+  font-size: 21px;
+  text-align: center;
 }
 /*
  * Заголовок стоит на градиентном скриме, а не прямо на арте: иначе светлая
@@ -355,7 +403,7 @@ html.high-contrast .levels-grid {
   text-shadow:
     0 4px 0 rgba(61, 44, 30, 0.55),
     0 8px 18px rgba(61, 44, 30, 0.35);
-  letter-spacing: 0.5px;
+  letter-spacing: -0.02em;
   transform: rotate(-2deg);
 }
 /*
@@ -406,7 +454,7 @@ html.high-contrast .levels-grid {
   display: block;
   height: 100%;
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--sun), #e2574c);
+  background: var(--success);
   transition: width 0.5s ease;
 }
 /* Карточки событий: две равные плитки, как в макете. */
@@ -427,7 +475,8 @@ html.high-contrast .levels-grid {
   min-width: 0;
   padding: 9px 11px;
   border-radius: 14px;
-  background: rgba(61, 44, 30, 0.07);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
   color: var(--ink);
   font-family: inherit;
   text-align: left;
@@ -438,12 +487,19 @@ html.high-contrast .levels-grid {
   cursor: default;
 }
 .event-card-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-weight: 800;
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+.event-card-title .ui-icon {
+  width: 18px;
+  height: 18px;
 }
 .event-card-sub {
   font-size: 11px;
@@ -512,9 +568,11 @@ html.high-contrast .levels-grid {
 .menu-meta-row {
   display: grid;
   align-items: stretch;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
 }
 .menu-meta-row > * {
   display: flex;
@@ -532,9 +590,41 @@ html.high-contrast .levels-grid {
   opacity: 0.9;
 }
 .menu-meta-row .btn {
-  padding: 9px 4px;
-  font-size: 14px;
+  min-height: 56px;
+  padding: 6px 3px;
+  border-radius: 12px;
+  box-shadow: none;
+  flex-direction: column;
+  gap: 3px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 10px;
+  line-height: 1.05;
   white-space: nowrap;
+}
+.menu-meta-row .btn:hover:not(:disabled),
+.menu-meta-row .btn:focus-visible {
+  background: var(--surface-muted);
+  color: var(--accent-strong);
+}
+.menu-meta-row .btn .ui-icon {
+  width: 21px;
+  height: 21px;
+}
+.menu-meta-row .btn > span {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.menu-meta-row .btn small {
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
 }
 .weekly-quests-list {
   display: flex;
@@ -868,9 +958,7 @@ html.high-contrast .levels-grid {
 /* ---------- выбор уровня ---------- */
 
 .levels-screen {
-  background:
-    radial-gradient(circle at 20% 10%, rgba(255, 247, 230, 0.14), transparent 45%),
-    var(--grass);
+  background: var(--grass);
   gap: 10px;
 }
 .panel-top {
@@ -882,14 +970,14 @@ html.high-contrast .levels-grid {
 }
 .panel-top h2 {
   margin: 0;
-  color: var(--cream);
+  color: var(--ink);
   font-size: 26px;
   font-weight: 900;
-  text-shadow: 0 3px 0 rgba(61, 44, 30, 0.4);
+  text-shadow: none;
 }
 .panel-top .stars-total {
-  background: rgba(61, 44, 30, 0.55);
-  color: var(--sun);
+  background: var(--cream);
+  color: var(--ink);
   font-weight: 800;
   border-radius: 12px;
   padding: 8px 14px;
@@ -917,26 +1005,26 @@ html.high-contrast .levels-grid {
 }
 .chapter-header {
   grid-column: 1 / -1;
-  color: var(--cream);
+  color: var(--ink);
   font-size: 17px;
   font-weight: 900;
-  text-shadow: 0 2px 0 rgba(61, 44, 30, 0.4);
+  text-shadow: none;
   padding: 10px 4px 0;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
 }
 .chapter-header small {
-  color: var(--sun);
+  color: var(--ink);
   font-size: 13px;
 }
 .chapter-tip {
   grid-column: 1 / -1;
-  color: var(--cream);
+  color: var(--ink);
   font-size: 12px;
   font-style: italic;
-  opacity: 0.92;
-  text-shadow: 0 1px 0 rgba(61, 44, 30, 0.35);
+  opacity: 1;
+  text-shadow: none;
   padding: 2px 6px 8px;
 }
 .level-card.current {
@@ -1026,9 +1114,7 @@ html.high-contrast .levels-grid {
 }
 
 .game-screen {
-  background:
-    radial-gradient(circle at 80% 0%, rgba(255, 247, 230, 0.12), transparent 40%),
-    var(--grass);
+  background: var(--grass);
 }
 .hud {
   display: flex;
@@ -1230,7 +1316,8 @@ html.high-contrast .levels-grid {
 .piece.held .mid {
   transform: scale(1.05);
 }
-.piece.tv-selected .mid {
+.piece.tv-selected .mid,
+.piece.selected .mid {
   filter: drop-shadow(0 0 7px #fff7e6) drop-shadow(0 0 12px #f6c445);
 }
 .piece.tv-active .mid {
@@ -1800,6 +1887,65 @@ html.high-contrast .levels-grid {
   font-size: 15px;
   text-align: center;
 }
+/* Экран результата: номер уровня, рекорд ходов, прогресс до улучшения двора. */
+.win-extra {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+.win-kicker {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent-deep);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.win-best {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  opacity: 0.85;
+}
+.win-upgrade-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 12px;
+  background: #eaf6df;
+  border: 2px solid #a3cc84;
+  border-radius: 12px;
+}
+.win-upgrade-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.win-upgrade-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #3f7a2b;
+}
+.win-upgrade-stars {
+  font-size: 12px;
+  font-weight: 800;
+  color: #3f7a2b;
+  white-space: nowrap;
+}
+.win-upgrade-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: #cde7bd;
+  overflow: hidden;
+}
+.win-upgrade-fill {
+  height: 100%;
+  width: var(--upgrade-pct, 0%);
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7fae5c, #3f7a2b);
+  transition: width 0.5s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
 
 /* ---------- уведомление о SDK-fallback ---------- */
 
@@ -2196,6 +2342,19 @@ html[data-daytime='night'] .yard-lamp-light {
 @media (prefers-reduced-motion: reduce) {
   .win-rewards > * {
     animation: none;
+  }
+  .win-upgrade-fill {
+    transition: none;
+  }
+}
+/* Маленький / невысокий экран: ужимаем награды и звёзды, чтобы основной CTA
+   (Дальше/Меню) оставался видимым без прокрутки. */
+@media (max-height: 700px) {
+  .win-rewards {
+    max-height: min(26vh, 170px);
+  }
+  .win-stars .star {
+    font-size: 44px;
   }
 }
 

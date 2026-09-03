@@ -906,6 +906,9 @@ export class BoardView {
   private updateTVSelection(): void {
     this.pieceEls.forEach((element, index) => {
       const selected = index === this.selectedPiece && !this.state.pieces[index].gone;
+      // `selected` — постоянная подсветка выбранной машины: срабатывает и по
+      // мыши/касанию, и по клавиатуре (не только TV-навигация).
+      element.classList.toggle('selected', selected);
       element.classList.toggle('tv-selected', selected);
       if (selected) element.setAttribute('aria-current', 'true');
       else element.removeAttribute('aria-current');

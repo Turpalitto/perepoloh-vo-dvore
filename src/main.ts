@@ -1,4 +1,8 @@
 import './polyfills';
+import '@fontsource/nunito/600.css';
+import '@fontsource/nunito/700.css';
+import '@fontsource/nunito/800.css';
+import '@fontsource/nunito/900.css';
 import './styles.css';
 import { createDebugTracker, setAnalyticsTracker, track } from './game/analytics';
 import { GameAudio } from './game/audio';

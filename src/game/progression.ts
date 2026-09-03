@@ -38,6 +38,25 @@ export function nextUpgrade(total: number): UpgradeStage | null {
   return UPGRADES.find((u) => u.stars > total) ?? null;
 }
 
+/**
+ * Прогресс до следующего улучшения двора для экрана результата.
+ * Возвращает уже открытый порог (prev), целевой порог (next) и накопленные
+ * звёзды в границах `[prev, next]`, чтобы проценты можно было посчитать
+ * локально. `null`, если все улучшения уже открыты.
+ */
+export function upgradeProgress(
+  total: number
+): { key: string; current: number; target: number } | null {
+  const next = nextUpgrade(total);
+  if (!next) return null;
+  let prev = 0;
+  for (const u of UPGRADES) {
+    if (u.stars <= total) prev = u.stars;
+    else break;
+  }
+  return { key: next.key, current: total - prev, target: next.stars - prev };
+}
+
 /** Улучшения, открывшиеся при росте суммы звёзд с before до after. */
 export function newlyUnlocked(before: number, after: number): UpgradeStage[] {
   return UPGRADES.filter((u) => u.stars > before && u.stars <= after);
